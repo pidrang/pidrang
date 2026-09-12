@@ -28,15 +28,31 @@ pidrang/
 
 ## Quick start
 
-...
+```
+pnpm install
+pnpm exec nx test core
+pnpm exec nx build core
+```
 
 ## Architecture
 
-...
+`@pidrang/core` is framework-native (Angular) but UI-agnostic: it depends on `@angular/core` only, never on a component library. Everything else builds on top of it:
+
+- `Resource`, `DataProvider`, `ListParams`/`ListResult<T>`, `GetOneParams`/`CreateParams<T>`/`UpdateParams<T>`/`DeleteParams`
+- `providePidrang({ dataProvider, resources })` for app-wide configuration
+- `injectDataProvider()`, `injectResources()`, `injectResource(name)` for reading that configuration
+- `injectResourceList<T>(resourceName, params?)`, a signal-based list loader built on Angular's native `resource()`
+
+`@pidrang/supabase` will implement `DataProvider` against `@supabase/supabase-js`; UI packages (`@pidrang/material`, later `primeng`/`tailwind`) will consume core's reactive primitives without knowing which `DataProvider` is wired in.
 
 ## Roadmap
 
-...
+1. ~~`@pidrang/core` contracts~~ — done
+2. `@pidrang/supabase` `DataProvider` implementation
+3. `apps/demo` — Users/Products/Orders CRUD, wired to core + supabase
+4. `@pidrang/material` — first UI layer
+5. `@pidrang/cli` — table → `Resource` → CRUD scaffolding
+6. Later: `primeng`, `tailwind`, `rest`, `graphql` packages, without changing core
 
 ## Contributing
 
