@@ -43,12 +43,12 @@ pnpm exec nx build core
 - `injectDataProvider()`, `injectResources()`, `injectResource(name)` for reading that configuration
 - `injectResourceList<T>(resourceName, params?)`, a signal-based list loader built on Angular's native `resource()`
 
-`@pidrang/supabase` will implement `DataProvider` against `@supabase/supabase-js`; UI packages (`@pidrang/material`, later `primeng`/`tailwind`) will consume core's reactive primitives without knowing which `DataProvider` is wired in.
+`@pidrang/supabase` implements `DataProvider` against `@supabase/supabase-js` (`SupabaseDataProvider`, `provideSupabaseDataProvider({ client })`). UI packages (`@pidrang/material`, later `primeng`/`tailwind`) will consume core's reactive primitives without knowing which `DataProvider` is wired in.
 
 ## Roadmap
 
 1. ~~`@pidrang/core` contracts~~ — done
-2. `@pidrang/supabase` `DataProvider` implementation
+2. ~~`@pidrang/supabase` `DataProvider` implementation~~ — done
 3. `apps/demo` — Users/Products/Orders CRUD, wired to core + supabase
 4. `@pidrang/material` — first UI layer
 5. `@pidrang/cli` — table → `Resource` → CRUD scaffolding
