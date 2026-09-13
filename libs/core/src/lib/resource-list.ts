@@ -3,25 +3,33 @@ import { ResourceRef, resource } from '@angular/core';
 import { injectDataProvider } from './inject-pidrang';
 import { ListParams, ListResult } from './list-params';
 
+interface ListRequest {
+  resourceName: string;
+  listParams: ListParams | undefined;
+}
+
 // Wraps DataProvider.getList in Angular's resource() so callers get
 // signal-based value/status/error/reload without depending on any UI layer.
 //
+// resourceName can be a reactive function (e.g. a route param signal) so
+// callers reusing the same component instance across resources still reload.
 // Returning undefined from `params` skips loading (Angular resource()
-// convention), so it is only forwarded when the caller supplies one.
+// convention).
 export function injectResourceList<T>(
-  resourceName: string,
+  resourceName: string | (() => string),
   params?: () => ListParams | undefined,
 ): ResourceRef<ListResult<T> | undefined> {
   const dataProvider = injectDataProvider();
-
-  if (params) {
-    return resource({
-      params,
-      loader: ({ params: listParams }) => dataProvider.getList<T>(resourceName, listParams),
-    });
-  }
+  const resourceNameFn = typeof resourceName === 'function' ? resourceName : () => resourceName;
 
   return resource({
-    loader: () => dataProvider.getList<T>(resourceName),
+    params: (): ListRequest | undefined => {
+      const listParams = params?.();
+      if (params && listParams === undefined) {
+        return undefined;
+      }
+      return { resourceName: resourceNameFn(), listParams };
+    },
+    loader: ({ params: request }) => dataProvider.getList<T>(request.resourceName, request.listParams),
   });
 }

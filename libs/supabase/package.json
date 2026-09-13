@@ -2,7 +2,6 @@
   "name": "@pidrang/supabase",
   "version": "0.0.1",
   "peerDependencies": {
-    "@angular/core": "^22.1.0",
     "@pidrang/core": "^0.0.1",
     "@supabase/supabase-js": "^2.116.0"
   },
