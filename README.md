@@ -25,6 +25,7 @@ pidrang/
 └── libs/
     ├── core/           # Headless primitives & contracts (@pidrang/core)
     └── supabase/       # Supabase DataProvider implementation (@pidrang/supabase)
+```
 
 ## Quick start
 
@@ -47,12 +48,7 @@ pnpm exec nx build core
 
 ## Roadmap
 
-1. ~~`@pidrang/core` contracts~~ — done
-2. ~~`@pidrang/supabase` `DataProvider` implementation~~ — done
-3. `apps/demo` — Users/Products/Orders CRUD, wired to core + supabase
-4. `@pidrang/material` — first UI layer
-5. `@pidrang/cli` — table → `Resource` → CRUD scaffolding
-6. Later: `primeng`, `tailwind`, `rest`, `graphql` packages, without changing core
+See [`ROADMAP.md`](./ROADMAP.md) for current progress.
 
 ## Contributing
 
