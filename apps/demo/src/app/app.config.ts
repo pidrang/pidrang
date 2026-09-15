@@ -7,8 +7,6 @@ import { createClient } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
 import { appRoutes } from './app.routes';
 
-// One client shared by both providers: supabase-js warns about multiple
-// GoTrueClient instances on the same page when auth state is duplicated.
 const supabaseClient = createClient(environment.supabaseUrl, environment.supabaseAnonKey);
 
 export const appConfig: ApplicationConfig = {
