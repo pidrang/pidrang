@@ -35,6 +35,16 @@ pnpm exec nx test core
 pnpm exec nx build core
 ```
 
+To run `apps/demo` against a local Supabase instance instead of the hosted project:
+
+```
+# in a clone of pidrang/supabase
+supabase start
+
+# in this repo
+pnpm exec nx serve demo --configuration=local
+```
+
 ## Architecture
 
 `@pidrang/core` is framework-native (Angular) but UI-agnostic: it depends on `@angular/core` only, never on a component library. Everything else builds on top of it:
