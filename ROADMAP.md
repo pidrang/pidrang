@@ -28,14 +28,14 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 
 - `providePidrang` + `provideSupabaseDataProvider` wired in `app.config.ts` for `users`/`products`/`orders`
 - Generic (resource-agnostic) List/Create/Show/Edit pages, driven by the `:resource` route param — raw JSON rendering, since `Resource` has no field schema yet
-- Backed by the `pidrang` Supabase project (see `pidrang-supabase` repo for schema/migrations); no styling (deliberately minimal ahead of `@pidrang/material`)
+- Backed by the `pidrang` Supabase project (see `pidrang/supabase` repo for schema/migrations); no styling (deliberately minimal ahead of `@pidrang/material`)
 
 ## Phase 4 — Auth Provider (next)
 
 - README already advertises an Auth Provider; this phase makes that real instead of leaving it undocumented
 - Sign-in/sign-out contract in `@pidrang/core`, session state exposed the same way `DataProvider` is (a token + `inject*` functions), so UI packages can read "am I logged in" without depending on Supabase directly
 - `@pidrang/supabase` implementation on top of `supabase-js` auth
-- Once this exists, the demo's currently-open RLS policies (see `pidrang-supabase`) should be tightened to require authentication for write actions
+- Once this exists, the demo's currently-open RLS policies (see `pidrang/supabase`) should be tightened to require authentication for write actions
 
 ## Phase 5 — `@pidrang/material`
 
@@ -53,6 +53,6 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 ## Not scheduled as a phase, still needed
 
 - CI: lint/test/build checks on every PR (this is what `chore/roadmap-and-ci` adds — checks only, no release/publish automation yet)
-- Dependabot alerts and a `SECURITY.md` for the `pidrang` and `pidrang-supabase` repos
+- Dependabot alerts and a `SECURITY.md` for the `pidrang` and `pidrang/supabase` repos
 - A README section stating plainly that Row Level Security is the integrator's responsibility — `SupabaseDataProvider` performs no authorization of its own
 - A clearer error than the raw `supabaseUrl is required` crash when `apps/demo` runs without credentials configured
