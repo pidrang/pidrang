@@ -7,7 +7,9 @@ import {
   ListResult,
   UpdateParams,
 } from '@pidrang/core';
-import { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+import { toError } from './to-error';
 
 export class SupabaseDataProvider implements DataProvider {
   constructor(private readonly client: SupabaseClient) {}
@@ -86,9 +88,4 @@ export class SupabaseDataProvider implements DataProvider {
     }
     return data as T;
   }
-}
-
-// Keeps PostgrestError (and its Supabase-specific fields) from leaking past the DataProvider boundary.
-function toError(error: PostgrestError): Error {
-  return new Error(error.message);
 }
