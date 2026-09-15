@@ -56,6 +56,10 @@ pnpm exec nx serve demo --configuration=local
 
 `@pidrang/supabase` implements `DataProvider` against `@supabase/supabase-js` (`SupabaseDataProvider`, `provideSupabaseDataProvider({ client })`). UI packages (`@pidrang/material`, later `primeng`/`tailwind`) will consume core's reactive primitives without knowing which `DataProvider` is wired in.
 
+`AuthProvider` (`login`, `logout`, `getIdentity`) follows the same pattern as `DataProvider`: `providePidrang({ authProvider, ... })` registers it, `injectAuthProvider()` reads it, and `injectAuthSession()` wraps it in a signal-based `resource()` for the current identity (`value()` is `AuthIdentity | null | undefined` while loading/signed-out/signed-in). `@pidrang/supabase` implements it with `SupabaseAuthProvider` / `provideSupabaseAuthProvider({ client })`, backed by Supabase Auth.
+
+`SupabaseDataProvider` and `SupabaseAuthProvider` perform no authorization themselves — every access guarantee comes from the Row Level Security policies on the integrator's own Supabase project. Pidrang assumes those policies are correctly configured; it does not enforce or verify them.
+
 ## Roadmap
 
 See [`ROADMAP.md`](./ROADMAP.md) for current progress.
