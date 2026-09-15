@@ -9,7 +9,6 @@ import { SignInPage } from './pages/sign-in-page';
 
 // Order matters: more specific segments (create, :id/edit) must be matched
 // before the generic :id and :resource routes. 'login' must come before the
-// :resource catch-all too, or it would be treated as a resource name.
 export const appRoutes: Route[] = [
   { path: '', component: HomePage },
   { path: 'login', component: SignInPage },

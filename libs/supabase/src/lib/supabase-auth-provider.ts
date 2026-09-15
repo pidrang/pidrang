@@ -18,8 +18,6 @@ export class SupabaseAuthProvider implements AuthProvider {
     }
   }
 
-  // No active session is not an error for a consumer asking "who is signed
-  // in", so it is normalized to null rather than surfacing supabase-js's error.
   async getIdentity(): Promise<AuthIdentity | null> {
     const { data, error } = await this.client.auth.getUser();
     if (error || !data.user) {
