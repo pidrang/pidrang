@@ -1,20 +1,22 @@
 import { AuthIdentity, AuthProvider, LoginParams } from '@pidrang/core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+import { toError } from './to-error';
+
 export class SupabaseAuthProvider implements AuthProvider {
   constructor(private readonly client: SupabaseClient) {}
 
   async login(params: LoginParams): Promise<void> {
     const { error } = await this.client.auth.signInWithPassword(params);
     if (error) {
-      throw new Error(error.message);
+      throw toError(error);
     }
   }
 
   async logout(): Promise<void> {
     const { error } = await this.client.auth.signOut();
     if (error) {
-      throw new Error(error.message);
+      throw toError(error);
     }
   }
 
