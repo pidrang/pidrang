@@ -7,8 +7,8 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 | 1 | `@pidrang/core` — contracts, `providePidrang`, signal-based resource state | Done |
 | 2 | `@pidrang/supabase` — `SupabaseDataProvider`, `provideSupabaseDataProvider` | Done |
 | 3 | `apps/demo` — core + supabase wired together, generic CRUD pages | Done |
-| 4 | Auth Provider — sign-in contract, session state, tightens the demo's RLS policies | Next |
-| 5 | `@pidrang/material` — first real UI layer (List/Create/Show/Edit/Delete bound to core's resource state) | Planned |
+| 4 | Auth Provider — sign-in contract, session state, tightens the demo's RLS policies | Done |
+| 5 | `@pidrang/material` — first real UI layer (List/Create/Show/Edit/Delete bound to core's resource state) | Next |
 | 6 | `@pidrang/cli` — table → `Resource` → working CRUD generation | Planned |
 | 7 | `primeng`, `tailwind`, `rest`, `graphql` packages, without changing core | Planned |
 
@@ -30,14 +30,14 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 - Generic (resource-agnostic) List/Create/Show/Edit pages, driven by the `:resource` route param — raw JSON rendering, since `Resource` has no field schema yet
 - Backed by the `pidrang` Supabase project (see `pidrang/supabase` repo for schema/migrations); no styling (deliberately minimal ahead of `@pidrang/material`)
 
-## Phase 4 — Auth Provider (next)
+## Phase 4 — Auth Provider
 
-- README already advertises an Auth Provider; this phase makes that real instead of leaving it undocumented
-- Sign-in/sign-out contract in `@pidrang/core`, session state exposed the same way `DataProvider` is (a token + `inject*` functions), so UI packages can read "am I logged in" without depending on Supabase directly
-- `@pidrang/supabase` implementation on top of `supabase-js` auth
-- Once this exists, the demo's currently-open RLS policies (see `pidrang/supabase`) should be tightened to require authentication for write actions
+- `AuthProvider` (`login`, `logout`, `getIdentity`) in `@pidrang/core`, `AUTH_PROVIDER` as an optional `providePidrang()` dependency, `injectAuthProvider()`, and `injectAuthSession()` (signal-based, built on `resource()`)
+- `SupabaseAuthProvider` / `provideSupabaseAuthProvider({ client })` in `@pidrang/supabase`, wrapping `supabase-js` auth; normalizes `AuthError` to a plain `Error`, treats a missing session as a `null` identity rather than an error
+- `apps/demo` wires it into `app.config.ts` (one Supabase client shared by both providers), adds a minimal `/login` page, and shows the signed-in identity with sign out on `HomePage`
+- `pidrang/supabase`'s RLS policies tightened: `select` stays public, `insert`/`update`/`delete` now require the `authenticated` role (see that repo's migrations)
 
-## Phase 5 — `@pidrang/material`
+## Phase 5 — `@pidrang/material` (next)
 
 - Angular Material components consuming core's reactive primitives (`injectResourceList`, `injectDataProvider`) — depends on core only, not on supabase
 - Will likely surface the need for a field schema on `Resource` (or a separate concept) to render typed forms instead of demo's raw-JSON textareas — revisit then, not before
