@@ -42,6 +42,17 @@
           "optimization": false,
           "extractLicenses": false,
           "sourceMap": true
+        },
+        "local": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true,
+          "fileReplacements": [
+            {
+              "replace": "apps/demo/src/environments/environment.ts",
+              "with": "apps/demo/src/environments/environment.local.ts"
+            }
+          ]
         }
       }
     },
@@ -55,6 +66,9 @@
         },
         "development": {
           "buildTarget": "demo:build:development"
+        },
+        "local": {
+          "buildTarget": "demo:build:local"
         }
       }
     },
