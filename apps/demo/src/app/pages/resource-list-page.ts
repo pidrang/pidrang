@@ -6,15 +6,21 @@ import {
   injectResources,
 } from '@pidrang/core';
 import { ResourceTable } from '@pidrang/material';
+import { MatButtonModule } from '@angular/material/button';
 
 type Row = { id: string } & Record<string, unknown>;
 
 @Component({
   selector: 'app-resource-list-page',
-  imports: [RouterLink, ResourceTable],
+  imports: [RouterLink, ResourceTable, MatButtonModule],
   template: `
     <h1>{{ resource() }}</h1>
-    <a [routerLink]="['/', resource(), 'create']">Create</a>
+    <a
+      mat-flat-button
+      color="primary"
+      [routerLink]="['/', resource(), 'create']"
+      >Create</a
+    >
 
     @if (list.isLoading()) {
       <p>Loading...</p>
@@ -23,17 +29,20 @@ type Row = { id: string } & Record<string, unknown>;
       <p>{{ error.message }}</p>
     }
 
-    <lib-resource-table [fields]="fields()" [data]="list.value()?.data ?? []" />
-
-    <ul>
-      @for (row of list.value()?.data ?? []; track row.id) {
-        <li>
-          <a [routerLink]="['/', resource(), row.id]">Show</a>
-          <a [routerLink]="['/', resource(), row.id, 'edit']">Edit</a>
-          <button type="button" (click)="remove(row.id)">Delete</button>
-        </li>
-      }
-    </ul>
+    <lib-resource-table [fields]="fields()" [data]="list.value()?.data ?? []">
+      <ng-template #actions let-row>
+        <a mat-button [routerLink]="['/', resource(), row.id]">Show</a>
+        <a mat-button [routerLink]="['/', resource(), row.id, 'edit']">Edit</a>
+        <button
+          mat-stroked-button
+          color="warn"
+          type="button"
+          (click)="remove(row.id)"
+        >
+          Delete
+        </button>
+      </ng-template>
+    </lib-resource-table>
   `,
 })
 export class ResourceListPage {

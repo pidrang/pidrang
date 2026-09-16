@@ -1,25 +1,36 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { injectAuthProvider, injectAuthSession, injectResources } from '@pidrang/core';
+import {
+  injectAuthProvider,
+  injectAuthSession,
+  injectResources,
+} from '@pidrang/core';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
   selector: 'app-home-page',
-  imports: [RouterLink],
+  imports: [RouterLink, MatButtonModule],
   template: `
     <h1>Pidrang demo</h1>
 
     @if (session.value(); as identity) {
       <p>
         Signed in as {{ identity.email ?? identity.id }}
-        <button type="button" (click)="signOut()">Sign out</button>
+        <button mat-stroked-button type="button" (click)="signOut()">
+          Sign out
+        </button>
       </p>
     } @else {
-      <p><a routerLink="/login">Sign in</a></p>
+      <p><a mat-flat-button color="primary" routerLink="/login">Sign in</a></p>
     }
 
     <ul>
       @for (resource of resources; track resource.name) {
-        <li><a [routerLink]="[resource.name]">{{ resource.label ?? resource.name }}</a></li>
+        <li>
+          <a mat-button [routerLink]="[resource.name]">{{
+            resource.label ?? resource.name
+          }}</a>
+        </li>
       }
     </ul>
   `,

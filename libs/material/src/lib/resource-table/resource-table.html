@@ -4,6 +4,15 @@
     <th mat-header-cell *matHeaderCellDef>{{ columnHeader(field) }}</th>
     <td mat-cell *matCellDef="let row">{{ row[field.name] }}</td>
   </ng-container>
+  } @if (actions(); as actionsTemplate) {
+  <ng-container matColumnDef="actions">
+    <th mat-header-cell *matHeaderCellDef></th>
+    <td mat-cell *matCellDef="let row">
+      <ng-container
+        *ngTemplateOutlet="actionsTemplate; context: { $implicit: row }"
+      />
+    </td>
+  </ng-container>
   }
 
   <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
