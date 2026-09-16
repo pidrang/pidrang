@@ -9,15 +9,17 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { injectDataProvider, injectResources } from '@pidrang/core';
 import { ResourceForm } from '@pidrang/material';
+import { MatButtonModule } from '@angular/material/button';
+import { recordLabel } from '../record-label';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
 
 @Component({
   selector: 'app-resource-edit-page',
-  imports: [RouterLink, ResourceForm],
+  imports: [RouterLink, ResourceForm, MatButtonModule],
   template: `
-    <h1>Edit {{ resource() }} #{{ id() }}</h1>
-    <a [routerLink]="['/', resource(), id()]">Back to show</a>
+    <h1>Edit {{ resource() }} — {{ label() }}</h1>
+    <a mat-button [routerLink]="['/', resource(), id()]">Back to show</a>
 
     @if (error()) {
       <p>{{ error() }}</p>
@@ -34,7 +36,7 @@ export class ResourceEditPage {
   readonly resource = input.required<string>();
   readonly id = input.required<string>();
 
-  protected readonly value = signal<Record<string, unknown> | undefined>(
+  protected readonly record = signal<Record<string, unknown> | undefined>(
     undefined,
   );
   protected readonly error = signal<string | null>(null);
@@ -50,21 +52,30 @@ export class ResourceEditPage {
         ?.fields?.filter((field) => !NON_EDITABLE_FIELDS.has(field.name)) ?? [],
   );
 
+  protected readonly value = computed(() => {
+    const record = this.record();
+    if (!record) {
+      return undefined;
+    }
+    return Object.fromEntries(
+      this.fields().map((field) => [field.name, record[field.name]]),
+    );
+  });
+
+  protected readonly label = computed(() => {
+    const record = this.record();
+    return record ? recordLabel(record) : this.id();
+  });
+
   constructor() {
     // Re-runs whenever resource() or id() changes, so navigating between
-    // records on the same component instance still reloads the value.
+    // records on the same component instance still reloads the record.
     effect(() => {
       const resource = this.resource();
       const id = this.id();
-      const fields = this.fields();
-      this.value.set(undefined);
+      this.record.set(undefined);
       this.dataProvider.getOne<Record<string, unknown>>(resource, { id }).then(
-        (record) =>
-          this.value.set(
-            Object.fromEntries(
-              fields.map((field) => [field.name, record[field.name]]),
-            ),
-          ),
+        (record) => this.record.set(record),
         (err) =>
           this.error.set(err instanceof Error ? err.message : String(err)),
       );

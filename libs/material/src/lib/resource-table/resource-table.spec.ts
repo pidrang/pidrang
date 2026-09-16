@@ -1,3 +1,4 @@
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { ResourceTable } from './resource-table';
@@ -36,5 +37,36 @@ describe('ResourceTable', () => {
         (cell as HTMLElement).textContent?.trim(),
       ),
     ).toEqual(['Alice', 'Bob']);
+  });
+
+  it('renders a projected actions template as the last cell of each row', async () => {
+    @Component({
+      imports: [ResourceTable],
+      template: `
+        <lib-resource-table [fields]="fields" [data]="data">
+          <ng-template #actions let-row>
+            <button type="button">Delete {{ row.name }}</button>
+          </ng-template>
+        </lib-resource-table>
+      `,
+    })
+    class HostWithActions {
+      protected readonly fields = [{ name: 'name', type: 'text' as const }];
+      protected readonly data = [{ name: 'Alice' }, { name: 'Bob' }];
+    }
+
+    TestBed.configureTestingModule({ imports: [HostWithActions] });
+
+    const fixture = TestBed.createComponent(HostWithActions);
+    await fixture.whenStable();
+
+    const rows = fixture.nativeElement.querySelectorAll('tbody tr');
+    expect(rows.length).toBe(2);
+    expect(rows[0].querySelector('button').textContent.trim()).toBe(
+      'Delete Alice',
+    );
+    expect(rows[1].querySelector('button').textContent.trim()).toBe(
+      'Delete Bob',
+    );
   });
 });

@@ -2,6 +2,7 @@ import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Field, injectDataProvider, injectResources } from '@pidrang/core';
 import { ResourceForm } from '@pidrang/material';
+import { MatButtonModule } from '@angular/material/button';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
 
@@ -18,10 +19,10 @@ function defaultValueForField(field: Field): unknown {
 
 @Component({
   selector: 'app-resource-create-page',
-  imports: [RouterLink, ResourceForm],
+  imports: [RouterLink, ResourceForm, MatButtonModule],
   template: `
     <h1>Create {{ resource() }}</h1>
-    <a [routerLink]="['/', resource()]">Back to list</a>
+    <a mat-button [routerLink]="['/', resource()]">Back to list</a>
 
     <lib-resource-form
       [fields]="fields()"
