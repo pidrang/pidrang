@@ -12,7 +12,8 @@ Pidrang is an open-source, headless framework designed to eliminate boilerplate 
 - ⚡ **Signal-First:** Built from the ground up leveraging Angular Signals for fine-grained reactivity.
 - 🗄️ **Data Providers:** First-class support for Supabase (REST, GraphQL, and custom backends coming soon).
 - 🔐 **Auth Provider:** Simplified authentication flow integration.
-- 📦 **Monorepo Structure:** Clean modular architecture (`@pidrang/core`, `@pidrang/supabase`).
+- 🎨 **Material UI Layer:** Schema-driven `ResourceTable`/`ResourceForm` built on Angular Material and Signal Forms.
+- 📦 **Monorepo Structure:** Clean modular architecture (`@pidrang/core`, `@pidrang/supabase`, `@pidrang/material`).
 
 ---
 
@@ -24,7 +25,8 @@ pidrang/
 │   └── demo/           # Angular test application
 └── libs/
     ├── core/           # Headless primitives & contracts (@pidrang/core)
-    └── supabase/       # Supabase DataProvider implementation (@pidrang/supabase)
+    ├── supabase/       # Supabase DataProvider implementation (@pidrang/supabase)
+    └── material/       # Angular Material UI layer (@pidrang/material)
 ```
 
 ## Quick start
@@ -59,6 +61,8 @@ pnpm exec nx serve demo --configuration=local
 `AuthProvider` (`login`, `logout`, `getIdentity`) follows the same pattern as `DataProvider`: `providePidrang({ authProvider, ... })` registers it, `injectAuthProvider()` reads it, and `injectAuthSession()` wraps it in a signal-based `resource()` for the current identity (`value()` is `AuthIdentity | null | undefined` while loading/signed-out/signed-in). `@pidrang/supabase` implements it with `SupabaseAuthProvider` / `provideSupabaseAuthProvider({ client })`, backed by Supabase Auth.
 
 `SupabaseDataProvider` and `SupabaseAuthProvider` perform no authorization themselves — every access guarantee comes from the Row Level Security policies on the integrator's own Supabase project. Pidrang assumes those policies are correctly configured; it does not enforce or verify them.
+
+`@pidrang/material` is the first UI layer: schema-driven components (`ResourceTable`, `ResourceForm`) that render from a `Resource`'s `Field[]` instead of hand-written markup per resource. It depends only on `@pidrang/core` and `@angular/material` — never on a specific `DataProvider` — so it works with `@pidrang/supabase` today and any future `DataProvider` without changes. `ResourceTable` supports a projected `#actions` template (`contentChild` + `ngTemplateOutlet`) for per-row buttons/links rendered as a real trailing column. `ResourceForm` is built on Angular's Signal Forms (`@angular/forms/signals`), with a `linkedSignal` draft that resets whenever its `value` input changes without mutating the caller's original object.
 
 ## Roadmap
 

@@ -2,15 +2,15 @@
 
 Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per-package details behind each item.
 
-| # | Phase | Status |
-|---|-------|--------|
-| 1 | `@pidrang/core` — contracts, `providePidrang`, signal-based resource state | Done |
-| 2 | `@pidrang/supabase` — `SupabaseDataProvider`, `provideSupabaseDataProvider` | Done |
-| 3 | `apps/demo` — core + supabase wired together, generic CRUD pages | Done |
-| 4 | Auth Provider — sign-in contract, session state, tightens the demo's RLS policies | Done |
-| 5 | `@pidrang/material` — first real UI layer (List/Create/Show/Edit/Delete bound to core's resource state) | Next |
-| 6 | `@pidrang/cli` — table → `Resource` → working CRUD generation | Planned |
-| 7 | `primeng`, `tailwind`, `rest`, `graphql` packages, without changing core | Planned |
+| #   | Phase                                                                                                   | Status  |
+| --- | ------------------------------------------------------------------------------------------------------- | ------- |
+| 1   | `@pidrang/core` — contracts, `providePidrang`, signal-based resource state                              | Done    |
+| 2   | `@pidrang/supabase` — `SupabaseDataProvider`, `provideSupabaseDataProvider`                             | Done    |
+| 3   | `apps/demo` — core + supabase wired together, generic CRUD pages                                        | Done    |
+| 4   | Auth Provider — sign-in contract, session state, tightens the demo's RLS policies                       | Done    |
+| 5   | `@pidrang/material` — first real UI layer (List/Create/Show/Edit/Delete bound to core's resource state) | Done    |
+| 6   | `@pidrang/cli` — table → `Resource` → working CRUD generation                                           | Next    |
+| 7   | `primeng`, `tailwind`, `rest`, `graphql` packages, without changing core                                | Planned |
 
 ## Phase 1 — `@pidrang/core`
 
@@ -38,10 +38,14 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 - `apps/demo` wires it into `app.config.ts` (one Supabase client shared by both providers), adds a minimal `/login` page, and shows the signed-in identity with sign out on `HomePage`
 - `pidrang/supabase`'s RLS policies tightened: `select` stays public, `insert`/`update`/`delete` now require the `authenticated` role (see that repo's migrations)
 
-## Phase 5 — `@pidrang/material` (next)
+## Phase 5 — `@pidrang/material`
 
-- Angular Material components consuming core's reactive primitives (`injectResourceList`, `injectDataProvider`) — depends on core only, not on supabase
-- `Resource.fields` (`Field`/`FieldType`, see Phase 1) already exists for rendering typed forms instead of demo's raw-JSON textareas
+- `ResourceTable<T>` — renders `Resource.fields` as a `MatTable`; a `#actions` template (`contentChild` + `ngTemplateOutlet`) lets consumers project per-row buttons/links as a real trailing column instead of a separate list underneath
+- `ResourceForm<T>` — built on Signal Forms (`@angular/forms/signals`, stable in Angular 22), one `mat-form-field`/`mat-checkbox` per `Field` based on `FieldType`; a `linkedSignal` draft resets whenever the `value` input changes but stays independently writable, without mutating the caller's object
+- `apps/demo` wired end to end: List/Create/Edit pages use `ResourceTable`/`ResourceForm` instead of raw JSON textareas; Show page still renders a raw JSON dump (not yet typed)
+- All buttons/links across the demo (nav, table actions, forms, login) styled with `MatButtonModule`; M3 theming via a single `mat.theme()` mixin (`@angular/material` has no `@angular/animations` dependency anymore) with a scoped `[color="warn"]` override, since M3's single-mixin API doesn't wire the legacy `.mat-warn` class mapping on its own
+- Edit/Show page titles show a human-readable label (`recordLabel()`: name → email → shortened id) instead of the raw UUID
+- Login keeps a centered `mat-card`; Create/Edit forms are plain wide forms (no card) since they already sit under a page heading
 
 ## Phase 6 — `@pidrang/cli`
 
