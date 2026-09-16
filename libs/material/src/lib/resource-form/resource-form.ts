@@ -1,5 +1,10 @@
 import { Component, input, linkedSignal, output } from '@angular/core';
-import { FormField, form } from '@angular/forms/signals';
+import {
+  Field as SignalField,
+  FormField,
+  FormRoot,
+  form,
+} from '@angular/forms/signals';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -19,6 +24,7 @@ const INPUT_TYPE_BY_FIELD_TYPE: Record<
   selector: 'lib-resource-form',
   imports: [
     FormField,
+    FormRoot,
     MatFormFieldModule,
     MatInputModule,
     MatCheckboxModule,
@@ -38,8 +44,15 @@ export class ResourceForm<T extends Record<string, unknown>> {
   // The field name comes from the runtime Resource.fields schema, not from T's
   // keys, so it can't be typed against the model without losing the dynamism
   // fields() is there for.
-  protected fieldTree(name: string): any {
-    return (this.model as Record<string, unknown>)[name];
+  protected fieldTree(
+    name: string,
+  ): SignalField<string | number | boolean | Date | null> {
+    return (
+      this.model as Record<
+        string,
+        SignalField<string | number | boolean | Date | null>
+      >
+    )[name];
   }
 
   protected fieldLabel(field: Field): string {
@@ -52,7 +65,8 @@ export class ResourceForm<T extends Record<string, unknown>> {
     ];
   }
 
-  protected onSubmit(): void {
+  protected onSubmit(event: Event): void {
+    event.preventDefault();
     this.save.emit(this.draft());
   }
 }
