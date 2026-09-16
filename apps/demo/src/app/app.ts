@@ -11,7 +11,7 @@ import { isSupabaseConfigured } from './is-supabase-configured';
   styleUrl: './app.css',
 })
 export class App {
-  hasSupabaseConfig = isSupabaseConfigured(
+  protected hasSupabaseConfig = isSupabaseConfigured(
     environment.supabaseUrl,
     environment.supabaseAnonKey,
   );
