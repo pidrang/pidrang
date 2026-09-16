@@ -1,4 +1,5 @@
 export * from './lib/resource';
+export * from './lib/field';
 export * from './lib/list-params';
 export * from './lib/crud-params';
 export * from './lib/data-provider';
