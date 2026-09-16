@@ -49,7 +49,7 @@ pnpm exec nx serve demo --configuration=local
 
 `@pidrang/core` is framework-native (Angular) but UI-agnostic: it depends on `@angular/core` only, never on a component library. Everything else builds on top of it:
 
-- `Resource`, `DataProvider`, `ListParams`/`ListResult<T>`, `GetOneParams`/`CreateParams<T>`/`UpdateParams<T>`/`DeleteParams`
+- `Resource` (optionally described with `Field`/`FieldType` for a typed form/table), `DataProvider`, `ListParams`/`ListResult<T>`, `GetOneParams`/`CreateParams<T>`/`UpdateParams<T>`/`DeleteParams`
 - `providePidrang({ dataProvider, resources })` for app-wide configuration
 - `injectDataProvider()`, `injectResources()`, `injectResource(name)` for reading that configuration
 - `injectResourceList<T>(resourceName, params?)`, a signal-based list loader built on Angular's native `resource()`

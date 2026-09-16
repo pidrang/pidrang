@@ -18,6 +18,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 - `providePidrang({ dataProvider, resources })`
 - `injectDataProvider()`, `injectResources()`, `injectResource(name)`
 - `injectResourceList<T>(resourceName, params?)` — signal-based, `resourceName` may be reactive
+- `Field`/`FieldType`, an optional `Resource.fields` — added later (ticket #4), ahead of Phase 5, so a UI layer can render a typed form/table without guessing types from the data at runtime
 
 ## Phase 2 — `@pidrang/supabase`
 
@@ -40,7 +41,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 ## Phase 5 — `@pidrang/material` (next)
 
 - Angular Material components consuming core's reactive primitives (`injectResourceList`, `injectDataProvider`) — depends on core only, not on supabase
-- Will likely surface the need for a field schema on `Resource` (or a separate concept) to render typed forms instead of demo's raw-JSON textareas — revisit then, not before
+- `Resource.fields` (`Field`/`FieldType`, see Phase 1) already exists for rendering typed forms instead of demo's raw-JSON textareas
 
 ## Phase 6 — `@pidrang/cli`
 
