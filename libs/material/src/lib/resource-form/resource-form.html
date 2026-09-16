@@ -1,4 +1,4 @@
-<form>
+<form [formRoot]="model" (submit)="onSubmit($event)">
   @for (field of fields(); track field.name) { @if (field.type === 'boolean') {
   <mat-checkbox [formField]="fieldTree(field.name)"
     >{{ fieldLabel(field) }}</mat-checkbox
@@ -14,7 +14,5 @@
   </mat-form-field>
   } }
 
-  <button mat-flat-button color="primary" type="button" (click)="onSubmit()">
-    Save
-  </button>
+  <button mat-flat-button color="primary" type="submit">Save</button>
 </form>
