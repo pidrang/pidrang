@@ -6,6 +6,12 @@
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "dependencies": {
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "@inquirer/prompts": "^7.0.0",
+    "pg": "^8.13.0"
+  },
+  "peerDependencies": {
+    "@pidrang/cli": "^0.0.1",
+    "@pidrang/core": "^0.0.1"
   }
 }
