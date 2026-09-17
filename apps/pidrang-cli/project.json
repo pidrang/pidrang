@@ -1,0 +1,19 @@
+{
+  "name": "pidrang-cli",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/pidrang-cli/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/pidrang-cli",
+        "main": "apps/pidrang-cli/src/index.ts",
+        "tsConfig": "apps/pidrang-cli/tsconfig.lib.json",
+        "assets": ["apps/pidrang-cli/*.md"]
+      }
+    }
+  }
+}

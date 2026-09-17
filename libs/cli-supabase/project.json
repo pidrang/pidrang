@@ -1,0 +1,19 @@
+{
+  "name": "cli-supabase",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/cli-supabase/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/cli-supabase",
+        "main": "libs/cli-supabase/src/index.ts",
+        "tsConfig": "libs/cli-supabase/tsconfig.lib.json",
+        "assets": ["libs/cli-supabase/*.md"]
+      }
+    }
+  }
+}
