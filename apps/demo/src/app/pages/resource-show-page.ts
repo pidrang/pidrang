@@ -1,6 +1,6 @@
 import { Component, computed, effect, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { injectDataProvider } from '@pidrang/core';
+import { injectDataProvider, injectResources } from '@pidrang/core';
 import { MatButtonModule } from '@angular/material/button';
 import { recordLabel } from '../record-label';
 
@@ -12,8 +12,13 @@ import { recordLabel } from '../record-label';
     <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     @if (error()) {
       <p>{{ error() }}</p>
-    } @else {
-      <pre>{{ formattedRecord() }}</pre>
+    } @else if (record(); as record) {
+      <dl>
+        @for (field of fields(); track field.name) {
+          <dt>{{ field.label ?? field.name }}</dt>
+          <dd>{{ record[field.name] }}</dd>
+        }
+      </dl>
     }
   `,
 })
@@ -26,16 +31,19 @@ export class ResourceShowPage {
   );
   protected readonly error = signal<string | null>(null);
 
+  private readonly dataProvider = injectDataProvider();
+  private readonly resources = injectResources();
+
+  protected readonly fields = computed(
+    () =>
+      this.resources.find((resource) => resource.name === this.resource())
+        ?.fields ?? [],
+  );
+
   protected readonly label = computed(() => {
     const record = this.record();
     return record ? recordLabel(record) : this.id();
   });
-
-  protected readonly formattedRecord = computed(() =>
-    JSON.stringify(this.record(), null, 2),
-  );
-
-  private readonly dataProvider = injectDataProvider();
 
   constructor() {
     // Re-runs whenever resource() or id() changes, so navigating between
