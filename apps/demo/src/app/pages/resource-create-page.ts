@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Field, injectDataProvider, injectResources } from '@pidrang/core';
 import { ResourceForm } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
+import { isAuthRequiredError } from '../auth-required-error';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
 
@@ -32,6 +33,9 @@ function defaultValueForField(field: Field): unknown {
 
     @if (error()) {
       <p>{{ error() }}</p>
+      @if (authRequired()) {
+        <p><a routerLink="/login">Sign in</a> first to make changes.</p>
+      }
     }
   `,
 })
@@ -39,6 +43,7 @@ export class ResourceCreatePage {
   readonly resource = input.required<string>();
 
   protected readonly error = signal<string | null>(null);
+  protected readonly authRequired = signal(false);
 
   private readonly dataProvider = injectDataProvider();
   private readonly router = inject(Router);
@@ -63,6 +68,7 @@ export class ResourceCreatePage {
       await this.router.navigate(['/', this.resource()]);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : String(err));
+      this.authRequired.set(isAuthRequiredError(err));
     }
   }
 }
