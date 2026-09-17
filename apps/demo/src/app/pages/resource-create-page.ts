@@ -34,7 +34,7 @@ function defaultValueForField(field: Field): unknown {
     @if (error()) {
       <p>{{ error() }}</p>
       @if (authRequired()) {
-        <p><a routerLink="/login">Sign in</a> first to make changes.</p>
+        <p>You may need to <a routerLink="/login">sign in</a> to make changes.</p>
       }
     }
   `,
