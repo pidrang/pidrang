@@ -1,0 +1,90 @@
+import { generateResourcesFile } from './generate-resources-file';
+import { GenerationPlan } from './generation-plan';
+
+describe('generateResourcesFile', () => {
+  it('generates a Resource literal with all fields and actions', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'products',
+          fields: [
+            { name: 'id', type: 'number' },
+            { name: 'name', type: 'text' },
+            { name: 'in_stock', type: 'boolean' },
+          ],
+          actions: ['list', 'create', 'show', 'edit', 'delete'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    expect(generateResourcesFile(plan)).toBe(
+      `import { Resource } from '@pidrang/core';
+
+export const resources: Resource[] = [
+  {
+    name: 'products',
+    fields: [
+      { name: 'id', type: 'number' },
+      { name: 'name', type: 'text' },
+      { name: 'in_stock', type: 'boolean' },
+    ],
+    list: true,
+    create: true,
+    show: true,
+    edit: true,
+    delete: true,
+  },
+];
+`,
+    );
+  });
+
+  it('sets unselected actions to false', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'orders',
+          fields: [{ name: 'id', type: 'number' }],
+          actions: ['list', 'show'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    const output = generateResourcesFile(plan);
+
+    expect(output).toContain('list: true,');
+    expect(output).toContain('show: true,');
+    expect(output).toContain('create: false,');
+    expect(output).toContain('edit: false,');
+    expect(output).toContain('delete: false,');
+  });
+
+  it('generates one Resource literal per planned table', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'products',
+          fields: [{ name: 'id', type: 'number' }],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+        {
+          table: 'orders',
+          fields: [{ name: 'id', type: 'number' }],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    const output = generateResourcesFile(plan);
+
+    expect(output).toContain(`name: 'products'`);
+    expect(output).toContain(`name: 'orders'`);
+  });
+});
