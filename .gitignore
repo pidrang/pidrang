@@ -49,3 +49,5 @@ Thumbs.db
 __screenshots__/
 .vscode/
 .verdaccio/
+
+vitest.config.*.timestamp*
