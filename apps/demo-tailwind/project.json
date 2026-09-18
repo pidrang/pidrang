@@ -1,0 +1,95 @@
+{
+  "name": "demo-tailwind",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "prefix": "app",
+  "sourceRoot": "apps/demo-tailwind/src",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@angular/build:application",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/apps/demo-tailwind",
+        "browser": "apps/demo-tailwind/src/main.ts",
+        "tsConfig": "apps/demo-tailwind/tsconfig.app.json",
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/demo-tailwind/public"
+          }
+        ],
+        "styles": ["apps/demo-tailwind/src/styles.css"]
+      },
+      "configurations": {
+        "production": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "600kb",
+              "maximumError": "1mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "4kb",
+              "maximumError": "8kb"
+            }
+          ],
+          "outputHashing": "all"
+        },
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true
+        },
+        "local": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true,
+          "fileReplacements": [
+            {
+              "replace": "apps/demo-tailwind/src/environments/environment.ts",
+              "with": "apps/demo-tailwind/src/environments/environment.local.ts"
+            }
+          ]
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@angular/build:dev-server",
+      "defaultConfiguration": "development",
+      "configurations": {
+        "production": {
+          "buildTarget": "demo-tailwind:build:production"
+        },
+        "development": {
+          "buildTarget": "demo-tailwind:build:development"
+        },
+        "local": {
+          "buildTarget": "demo-tailwind:build:local"
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false
+      }
+    },
+    "serve-static": {
+      "continuous": true,
+      "executor": "@nx/web:file-server",
+      "options": {
+        "buildTarget": "demo-tailwind:build",
+        "port": 4200,
+        "staticFilePath": "dist/apps/demo-tailwind/browser",
+        "spa": true
+      }
+    }
+  }
+}
