@@ -44,6 +44,13 @@ import {
         </li>
       }
     </ul>
+
+    <p class="mt-4 text-gray-700">
+      Compare with the same demo built on a different UI adapter:
+      <a href="http://localhost:4200" class="text-blue-600 hover:underline"
+        >Material adapter</a
+      >
+    </p>
   `,
 })
 export class HomePage {

@@ -33,6 +33,11 @@ import { MatButtonModule } from '@angular/material/button';
         </li>
       }
     </ul>
+
+    <p>
+      Compare with the same demo built on a different UI adapter:
+      <a mat-button href="http://localhost:4201">Tailwind adapter</a>
+    </p>
   `,
 })
 export class HomePage {
