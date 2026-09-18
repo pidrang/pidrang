@@ -60,6 +60,9 @@
       "continuous": true,
       "executor": "@angular/build:dev-server",
       "defaultConfiguration": "development",
+      "options": {
+        "port": 4201
+      },
       "configurations": {
         "production": {
           "buildTarget": "demo-tailwind:build:production"
@@ -86,7 +89,7 @@
       "executor": "@nx/web:file-server",
       "options": {
         "buildTarget": "demo-tailwind:build",
-        "port": 4200,
+        "port": 4201,
         "staticFilePath": "dist/apps/demo-tailwind/browser",
         "spa": true
       }
