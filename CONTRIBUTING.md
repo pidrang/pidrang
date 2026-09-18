@@ -6,7 +6,7 @@ First off, thank you for considering contributing to Pidrang!
 
 1. Clone the repository.
 2. Install dependencies: `pnpm install`
-3. Start the demo workspace: `pnpm nx serve demo`
+3. Start the demo workspace: `pnpm nx serve demo-material`
 
 ## Branching Strategy
 
