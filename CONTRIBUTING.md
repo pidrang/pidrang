@@ -17,6 +17,7 @@ First off, thank you for considering contributing to Pidrang!
 ## Commit Guidelines
 
 We follow Conventional Commits:
+
 - `feat(core): add getList provider contract`
 - `fix(supabase): handle null response in update`
 - `docs: update README roadmap`
