@@ -1,0 +1,32 @@
+<form
+  [formRoot]="model"
+  (submit)="onSubmit($event)"
+  class="flex max-w-xl flex-col items-stretch gap-4"
+>
+  @for (field of fields(); track field.name) { @if (field.type === 'boolean') {
+  <label class="flex items-center gap-2 text-sm text-gray-700">
+    <input
+      type="checkbox"
+      [formField]="booleanFieldTree(field.name)"
+      class="h-4 w-4 rounded border-gray-300"
+    />
+    {{ fieldLabel(field) }}
+  </label>
+  } @else {
+  <label class="flex flex-col gap-1 text-sm text-gray-700">
+    {{ fieldLabel(field) }}
+    <input
+      [type]="inputType(field)"
+      [formField]="fieldTree(field.name)"
+      class="rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+    />
+  </label>
+  } }
+
+  <button
+    type="submit"
+    class="self-start rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+  >
+    Save
+  </button>
+</form>
