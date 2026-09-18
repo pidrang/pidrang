@@ -25,7 +25,9 @@ const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
     @if (error()) {
       <p>{{ error() }}</p>
       @if (authRequired()) {
-        <p>You may need to <a routerLink="/login">sign in</a> to make changes.</p>
+        <p>
+          You may need to <a routerLink="/login">sign in</a> to make changes.
+        </p>
       }
     } @else if (value(); as value) {
       <lib-resource-form
