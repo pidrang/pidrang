@@ -17,7 +17,8 @@
     "paths": {
       "@pidrang/core": ["./libs/core/src/index.ts"],
       "@pidrang/supabase": ["./libs/supabase/src/index.ts"],
-      "@pidrang/material": ["./libs/material/src/index.ts"]
+      "@pidrang/material": ["./libs/material/src/index.ts"],
+      "@pidrang/tailwind": ["./libs/tailwind/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
