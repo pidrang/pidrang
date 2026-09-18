@@ -10,7 +10,8 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 | 4   | Auth Provider — sign-in contract, session state, tightens the demo's RLS policies                       | Done    |
 | 5   | `@pidrang/material` — first real UI layer (List/Create/Show/Edit/Delete bound to core's resource state) | Done    |
 | 6   | `@pidrang/cli` — table → `Resource` → working CRUD generation                                           | Next    |
-| 7   | `primeng`, `tailwind`, `rest`, `graphql` packages, without changing core                                | Planned |
+| 7   | `@pidrang/tailwind` — second UI layer (Tailwind CSS utility classes, no component library)              | Done    |
+| 8   | `primeng`, `rest`, `graphql` packages, without changing core                                            | Planned |
 
 ## Phase 1 — `@pidrang/core`
 
@@ -51,9 +52,16 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 
 - Table → `Resource` → working CRUD generation (the "30 seconds" demo goal)
 
-## Phase 7 — later, without core changes
+## Phase 7 — `@pidrang/tailwind`
 
-- `@pidrang/primeng`, `@pidrang/tailwind`, `@pidrang/rest`, `@pidrang/graphql`, `@pidrang/strapi`
+- `ResourceTable<T>` — renders `Resource.fields` as a plain `<table>` styled with Tailwind utility classes; same `#actions`-template projection API as `@pidrang/material`'s
+- `ResourceForm<T>` — same Signal Forms base as `@pidrang/material`'s (`linkedSignal` draft, never mutates the caller's object), one labeled `<input>`/checkbox per `Field`; a native `input[type=checkbox]` needs its own `SignalField<boolean>`-typed accessor since Angular's template type-checker enforces `FormCheckboxControl<boolean>` exactly for native checkboxes (loosely typed for `mat-checkbox`, which isn't a native element)
+- `apps/demo-tailwind` — same three resources (`users`/`products`/`orders`) as `apps/demo-material`, wired end to end with `ResourceTable`/`ResourceForm`, so the two UI adapters are directly comparable
+- Ships no CSS of its own: the library is markup-only utility classes, so the consuming app's Tailwind build must include `libs/tailwind/src` in its `@source` scan or the classes get purged; `apps/demo-tailwind` wires this via a project-local `.postcssrc.json` (`@tailwindcss/postcss`) and a `@source` directive in `styles.css`
+
+## Phase 8 — later, without core changes
+
+- `@pidrang/primeng`, `@pidrang/rest`, `@pidrang/graphql`, `@pidrang/strapi`
 
 ## Not scheduled as a phase, still needed
 

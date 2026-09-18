@@ -13,7 +13,8 @@ Pidrang is an open-source, headless framework designed to eliminate boilerplate 
 - 🗄️ **Data Providers:** First-class support for Supabase (REST, GraphQL, and custom backends coming soon).
 - 🔐 **Auth Provider:** Simplified authentication flow integration.
 - 🎨 **Material UI Layer:** Schema-driven `ResourceTable`/`ResourceForm` built on Angular Material and Signal Forms.
-- 📦 **Monorepo Structure:** Clean modular architecture (`@pidrang/core`, `@pidrang/supabase`, `@pidrang/material`).
+- 🌬️ **Tailwind UI Layer:** Same schema-driven `ResourceTable`/`ResourceForm`, styled with Tailwind utility classes instead of a component library.
+- 📦 **Monorepo Structure:** Clean modular architecture (`@pidrang/core`, `@pidrang/supabase`, `@pidrang/material`, `@pidrang/tailwind`).
 
 ---
 
@@ -22,11 +23,13 @@ Pidrang is an open-source, headless framework designed to eliminate boilerplate 
 ```text
 pidrang/
 ├── apps/
-│   └── demo-material/  # Angular test application (Material UI)
+│   ├── demo-material/  # Angular test application (Material UI)
+│   └── demo-tailwind/  # Angular test application (Tailwind UI)
 └── libs/
     ├── core/           # Headless primitives & contracts (@pidrang/core)
     ├── supabase/       # Supabase DataProvider implementation (@pidrang/supabase)
-    └── material/       # Angular Material UI layer (@pidrang/material)
+    ├── material/       # Angular Material UI layer (@pidrang/material)
+    └── tailwind/       # Tailwind CSS UI layer (@pidrang/tailwind)
 ```
 
 ## Quick start
@@ -56,13 +59,15 @@ pnpm exec nx serve demo-material --configuration=local
 - `injectDataProvider()`, `injectResources()`, `injectResource(name)` for reading that configuration
 - `injectResourceList<T>(resourceName, params?)`, a signal-based list loader built on Angular's native `resource()`
 
-`@pidrang/supabase` implements `DataProvider` against `@supabase/supabase-js` (`SupabaseDataProvider`, `provideSupabaseDataProvider({ client })`). UI packages (`@pidrang/material`, later `primeng`/`tailwind`) will consume core's reactive primitives without knowing which `DataProvider` is wired in.
+`@pidrang/supabase` implements `DataProvider` against `@supabase/supabase-js` (`SupabaseDataProvider`, `provideSupabaseDataProvider({ client })`). UI packages (`@pidrang/material`, `@pidrang/tailwind`, later `primeng`) consume core's reactive primitives without knowing which `DataProvider` is wired in.
 
 `AuthProvider` (`login`, `logout`, `getIdentity`) follows the same pattern as `DataProvider`: `providePidrang({ authProvider, ... })` registers it, `injectAuthProvider()` reads it, and `injectAuthSession()` wraps it in a signal-based `resource()` for the current identity (`value()` is `AuthIdentity | null | undefined` while loading/signed-out/signed-in). `@pidrang/supabase` implements it with `SupabaseAuthProvider` / `provideSupabaseAuthProvider({ client })`, backed by Supabase Auth.
 
 `SupabaseDataProvider` and `SupabaseAuthProvider` perform no authorization themselves — every access guarantee comes from the Row Level Security policies on the integrator's own Supabase project. Pidrang assumes those policies are correctly configured; it does not enforce or verify them.
 
 `@pidrang/material` is the first UI layer: schema-driven components (`ResourceTable`, `ResourceForm`) that render from a `Resource`'s `Field[]` instead of hand-written markup per resource. It depends only on `@pidrang/core` and `@angular/material` — never on a specific `DataProvider` — so it works with `@pidrang/supabase` today and any future `DataProvider` without changes. `ResourceTable` supports a projected `#actions` template (`contentChild` + `ngTemplateOutlet`) for per-row buttons/links rendered as a real trailing column. `ResourceForm` is built on Angular's Signal Forms (`@angular/forms/signals`), with a `linkedSignal` draft that resets whenever its `value` input changes without mutating the caller's original object.
+
+`@pidrang/tailwind` is a second UI layer with the same `ResourceTable`/`ResourceForm` API, styled with Tailwind utility classes instead of a component library. It ships no CSS of its own — the consuming app's Tailwind build (its own `@source` scan) is what turns the classes used in the library's templates into real styles.
 
 ## Roadmap
 
