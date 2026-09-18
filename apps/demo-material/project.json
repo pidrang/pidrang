@@ -1,9 +1,9 @@
 {
-  "name": "demo",
+  "name": "demo-material",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "prefix": "app",
-  "sourceRoot": "apps/demo/src",
+  "sourceRoot": "apps/demo-material/src",
   "tags": [],
   "targets": {
     "build": {
@@ -11,16 +11,19 @@
       "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
-        "outputPath": "dist/apps/demo",
-        "browser": "apps/demo/src/main.ts",
-        "tsConfig": "apps/demo/tsconfig.app.json",
+        "outputPath": "dist/apps/demo-material",
+        "browser": "apps/demo-material/src/main.ts",
+        "tsConfig": "apps/demo-material/tsconfig.app.json",
         "assets": [
           {
             "glob": "**/*",
-            "input": "apps/demo/public"
+            "input": "apps/demo-material/public"
           }
         ],
-        "styles": ["apps/demo/src/styles.css", "apps/demo/src/theme.scss"]
+        "styles": [
+          "apps/demo-material/src/styles.css",
+          "apps/demo-material/src/theme.scss"
+        ]
       },
       "configurations": {
         "production": {
@@ -49,8 +52,8 @@
           "sourceMap": true,
           "fileReplacements": [
             {
-              "replace": "apps/demo/src/environments/environment.ts",
-              "with": "apps/demo/src/environments/environment.local.ts"
+              "replace": "apps/demo-material/src/environments/environment.ts",
+              "with": "apps/demo-material/src/environments/environment.local.ts"
             }
           ]
         }
@@ -62,13 +65,13 @@
       "defaultConfiguration": "development",
       "configurations": {
         "production": {
-          "buildTarget": "demo:build:production"
+          "buildTarget": "demo-material:build:production"
         },
         "development": {
-          "buildTarget": "demo:build:development"
+          "buildTarget": "demo-material:build:development"
         },
         "local": {
-          "buildTarget": "demo:build:local"
+          "buildTarget": "demo-material:build:local"
         }
       }
     },
@@ -85,9 +88,9 @@
       "continuous": true,
       "executor": "@nx/web:file-server",
       "options": {
-        "buildTarget": "demo:build",
+        "buildTarget": "demo-material:build",
         "port": 4200,
-        "staticFilePath": "dist/apps/demo/browser",
+        "staticFilePath": "dist/apps/demo-material/browser",
         "spa": true
       }
     }

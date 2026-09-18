@@ -22,7 +22,7 @@ Pidrang is an open-source, headless framework designed to eliminate boilerplate 
 ```text
 pidrang/
 ├── apps/
-│   └── demo/           # Angular test application
+│   └── demo-material/  # Angular test application (Material UI)
 └── libs/
     ├── core/           # Headless primitives & contracts (@pidrang/core)
     ├── supabase/       # Supabase DataProvider implementation (@pidrang/supabase)
@@ -37,14 +37,14 @@ pnpm exec nx test core
 pnpm exec nx build core
 ```
 
-To run `apps/demo` against a local Supabase instance instead of the hosted project:
+To run `apps/demo-material` against a local Supabase instance instead of the hosted project:
 
 ```
 # in a clone of pidrang/supabase
 supabase start
 
 # in this repo
-pnpm exec nx serve demo --configuration=local
+pnpm exec nx serve demo-material --configuration=local
 ```
 
 ## Architecture
