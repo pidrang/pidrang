@@ -4,7 +4,7 @@ Headless contracts for Pidrang. Depends on `@angular/core` only — no UI compon
 
 ## Exports
 
-- `Resource`, `Field`, `FieldType`
+- `Resource`, `Field` (`name`, `label?`, `type`, `hidden?`), `FieldType`
 - `DataProvider`, `ListParams`, `ListResult<T>`, `GetOneParams`, `CreateParams<T>`, `UpdateParams<T>`, `DeleteParams`
 - `providePidrang({ dataProvider, resources })`
 - `injectDataProvider()`, `injectResources()`, `injectResource(name)`
