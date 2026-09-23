@@ -11,7 +11,7 @@
     "pg": "^8.13.0"
   },
   "peerDependencies": {
-    "@pidrang/cli": "^0.0.1",
-    "@pidrang/core": "^0.0.1"
+    "@pidrang/cli": "workspace:*",
+    "@pidrang/core": "workspace:*"
   }
 }
