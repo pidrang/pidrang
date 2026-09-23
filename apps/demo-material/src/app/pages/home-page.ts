@@ -5,6 +5,7 @@ import {
   injectAuthSession,
   injectResources,
 } from '@pidrang/core';
+import { environment } from '../../environments/environment';
 import { MatButtonModule } from '@angular/material/button';
 
 @Component({
@@ -36,11 +37,12 @@ import { MatButtonModule } from '@angular/material/button';
 
     <p>
       Compare with the same demo built on a different UI adapter:
-      <a mat-button href="http://localhost:4201">Tailwind adapter</a>
+      <a mat-button [href]="tailwindDemoUrl">Tailwind adapter</a>
     </p>
   `,
 })
 export class HomePage {
+  protected readonly tailwindDemoUrl = environment.tailwindDemoUrl;
   protected readonly resources = injectResources();
   protected readonly session = injectAuthSession();
 
