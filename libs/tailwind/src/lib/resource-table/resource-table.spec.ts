@@ -39,6 +39,30 @@ describe('ResourceTable', () => {
     ).toEqual(['Alice', 'Bob']);
   });
 
+  it('keeps each row element bound to its id when the data is reordered', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceTable] });
+
+    const fixture = TestBed.createComponent(ResourceTable);
+    fixture.componentRef.setInput('fields', [{ name: 'name', type: 'text' }]);
+    fixture.componentRef.setInput('data', [
+      { id: 1, name: 'Alice' },
+      { id: 2, name: 'Bob' },
+    ]);
+    await fixture.whenStable();
+    const [aliceRow, bobRow] =
+      fixture.nativeElement.querySelectorAll('tbody tr');
+
+    fixture.componentRef.setInput('data', [
+      { id: 2, name: 'Bob' },
+      { id: 1, name: 'Alice' },
+    ]);
+    await fixture.whenStable();
+
+    const rows = fixture.nativeElement.querySelectorAll('tbody tr');
+    expect(rows[0]).toBe(bobRow);
+    expect(rows[1]).toBe(aliceRow);
+  });
+
   it('renders a projected actions template as the last cell of each row', async () => {
     @Component({
       imports: [ResourceTable],
