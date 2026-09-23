@@ -10,7 +10,7 @@ The wizard asks which one to use, then only prompts for that strategy's credenti
 - **`service-role`** — reads the REST OpenAPI schema (`/rest/v1/`), needs the project URL and a secret (`service_role`) key.
 - **`postgres`** — connects directly to Postgres and reads `information_schema` (host/port/database/user/password). No Supabase-specific dependency — the most broadly reliable option.
 
-Only `postgres` is validated against standard Postgres behavior. `graphql` and `service-role` are implemented from `pg_graphql`/PostgREST documentation and still need end-to-end verification against a live project with each enabled.
+All three are verified against a real local Supabase instance (`supabase start`), listing and introspecting the same three tables and producing identical `Field[]` output. The `graphql` strategy's introspection query needed a real fix during that verification: pg_graphql wraps `edges` as `NON_NULL(LIST(NON_NULL(OBJECT)))` and `node` as `NON_NULL(OBJECT)`, and GraphQL's `__Type.fields` is only populated once you unwrap down to the OBJECT kind — the original query, written from documentation alone, didn't unwrap deep enough and silently returned zero fields.
 
 ## Exports
 

@@ -3,42 +3,9 @@ import { SchemaProvider } from '@pidrang/cli';
 import { GraphQlConnection } from './supabase-connection';
 import { graphqlScalarToFieldType } from './graphql-field-type';
 
-// pg_graphql exposes each table as a Relay-style `<table>Collection` field on
-// Query, returning `{ edges { node { ...columns, nodeId } } }`. This query
-// walks that fixed shape rather than a generic recursive introspection.
-const INTROSPECTION_QUERY = `
-  query IntrospectSchema {
-    __schema {
-      queryType {
-        fields {
-          name
-          type {
-            fields {
-              name
-              type {
-                fields {
-                  name
-                  type {
-                    name
-                    kind
-                    ofType {
-                      name
-                      kind
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-
 interface IntrospectionType {
-  name?: string | null;
   kind?: string;
+  name?: string | null;
   ofType?: IntrospectionType | null;
   fields?: IntrospectionField[] | null;
 }
@@ -58,6 +25,51 @@ interface IntrospectionResponse {
   };
   errors?: { message: string }[];
 }
+
+// pg_graphql exposes each table as a Relay-style `<table>Collection` field on
+// Query, returning `{ edges { node { ...columns, nodeId } } }`. `edges` is
+// wrapped as `NON_NULL(LIST(NON_NULL(OBJECT)))` and `node` as
+// `NON_NULL(OBJECT)`, and `__Type.fields` is only populated for an
+// OBJECT/INTERFACE kind (null otherwise, verified against a real pg_graphql
+// schema) — so reaching the actual columns needs `fields` re-queried after
+// each `ofType` unwrap, at every hop (Query -> Collection -> edges -> Edge ->
+// node -> Node -> columns). GraphQL has no recursive query syntax, so this
+// generates a bounded-depth query instead of hand-writing the nesting.
+function typeSelection(depth: number): string {
+  if (depth <= 0) {
+    return `kind name ofType { kind name ofType { kind name } }`;
+  }
+  return `
+    kind
+    name
+    fields {
+      name
+      type {
+        ${typeSelection(depth - 1)}
+      }
+    }
+    ofType {
+      ${typeSelection(depth - 1)}
+    }
+  `;
+}
+
+// Deep enough to cover Collection -> edges (3 unwraps) -> Edge -> node
+// (1 unwrap) -> Node -> columns, with margin.
+const INTROSPECTION_QUERY = `
+  query IntrospectSchema {
+    __schema {
+      queryType {
+        fields {
+          name
+          type {
+            ${typeSelection(8)}
+          }
+        }
+      }
+    }
+  }
+`;
 
 async function runIntrospection(
   connection: GraphQlConnection,
@@ -79,14 +91,30 @@ async function runIntrospection(
   return body.data?.__schema.queryType.fields ?? [];
 }
 
-function findNodeFields(collectionField: IntrospectionField): IntrospectionField[] {
-  const edgesField = collectionField.type.fields?.find(
-    (field) => field.name === 'edges',
-  );
-  const nodeField = edgesField?.type.fields?.find(
-    (field) => field.name === 'node',
-  );
-  return nodeField?.type.fields ?? [];
+// Walks `ofType` until it finds a level where `fields` is populated (i.e. an
+// OBJECT/INTERFACE kind), since a NON_NULL/LIST wrapper's own `fields` is
+// always null.
+function unwrapObjectFields(
+  type: IntrospectionType | null | undefined,
+): IntrospectionField[] {
+  if (!type) {
+    return [];
+  }
+  return type.fields ?? unwrapObjectFields(type.ofType);
+}
+
+function findFieldFields(
+  fields: IntrospectionField[],
+  name: string,
+): IntrospectionField[] {
+  const field = fields.find((f) => f.name === name);
+  return field ? unwrapObjectFields(field.type) : [];
+}
+
+function isScalarField(field: IntrospectionField): boolean {
+  const kind =
+    field.type.kind === 'NON_NULL' ? field.type.ofType?.kind : field.type.kind;
+  return kind === 'SCALAR' || kind === 'ENUM';
 }
 
 function scalarTypeName(type: IntrospectionType): string {
@@ -112,8 +140,13 @@ export function createGraphQlSchemaProvider(
       if (!collectionField) {
         throw new Error(`Table "${table}" not found in Supabase GraphQL schema`);
       }
-      return findNodeFields(collectionField)
-        .filter((field) => field.name !== 'nodeId')
+
+      const collectionFields = unwrapObjectFields(collectionField.type);
+      const edgeFields = findFieldFields(collectionFields, 'edges');
+      const nodeFields = findFieldFields(edgeFields, 'node');
+
+      return nodeFields
+        .filter((field) => field.name !== 'nodeId' && isScalarField(field))
         .map(
           (field): Field => ({
             name: field.name,
