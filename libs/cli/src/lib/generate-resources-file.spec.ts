@@ -63,6 +63,30 @@ export const resources: Resource[] = [
     expect(output).toContain('delete: false,');
   });
 
+  it('marks fields listed in hiddenFields as hidden', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'users',
+          fields: [
+            { name: 'id', type: 'number' },
+            { name: 'password_hash', type: 'text' },
+          ],
+          actions: ['list'],
+          hiddenFields: ['password_hash'],
+        },
+      ],
+    };
+
+    const output = generateResourcesFile(plan);
+
+    expect(output).toContain(`{ name: 'id', type: 'number' },`);
+    expect(output).toContain(
+      `{ name: 'password_hash', type: 'text', hidden: true },`,
+    );
+  });
+
   it('generates one Resource literal per planned table', () => {
     const plan: GenerationPlan = {
       providerId: 'supabase',
