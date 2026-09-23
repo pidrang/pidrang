@@ -7,6 +7,10 @@ const connection: GraphQlConnection = {
   anonKey: 'anon-key',
 };
 
+// Mirrors the real shape pg_graphql returns (verified against a live local
+// Supabase instance): `edges` is NON_NULL(LIST(NON_NULL(OBJECT Edge))) and
+// `node` is NON_NULL(OBJECT Node) — `fields` only appears once you unwrap
+// down to the OBJECT kind, it's null on every wrapper level in between.
 function collectionField(
   name: string,
   columns: { name: string; typeName: string }[],
@@ -14,24 +18,60 @@ function collectionField(
   return {
     name: `${name}Collection`,
     type: {
+      kind: 'OBJECT',
+      name: `${name}Connection`,
       fields: [
         {
           name: 'edges',
           type: {
-            fields: [
-              {
-                name: 'node',
-                type: {
+            kind: 'NON_NULL',
+            fields: null,
+            ofType: {
+              kind: 'LIST',
+              fields: null,
+              ofType: {
+                kind: 'NON_NULL',
+                fields: null,
+                ofType: {
+                  kind: 'OBJECT',
+                  name: `${name}Edge`,
                   fields: [
-                    { name: 'nodeId', type: { name: 'ID' } },
-                    ...columns.map((column) => ({
-                      name: column.name,
-                      type: { name: column.typeName, kind: 'SCALAR', ofType: null },
-                    })),
+                    {
+                      name: 'node',
+                      type: {
+                        kind: 'NON_NULL',
+                        fields: null,
+                        ofType: {
+                          kind: 'OBJECT',
+                          name,
+                          fields: [
+                            {
+                              name: 'nodeId',
+                              type: {
+                                kind: 'NON_NULL',
+                                ofType: { kind: 'SCALAR', name: 'ID' },
+                              },
+                            },
+                            ...columns.map((column) => ({
+                              name: column.name,
+                              type: {
+                                kind: 'NON_NULL',
+                                name: null,
+                                ofType: { kind: 'SCALAR', name: column.typeName },
+                              },
+                            })),
+                            {
+                              name: 'author',
+                              type: { kind: 'OBJECT', name: 'users', ofType: null },
+                            },
+                          ],
+                        },
+                      },
+                    },
                   ],
                 },
               },
-            ],
+            },
           },
         },
       ],
@@ -75,7 +115,7 @@ describe('createGraphQlSchemaProvider', () => {
     expect(await provider.listTables()).toEqual(['products']);
   });
 
-  it('introspects a table into typed fields, excluding nodeId', async () => {
+  it('introspects a table into typed fields, excluding nodeId and relations', async () => {
     const provider = createGraphQlSchemaProvider(connection);
     expect(await provider.introspectTable('products')).toEqual([
       { name: 'id', type: 'number' },
