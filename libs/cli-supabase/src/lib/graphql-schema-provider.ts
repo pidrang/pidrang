@@ -82,6 +82,11 @@ async function runIntrospection(
     },
     body: JSON.stringify({ query: INTROSPECTION_QUERY }),
   });
+  if (!response.ok) {
+    throw new Error(
+      `Supabase GraphQL introspection failed: ${response.status} ${response.statusText}`,
+    );
+  }
   const body = (await response.json()) as IntrospectionResponse;
   if (body.errors?.length) {
     throw new Error(

@@ -101,6 +101,7 @@ describe('createGraphQlSchemaProvider', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
+        ok: true,
         json: () => Promise.resolve(introspectionResponse),
       }),
     );
@@ -128,6 +129,7 @@ describe('createGraphQlSchemaProvider', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
+        ok: true,
         json: () =>
           Promise.resolve({
             errors: [{ message: 'pg_graphql extension is not enabled.' }],
@@ -138,6 +140,20 @@ describe('createGraphQlSchemaProvider', () => {
     await expect(provider.listTables()).rejects.toThrow(
       /pg_graphql extension is not enabled/,
     );
+  });
+
+  it('throws when the response is not ok', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        json: () => Promise.resolve({ message: 'Invalid API key' }),
+      }),
+    );
+    const provider = createGraphQlSchemaProvider(connection);
+    await expect(provider.listTables()).rejects.toThrow(/401 Unauthorized/);
   });
 
   it('throws when the table is not found', async () => {
