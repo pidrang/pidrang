@@ -3,6 +3,13 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/cli-supabase/src",
   "projectType": "library",
+  "release": {
+    "version": {
+      "manifestRootsToUpdate": ["dist/{projectRoot}"],
+      "currentVersionResolver": "git-tag",
+      "fallbackCurrentVersionResolver": "disk"
+    }
+  },
   "tags": [],
   "targets": {
     "build": {
@@ -13,6 +20,11 @@
         "main": "libs/cli-supabase/src/index.ts",
         "tsConfig": "libs/cli-supabase/tsconfig.lib.json",
         "assets": ["libs/cli-supabase/*.md"]
+      }
+    },
+    "nx-release-publish": {
+      "options": {
+        "packageRoot": "dist/{projectRoot}"
       }
     }
   }
