@@ -2,7 +2,7 @@
   "name": "@pidrang/supabase",
   "version": "0.0.1",
   "peerDependencies": {
-    "@pidrang/core": "^0.0.1",
+    "@pidrang/core": "workspace:*",
     "@supabase/supabase-js": "^2.116.0"
   },
   "sideEffects": false

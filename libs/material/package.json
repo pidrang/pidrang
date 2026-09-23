@@ -6,7 +6,7 @@
     "@angular/core": "^22.1.0",
     "@angular/forms": "^22.1.0",
     "@angular/material": "^22.1.0",
-    "@pidrang/core": "^0.0.1"
+    "@pidrang/core": "workspace:*"
   },
   "sideEffects": false
 }

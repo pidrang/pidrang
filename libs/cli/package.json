@@ -10,6 +10,6 @@
     "@inquirer/prompts": "^7.0.0"
   },
   "peerDependencies": {
-    "@pidrang/core": "^0.0.1"
+    "@pidrang/core": "workspace:*"
   }
 }

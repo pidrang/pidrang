@@ -5,7 +5,12 @@
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
+  "bin": {
+    "pidrang": "./src/main.js"
+  },
   "dependencies": {
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "@pidrang/cli": "workspace:*",
+    "@pidrang/cli-supabase": "workspace:*"
   }
 }
