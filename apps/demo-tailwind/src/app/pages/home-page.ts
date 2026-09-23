@@ -5,6 +5,7 @@ import {
   injectAuthSession,
   injectResources,
 } from '@pidrang/core';
+import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-home-page',
@@ -47,13 +48,14 @@ import {
 
     <p class="mt-4 text-gray-700">
       Compare with the same demo built on a different UI adapter:
-      <a href="http://localhost:4200" class="text-blue-600 hover:underline"
+      <a [href]="materialDemoUrl" class="text-blue-600 hover:underline"
         >Material adapter</a
       >
     </p>
   `,
 })
 export class HomePage {
+  protected readonly materialDemoUrl = environment.materialDemoUrl;
   protected readonly resources = injectResources();
   protected readonly session = injectAuthSession();
 
