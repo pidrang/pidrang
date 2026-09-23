@@ -53,8 +53,9 @@ export class ResourceListPage {
   protected readonly list = injectResourceList<Row>(() => this.resource());
   protected readonly fields = computed(
     () =>
-      this.resources.find((resource) => resource.name === this.resource())
-        ?.fields ?? [],
+      this.resources
+        .find((resource) => resource.name === this.resource())
+        ?.fields?.filter((field) => !field.hidden) ?? [],
   );
 
   protected async remove(id: string): Promise<void> {

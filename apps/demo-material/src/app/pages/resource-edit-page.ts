@@ -56,7 +56,9 @@ export class ResourceEditPage {
     () =>
       this.resources
         .find((resource) => resource.name === this.resource())
-        ?.fields?.filter((field) => !NON_EDITABLE_FIELDS.has(field.name)) ?? [],
+        ?.fields?.filter(
+          (field) => !NON_EDITABLE_FIELDS.has(field.name) && !field.hidden,
+        ) ?? [],
   );
 
   protected readonly value = computed(() => {

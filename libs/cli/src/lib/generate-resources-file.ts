@@ -25,10 +25,10 @@ export function generateResourcesFile(plan: GenerationPlan): string {
 
 function generateResourceLiteral(table: TablePlan): string {
   const fields = table.fields
-    .map(
-      (field) =>
-        `      { name: ${quote(field.name)}, type: ${quote(field.type)} },`,
-    )
+    .map((field) => {
+      const hidden = table.hiddenFields.includes(field.name);
+      return `      { name: ${quote(field.name)}, type: ${quote(field.type)}${hidden ? ', hidden: true' : ''} },`;
+    })
     .join('\n');
 
   const actions = CRUD_ACTIONS.map(
