@@ -9,7 +9,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 | 3   | `apps/demo-material` — core + supabase wired together, generic CRUD pages                               | Done    |
 | 4   | Auth Provider — sign-in contract, session state, tightens the demo's RLS policies                       | Done    |
 | 5   | `@pidrang/material` — first real UI layer (List/Create/Show/Edit/Delete bound to core's resource state) | Done    |
-| 6   | `@pidrang/cli` — table → `Resource` → working CRUD generation                                           | Next    |
+| 6   | `@pidrang/cli` — table → `Resource` → working CRUD generation                                           | In progress |
 | 7   | `@pidrang/tailwind` — second UI layer (Tailwind CSS utility classes, no component library)              | Done    |
 | 8   | `primeng`, `rest`, `graphql` packages, without changing core                                            | Planned |
 
@@ -50,7 +50,11 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 
 ## Phase 6 — `@pidrang/cli`
 
-- Table → `Resource` → working CRUD generation (the "30 seconds" demo goal)
+- Table → `Resource` → working CRUD generation (the "30 seconds" demo goal), shipped as `pidrang` on npm (`npx pidrang init`) rather than an Nx generator, since it targets any Angular app, not just this workspace
+- `@pidrang/cli` — provider-agnostic: `SchemaProvider`/`SchemaProviderDefinition` contract, `runInitWizard()` (provider → connection → tables → per-table actions/hidden fields → `GenerationPlan`), `generateResourcesFile(plan)` (pure `resources.ts` codegen, no disk I/O)
+- `@pidrang/cli-supabase` — three connection strategies the wizard lets the user pick between, since no single Supabase introspection method is reliably available across projects: `graphql` (`pg_graphql`, anon key), `service-role` (REST OpenAPI schema, secret key), `postgres` (direct `information_schema`, the only one validated against standard Postgres so far)
+- `Field.hidden?: boolean` added to `@pidrang/core` so the wizard's "hide from list/edit" choice is real, read by `apps/demo-material`'s generic list/edit pages at runtime (not baked in per table, since those pages are shared across every `Resource`)
+- Still to do: `apps/pidrang-cli` bin entrypoint (disk writing, printed routes/`providePidrang` snippet instead of editing the target app's files), and an end-to-end run against a real Supabase project (needed to validate the `graphql`/`service-role` strategies, not yet exercised live)
 
 ## Phase 7 — `@pidrang/tailwind`
 
