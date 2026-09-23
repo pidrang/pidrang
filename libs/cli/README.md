@@ -10,6 +10,7 @@ Provider-agnostic engine behind `pidrang init`: the interactive wizard, the `Res
 - `GenerationPlan`, `TablePlan` — the wizard's output: per selected table, its fields, chosen actions, and fields to hide from list/edit views
 - `runInitWizard(providers: SchemaProviderDefinition[])` — drives the interactive flow, returns a `GenerationPlan`
 - `generateResourcesFile(plan: GenerationPlan)` — pure string generator, turns a plan into a ready-to-use `resources.ts` (no disk I/O)
+- `generatePagesBundle()`, `RESOURCE_ROUTES_SNIPPET` — the generic List/Create/Show/Edit pages + helpers (`auth-required-error.ts`, `record-label.ts`), copied verbatim from `apps/demo-material`, plus the routes to wire them up. Scoped to `@pidrang/material` for now — these pages are resource-agnostic and shared across every table, so they're generated once, not per table. No disk I/O here either; writing them into the target app is `apps/pidrang-cli`'s job.
 
 ## Running unit tests
 
