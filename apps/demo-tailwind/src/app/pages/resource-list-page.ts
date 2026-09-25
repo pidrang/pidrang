@@ -1,4 +1,11 @@
-import { Component, computed, input } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  input,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   injectDataProvider,
@@ -8,6 +15,8 @@ import {
 import { ResourceTable } from '@pidrang/tailwind';
 
 type Row = { id: string } & Record<string, unknown>;
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 @Component({
   selector: 'app-resource-list-page',
@@ -25,45 +34,138 @@ type Row = { id: string } & Record<string, unknown>;
     }
     @if (list.error(); as error) {
       <p class="mt-4 text-red-600">{{ error.message }}</p>
+    } @else {
+      @if (total() === 0) {
+        <p class="mt-4 text-gray-500">No records yet.</p>
+      } @else if (list.hasValue()) {
+        <div class="mt-4">
+          <lib-resource-table [fields]="fields()" [data]="list.value().data">
+            <ng-template #actions let-row>
+              <a
+                [routerLink]="['/', resource(), row.id]"
+                class="text-blue-600 hover:underline"
+                >Show</a
+              >
+              <a
+                [routerLink]="['/', resource(), row.id, 'edit']"
+                class="ml-3 text-blue-600 hover:underline"
+                >Edit</a
+              >
+              <button
+                type="button"
+                [disabled]="list.isLoading()"
+                (click)="remove(row.id)"
+                class="ml-3 text-red-600 hover:underline disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </ng-template>
+          </lib-resource-table>
+        </div>
+      }
+      <nav
+        aria-label="Pagination"
+        class="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-700"
+      >
+        <label class="flex items-center gap-2">
+          Rows per page
+          <select
+            class="rounded border border-gray-300 px-2 py-1"
+            [disabled]="list.isLoading()"
+            (change)="changePageSize($event)"
+          >
+            @for (size of pageSizeOptions; track size) {
+              <option [value]="size" [selected]="size === pageSize()">
+                {{ size }}
+              </option>
+            }
+          </select>
+        </label>
+        <span>Page {{ page() }} of {{ lastPage() }}</span>
+        <span>{{ total() ?? '-' }} records</span>
+        <button
+          type="button"
+          class="rounded border border-gray-300 px-3 py-1 disabled:opacity-50"
+          [disabled]="list.isLoading() || page() <= 1"
+          (click)="page.set(page() - 1)"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          class="rounded border border-gray-300 px-3 py-1 disabled:opacity-50"
+          [disabled]="list.isLoading() || page() >= lastPage()"
+          (click)="page.set(page() + 1)"
+        >
+          Next
+        </button>
+      </nav>
     }
-
-    <div class="mt-4">
-      <lib-resource-table [fields]="fields()" [data]="list.value()?.data ?? []">
-        <ng-template #actions let-row>
-          <a
-            [routerLink]="['/', resource(), row.id]"
-            class="text-blue-600 hover:underline"
-            >Show</a
-          >
-          <a
-            [routerLink]="['/', resource(), row.id, 'edit']"
-            class="ml-3 text-blue-600 hover:underline"
-            >Edit</a
-          >
-          <button
-            type="button"
-            (click)="remove(row.id)"
-            class="ml-3 text-red-600 hover:underline"
-          >
-            Delete
-          </button>
-        </ng-template>
-      </lib-resource-table>
-    </div>
   `,
 })
 export class ResourceListPage {
   readonly resource = input.required<string>();
 
+  protected readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
+  protected readonly pageSize = signal(PAGE_SIZE_OPTIONS[0]);
+  protected readonly page = linkedSignal({
+    source: () => ({ resource: this.resource(), pageSize: this.pageSize() }),
+    computation: () => 1,
+  });
+
   private readonly dataProvider = injectDataProvider();
   private readonly resources = injectResources();
-  protected readonly list = injectResourceList<Row>(() => this.resource());
+  protected readonly list = injectResourceList<Row>(
+    () => this.resource(),
+    () => ({
+      pagination: { current: this.page(), pageSize: this.pageSize() },
+      sorters: [{ field: 'id', order: 'asc' }],
+    }),
+  );
+  protected readonly total = linkedSignal<
+    { resource: string; total: number | undefined },
+    number | undefined
+  >({
+    source: () => ({
+      resource: this.resource(),
+      total: this.list.hasValue() ? this.list.value().total : undefined,
+    }),
+    computation: (source, previous) =>
+      source.total ??
+      (previous?.source.resource === source.resource
+        ? previous.value
+        : undefined),
+  });
+  protected readonly lastPage = computed(() =>
+    Math.max(1, Math.ceil((this.total() ?? 0) / this.pageSize())),
+  );
   protected readonly fields = computed(
     () =>
       this.resources
         .find((resource) => resource.name === this.resource())
         ?.fields?.filter((field) => !field.hidden) ?? [],
   );
+
+  constructor() {
+    effect(() => {
+      if (!this.list.hasValue()) {
+        return;
+      }
+      const lastPage = Math.max(
+        1,
+        Math.ceil(this.list.value().total / this.pageSize()),
+      );
+      if (this.page() > lastPage) {
+        this.page.set(lastPage);
+      }
+    });
+  }
+
+  protected changePageSize(event: Event): void {
+    if (event.target instanceof HTMLSelectElement) {
+      this.pageSize.set(Number(event.target.value));
+    }
+  }
 
   protected async remove(id: string): Promise<void> {
     await this.dataProvider.delete(this.resource(), { id });

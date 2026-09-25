@@ -52,6 +52,21 @@ describe('generatePagesBundle', () => {
     expect(editPage?.content).toContain('!field.hidden');
   });
 
+  it('generates a paginated list page with stable id ordering', () => {
+    const listPage = generatePagesBundle().find(
+      (file) => file.path === 'src/app/pages/resource-list-page.ts',
+    );
+
+    expect(listPage?.content).toContain('<mat-paginator');
+    expect(listPage?.content).toContain(
+      'pagination: { current: this.page(), pageSize: this.pageSize() }',
+    );
+    expect(listPage?.content).toContain(
+      "sorters: [{ field: 'id', order: 'asc' }]",
+    );
+    expect(listPage?.content).not.toContain('list.value()?.data');
+  });
+
   it('exports each page component name once', () => {
     const files = generatePagesBundle();
     const names = [
