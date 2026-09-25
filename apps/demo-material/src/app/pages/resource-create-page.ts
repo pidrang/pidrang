@@ -1,4 +1,12 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  input,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   Field,
@@ -11,6 +19,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { isAuthRequiredError } from '../auth-required-error';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
+
+interface SaveFailure {
+  message: string;
+  authRequired: boolean;
+}
 
 function defaultValueForField(field: Field): unknown {
   switch (field.type) {
@@ -35,12 +48,13 @@ function defaultValueForField(field: Field): unknown {
     <lib-resource-form
       [fields]="fields()"
       [value]="initialValue()"
+      [pending]="saving()"
       (save)="submit($event)"
     />
 
-    @if (error()) {
-      <p>{{ error() }}</p>
-      @if (authRequired()) {
+    @if (saveFailure(); as failure) {
+      <p role="alert">{{ failure.message }}</p>
+      @if (failure.authRequired) {
         <p>
           You may need to <a routerLink="/login">sign in</a> to make changes.
         </p>
@@ -51,12 +65,16 @@ function defaultValueForField(field: Field): unknown {
 export class ResourceCreatePage {
   readonly resource = input.required<string>();
 
-  protected readonly error = signal<string | null>(null);
-  protected readonly authRequired = signal(false);
+  protected readonly saving = signal(false);
+  protected readonly saveFailure = linkedSignal<string, SaveFailure | null>({
+    source: () => this.resource(),
+    computation: () => null,
+  });
 
   private readonly dataProvider = injectDataProvider();
   private readonly router = inject(Router);
   private readonly resources = injectResources();
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly definition = computed(() =>
     this.resources.find((resource) => resource.name === this.resource()),
@@ -85,18 +103,29 @@ export class ResourceCreatePage {
   );
 
   protected async submit(data: Record<string, unknown>): Promise<void> {
-    if (!this.canCreate()) {
+    if (!this.canCreate() || this.saving()) {
       return;
     }
+    const resource = this.resource();
+    this.saving.set(true);
+    this.saveFailure.set(null);
     try {
       const created = await this.dataProvider.create<Record<string, unknown>>(
-        this.resource(),
+        resource,
         { data },
       );
-      await this.router.navigate(this.destinationAfterCreate(created['id']));
+      if (this.isCurrent(resource)) {
+        await this.router.navigate(this.destinationAfterCreate(created['id']));
+      }
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : String(err));
-      this.authRequired.set(isAuthRequiredError(err));
+      if (this.isCurrent(resource)) {
+        this.saveFailure.set({
+          message: err instanceof Error ? err.message : String(err),
+          authRequired: isAuthRequiredError(err),
+        });
+      }
+    } finally {
+      this.saving.set(false);
     }
   }
 
@@ -108,5 +137,9 @@ export class ResourceCreatePage {
       return ['/', this.resource(), id];
     }
     return ['/'];
+  }
+
+  private isCurrent(resource: string): boolean {
+    return !this.destroyRef.destroyed && resource === this.resource();
   }
 }
