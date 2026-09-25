@@ -1,6 +1,28 @@
 {
   "name": "@pidrang/material",
   "version": "0.0.1",
+  "description": "Schema-driven ResourceTable and ResourceForm for Pidrang, built on Angular Material and Signal Forms.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pidrang/pidrang.git",
+    "directory": "libs/material"
+  },
+  "homepage": "https://github.com/pidrang/pidrang#readme",
+  "bugs": {
+    "url": "https://github.com/pidrang/pidrang/issues"
+  },
+  "keywords": [
+    "angular",
+    "admin",
+    "angular-material",
+    "signal-forms",
+    "crud",
+    "pidrang"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@angular/common": "^22.1.0",
     "@angular/core": "^22.1.0",

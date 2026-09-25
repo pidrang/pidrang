@@ -86,8 +86,65 @@
     }
   },
   "release": {
+    "projects": ["core", "supabase", "material", "tailwind"],
+    "projectsRelationship": "fixed",
+    "releaseTag": {
+      "pattern": "v{version}"
+    },
     "version": {
-      "preVersionCommand": "pnpm dlx nx run-many -t build"
+      "preVersionCommand": "pnpm exec nx run-many -t build -p core supabase material tailwind && for lib in core supabase material tailwind; do cp LICENCE dist/libs/$lib/LICENCE; done",
+      "conventionalCommits": true,
+      "manifestRootsToUpdate": [
+        "{projectRoot}",
+        {
+          "path": "dist/{projectRoot}",
+          "preserveLocalDependencyProtocols": false
+        }
+      ],
+      "versionPrefix": "^"
+    },
+    "changelog": {
+      "workspaceChangelog": {
+        "file": "CHANGELOG.md",
+        "createRelease": "github",
+        "renderOptions": {
+          "authors": false
+        }
+      }
+    },
+    "git": {
+      "commit": true,
+      "tag": true,
+      "commitMessage": "chore(release): v{version}"
+    },
+    "conventionalCommits": {
+      "types": {
+        "feat": {
+          "changelog": {
+            "title": "Features"
+          }
+        },
+        "fix": {
+          "changelog": {
+            "title": "Fixes"
+          }
+        },
+        "perf": {
+          "changelog": {
+            "title": "Performance"
+          }
+        },
+        "refactor": {
+          "changelog": {
+            "title": "Refactors"
+          }
+        },
+        "revert": {
+          "changelog": {
+            "title": "Reverts"
+          }
+        }
+      }
     }
   }
 }

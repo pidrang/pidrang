@@ -1,6 +1,28 @@
 {
   "name": "@pidrang/supabase",
   "version": "0.0.1",
+  "description": "Supabase DataProvider and AuthProvider for Pidrang.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pidrang/pidrang.git",
+    "directory": "libs/supabase"
+  },
+  "homepage": "https://github.com/pidrang/pidrang#readme",
+  "bugs": {
+    "url": "https://github.com/pidrang/pidrang/issues"
+  },
+  "keywords": [
+    "angular",
+    "admin",
+    "supabase",
+    "data-provider",
+    "auth",
+    "pidrang"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@pidrang/core": "workspace:*",
     "@supabase/supabase-js": "^2.116.0"
