@@ -23,7 +23,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 
 ## Phase 2 — `@pidrang/supabase`
 
-- `SupabaseDataProvider implements DataProvider`, mapping `ListParams` to `.eq()`/`.order()`/`.range()`, normalizing `PostgrestError` to a plain `Error`
+- `SupabaseDataProvider implements DataProvider`, mapping `ListParams` to `.eq()`/`.order()`/`.range()`, normalizing `PostgrestError` to a `PidrangError` (`unauthenticated`/`forbidden`/`not-found`/`unknown` category from the HTTP status, plus `code`/`status`/`cause`)
 - `provideSupabaseDataProvider({ client })` — returns a plain `DataProvider`, no Angular DI of its own
 
 ## Phase 3 — `apps/demo-material`
@@ -35,7 +35,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 ## Phase 4 — Auth Provider
 
 - `AuthProvider` (`login`, `logout`, `getIdentity`) in `@pidrang/core`, `AUTH_PROVIDER` as an optional `providePidrang()` dependency, `injectAuthProvider()`, and `injectAuthSession()` (signal-based, built on `resource()`)
-- `SupabaseAuthProvider` / `provideSupabaseAuthProvider({ client })` in `@pidrang/supabase`, wrapping `supabase-js` auth; normalizes `AuthError` to a plain `Error`, treats a missing session as a `null` identity rather than an error
+- `SupabaseAuthProvider` / `provideSupabaseAuthProvider({ client })` in `@pidrang/supabase`, wrapping `supabase-js` auth; normalizes `AuthError` to a `PidrangError`, returns a `null` identity only for a missing session (`AuthSessionMissingError`, `session_not_found`) and propagates network/server failures, and maps Supabase auth events to `onSessionChange()`
 - `apps/demo-material` wires it into `app.config.ts` (one Supabase client shared by both providers), adds a minimal `/login` page, and shows the signed-in identity with sign out on `HomePage`
 - `pidrang/supabase`'s RLS policies tightened: `select` stays public, `insert`/`update`/`delete` now require the `authenticated` role (see that repo's migrations)
 
