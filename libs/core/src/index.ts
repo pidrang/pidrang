@@ -12,3 +12,6 @@ export * from './lib/provide-pidrang';
 export * from './lib/inject-pidrang';
 export * from './lib/resource-list';
 export * from './lib/auth-session';
+export * from './lib/pidrang-error-category';
+export * from './lib/pidrang-error-options';
+export * from './lib/pidrang-error';

@@ -1,4 +1,9 @@
-import { ApplicationRef } from '@angular/core';
+import {
+  ApplicationRef,
+  EnvironmentInjector,
+  createEnvironmentInjector,
+  runInInjectionContext,
+} from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { AuthIdentity, AuthProvider } from './auth-provider';
@@ -7,7 +12,8 @@ import { injectAuthSession } from './auth-session';
 import { providePidrang } from './provide-pidrang';
 
 const noopDataProvider: DataProvider = {
-  getList: <T>() => Promise.resolve({ data: [], total: 0 } as { data: T[]; total: number }),
+  getList: <T>() =>
+    Promise.resolve({ data: [], total: 0 } as { data: T[]; total: number }),
   getOne: <T>() => Promise.resolve({} as T),
   create: <T>() => Promise.resolve({} as T),
   update: <T>() => Promise.resolve({} as T),
@@ -20,6 +26,43 @@ function authProviderReturning(identity: AuthIdentity | null): AuthProvider {
     logout: () => Promise.resolve(),
     getIdentity: () => Promise.resolve(identity),
   };
+}
+
+async function settle(): Promise<void> {
+  TestBed.tick();
+  await TestBed.inject(ApplicationRef).whenStable();
+}
+
+function subscribableAuthProvider(
+  getIdentity: () => Promise<AuthIdentity | null>,
+) {
+  const listeners = new Set<() => void>();
+  const provider: AuthProvider = {
+    login: () => Promise.resolve(),
+    logout: () => Promise.resolve(),
+    getIdentity,
+    onSessionChange: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  return {
+    provider,
+    listeners,
+    notify: () => listeners.forEach((listener) => listener()),
+  };
+}
+
+function configure(authProvider: AuthProvider): void {
+  TestBed.configureTestingModule({
+    providers: [
+      providePidrang({
+        dataProvider: noopDataProvider,
+        resources: [],
+        authProvider,
+      }),
+    ],
+  });
 }
 
 describe('injectAuthSession', () => {
@@ -75,9 +118,107 @@ describe('injectAuthSession', () => {
 
   it('throws when no auth provider is configured', () => {
     TestBed.configureTestingModule({
-      providers: [providePidrang({ dataProvider: noopDataProvider, resources: [] })],
+      providers: [
+        providePidrang({ dataProvider: noopDataProvider, resources: [] }),
+      ],
     });
 
-    expect(() => TestBed.runInInjectionContext(() => injectAuthSession())).toThrow();
+    expect(() =>
+      TestBed.runInInjectionContext(() => injectAuthSession()),
+    ).toThrow();
+  });
+
+  it('reloads every live consumer when the provider reports a session change', async () => {
+    let identity: AuthIdentity | null = null;
+    const auth = subscribableAuthProvider(() => Promise.resolve(identity));
+    configure(auth.provider);
+
+    const first = TestBed.runInInjectionContext(() => injectAuthSession());
+    const second = TestBed.runInInjectionContext(() => injectAuthSession());
+    await settle();
+    expect(first.value()).toBeNull();
+    expect(second.value()).toBeNull();
+
+    identity = { id: '1' };
+    auth.notify();
+    await settle();
+    expect(first.value()).toEqual({ id: '1' });
+    expect(second.value()).toEqual({ id: '1' });
+
+    identity = null;
+    auth.notify();
+    await settle();
+    expect(first.value()).toBeNull();
+    expect(second.value()).toBeNull();
+  });
+
+  it('unsubscribes when the consumer is destroyed', async () => {
+    const auth = subscribableAuthProvider(() => Promise.resolve(null));
+    configure(auth.provider);
+
+    const injector = createEnvironmentInjector(
+      [],
+      TestBed.inject(EnvironmentInjector),
+    );
+    runInInjectionContext(injector, () => injectAuthSession());
+    expect(auth.listeners.size).toBe(1);
+
+    injector.destroy();
+
+    expect(auth.listeners.size).toBe(0);
+  });
+
+  it('ignores a late response once the consumer is destroyed', async () => {
+    let resolveIdentity: (identity: AuthIdentity | null) => void = () =>
+      undefined;
+    const auth = subscribableAuthProvider(
+      () => new Promise((resolve) => (resolveIdentity = resolve)),
+    );
+    configure(auth.provider);
+
+    const injector = createEnvironmentInjector(
+      [],
+      TestBed.inject(EnvironmentInjector),
+    );
+    const session = runInInjectionContext(injector, () => injectAuthSession());
+    TestBed.tick();
+
+    injector.destroy();
+    resolveIdentity({ id: 'stale' });
+    await settle();
+
+    expect(session.value()).toBeUndefined();
+  });
+
+  it('keeps the newest identity when an older request resolves last', async () => {
+    const pending: ((identity: AuthIdentity | null) => void)[] = [];
+    const auth = subscribableAuthProvider(
+      () => new Promise((resolve) => pending.push(resolve)),
+    );
+    configure(auth.provider);
+
+    const session = TestBed.runInInjectionContext(() => injectAuthSession());
+    TestBed.tick();
+    auth.notify();
+    TestBed.tick();
+    expect(pending).toHaveLength(2);
+
+    pending[1]({ id: 'new' });
+    await Promise.resolve();
+    pending[0]({ id: 'old' });
+    await settle();
+
+    expect(session.value()).toEqual({ id: 'new' });
+  });
+
+  it('surfaces a provider failure through error()', async () => {
+    const failure = new Error('network down');
+    const auth = subscribableAuthProvider(() => Promise.reject(failure));
+    configure(auth.provider);
+
+    const session = TestBed.runInInjectionContext(() => injectAuthSession());
+    await settle();
+
+    expect(session.error()).toBe(failure);
   });
 });
