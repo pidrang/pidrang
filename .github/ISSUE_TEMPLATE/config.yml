@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/pidrang/pidrang/discussions
+    about: Ask how to use Pidrang or share what you are building.
+  - name: Report a security vulnerability
+    url: https://github.com/pidrang/pidrang/security/policy
+    about: Do not open a public issue for security problems.
