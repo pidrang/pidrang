@@ -14,4 +14,6 @@ export interface AuthProvider {
   logout(): Promise<void>;
 
   getIdentity(): Promise<AuthIdentity | null>;
+
+  onSessionChange?(listener: () => void): () => void;
 }
