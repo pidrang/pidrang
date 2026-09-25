@@ -15,7 +15,9 @@ import { MatButtonModule } from '@angular/material/button';
   template: `
     <h1>Pidrang demo</h1>
 
-    @if (session.value(); as identity) {
+    @if (session.error(); as sessionError) {
+      <p>Could not load your session: {{ sessionError.message }}</p>
+    } @else if (session.value(); as identity) {
       <p>
         Signed in as {{ identity.email ?? identity.id }}
         <button mat-stroked-button type="button" (click)="signOut()">
@@ -60,6 +62,5 @@ export class HomePage {
 
   protected async signOut(): Promise<void> {
     await this.authProvider.logout();
-    this.session.reload();
   }
 }

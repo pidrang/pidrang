@@ -1,27 +1,34 @@
+import { PidrangError } from '@pidrang/core';
+
 import { isAuthRequiredError } from './auth-required-error';
 
 describe('isAuthRequiredError', () => {
-  it('recognizes a Postgrest row-level security message', () => {
+  it('recognizes an unauthenticated failure', () => {
     expect(
       isAuthRequiredError(
-        new Error(
-          'new row violates row-level security policy for table "products"',
-        ),
+        new PidrangError('permission denied for table products', {
+          category: 'unauthenticated',
+          status: 401,
+        }),
       ),
     ).toBe(true);
   });
 
-  it('recognizes a Postgrest missing-GRANT message', () => {
+  it('does not ask a signed-in user to sign in again on a forbidden write', () => {
+    expect(
+      isAuthRequiredError(
+        new PidrangError(
+          'new row violates row-level security policy for table "products"',
+          { category: 'forbidden', status: 403 },
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('ignores unstructured errors', () => {
     expect(
       isAuthRequiredError(new Error('permission denied for table products')),
-    ).toBe(true);
-  });
-
-  it('ignores unrelated errors', () => {
-    expect(isAuthRequiredError(new Error('Network error'))).toBe(false);
-  });
-
-  it('handles a non-Error thrown value', () => {
-    expect(isAuthRequiredError('row-level security violation')).toBe(true);
+    ).toBe(false);
+    expect(isAuthRequiredError('row-level security violation')).toBe(false);
   });
 });

@@ -3,16 +3,10 @@ export interface GeneratedFile {
   content: string;
 }
 
-const AUTH_REQUIRED_ERROR = `const AUTH_REQUIRED_ERROR_PATTERNS = [
-  'row-level security',
-  'permission denied for table',
-];
+const AUTH_REQUIRED_ERROR = `import { PidrangError } from '@pidrang/core';
 
 export function isAuthRequiredError(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err);
-  return AUTH_REQUIRED_ERROR_PATTERNS.some((pattern) =>
-    message.toLowerCase().includes(pattern),
-  );
+  return err instanceof PidrangError && err.category === 'unauthenticated';
 }
 `;
 

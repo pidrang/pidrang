@@ -14,7 +14,11 @@ import { environment } from '../../environments/environment';
   template: `
     <h1 class="text-2xl font-semibold text-gray-900">Pidrang demo</h1>
 
-    @if (session.value(); as identity) {
+    @if (session.error(); as sessionError) {
+      <p class="mt-2 text-red-600">
+        Could not load your session: {{ sessionError.message }}
+      </p>
+    } @else if (session.value(); as identity) {
       <p class="mt-2 flex items-center gap-2 text-gray-700">
         Signed in as {{ identity.email ?? identity.id }}
         <button
@@ -75,6 +79,5 @@ export class HomePage {
 
   protected async signOut(): Promise<void> {
     await this.authProvider.logout();
-    this.session.reload();
   }
 }
