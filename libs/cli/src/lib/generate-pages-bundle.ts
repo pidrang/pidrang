@@ -28,6 +28,46 @@ const RECORD_LABEL = `export function recordLabel(record: Record<string, unknown
 }
 `;
 
+const CAN_MATCH_RESOURCE_ACTION = `import { inject } from '@angular/core';
+import { CanMatchFn, RedirectCommand, Router } from '@angular/router';
+import {
+  RESOURCES,
+  ResourceAction,
+  isResourceActionEnabled,
+} from '@pidrang/core';
+
+export function canMatchResourceAction(action: ResourceAction): CanMatchFn {
+  return (_route, segments) => {
+    const router = inject(Router);
+    const resource = inject(RESOURCES, { optional: true })?.find(
+      (candidate) => candidate.name === segments[0]?.path,
+    );
+    return (
+      isResourceActionEnabled(resource, action) ||
+      new RedirectCommand(router.parseUrl('/not-found'), {
+        skipLocationChange: true,
+      })
+    );
+  };
+}
+`;
+
+const NOT_FOUND_PAGE = `import { Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+
+@Component({
+  selector: 'app-not-found-page',
+  imports: [RouterLink, MatButtonModule],
+  template: \`
+    <h1>Page not available</h1>
+    <p>This resource does not exist, or this action is disabled for it.</p>
+    <a mat-button routerLink="/">Back to home</a>
+  \`,
+})
+export class NotFoundPage {}
+`;
+
 const RESOURCE_LIST_PAGE = `import {
   Component,
   computed,
@@ -41,6 +81,7 @@ import {
   injectDataProvider,
   injectResourceList,
   injectResources,
+  isResourceActionEnabled,
 } from '@pidrang/core';
 import { ResourceTable } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
@@ -55,12 +96,14 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
   imports: [RouterLink, ResourceTable, MatButtonModule, MatPaginatorModule],
   template: \`
     <h1>{{ resource() }}</h1>
-    <a
-      mat-flat-button
-      color="primary"
-      [routerLink]="['/', resource(), 'create']"
-      >Create</a
-    >
+    @if (canCreate()) {
+      <a
+        mat-flat-button
+        color="primary"
+        [routerLink]="['/', resource(), 'create']"
+        >Create</a
+      >
+    }
 
     @if (list.isLoading()) {
       <p>Loading...</p>
@@ -72,21 +115,29 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
         <p>No records yet.</p>
       } @else if (list.hasValue()) {
         <lib-resource-table [fields]="fields()" [data]="list.value().data">
-          <ng-template #actions let-row>
-            <a mat-button [routerLink]="['/', resource(), row.id]">Show</a>
-            <a mat-button [routerLink]="['/', resource(), row.id, 'edit']"
-              >Edit</a
-            >
-            <button
-              mat-stroked-button
-              color="warn"
-              type="button"
-              [disabled]="list.isLoading()"
-              (click)="remove(row.id)"
-            >
-              Delete
-            </button>
-          </ng-template>
+          @if (canShow() || canEdit() || canDelete()) {
+            <ng-template #actions let-row>
+              @if (canShow()) {
+                <a mat-button [routerLink]="['/', resource(), row.id]">Show</a>
+              }
+              @if (canEdit()) {
+                <a mat-button [routerLink]="['/', resource(), row.id, 'edit']"
+                  >Edit</a
+                >
+              }
+              @if (canDelete()) {
+                <button
+                  mat-stroked-button
+                  color="warn"
+                  type="button"
+                  [disabled]="list.isLoading()"
+                  (click)="remove(row.id)"
+                >
+                  Delete
+                </button>
+              }
+            </ng-template>
+          }
         </lib-resource-table>
       }
       <mat-paginator
@@ -134,11 +185,23 @@ export class ResourceListPage {
         ? previous.value
         : undefined),
   });
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
+  );
+  protected readonly canCreate = computed(() =>
+    isResourceActionEnabled(this.definition(), 'create'),
+  );
+  protected readonly canShow = computed(() =>
+    isResourceActionEnabled(this.definition(), 'show'),
+  );
+  protected readonly canEdit = computed(() =>
+    isResourceActionEnabled(this.definition(), 'edit'),
+  );
+  protected readonly canDelete = computed(() =>
+    isResourceActionEnabled(this.definition(), 'delete'),
+  );
   protected readonly fields = computed(
-    () =>
-      this.resources
-        .find((resource) => resource.name === this.resource())
-        ?.fields?.filter((field) => !field.hidden) ?? [],
+    () => this.definition()?.fields?.filter((field) => !field.hidden) ?? [],
   );
 
   constructor() {
@@ -165,6 +228,9 @@ export class ResourceListPage {
   }
 
   protected async remove(id: string): Promise<void> {
+    if (!this.canDelete()) {
+      return;
+    }
     await this.dataProvider.delete(this.resource(), { id });
     this.list.reload();
   }
@@ -173,7 +239,12 @@ export class ResourceListPage {
 
 const RESOURCE_CREATE_PAGE = `import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { Field, injectDataProvider, injectResources } from '@pidrang/core';
+import {
+  Field,
+  injectDataProvider,
+  injectResources,
+  isResourceActionEnabled,
+} from '@pidrang/core';
 import { ResourceForm } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
 import { isAuthRequiredError } from '../auth-required-error';
@@ -196,7 +267,9 @@ function defaultValueForField(field: Field): unknown {
   imports: [RouterLink, ResourceForm, MatButtonModule],
   template: \`
     <h1>Create {{ resource() }}</h1>
-    <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    @if (canList()) {
+      <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    }
 
     <lib-resource-form
       [fields]="fields()"
@@ -224,11 +297,24 @@ export class ResourceCreatePage {
   private readonly router = inject(Router);
   private readonly resources = injectResources();
 
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
+  );
+  protected readonly canList = computed(() =>
+    isResourceActionEnabled(this.definition(), 'list'),
+  );
+  private readonly canCreate = computed(() =>
+    isResourceActionEnabled(this.definition(), 'create'),
+  );
+  private readonly canShow = computed(() =>
+    isResourceActionEnabled(this.definition(), 'show'),
+  );
+
   protected readonly fields = computed(
     () =>
-      this.resources
-        .find((resource) => resource.name === this.resource())
-        ?.fields?.filter((field) => !NON_EDITABLE_FIELDS.has(field.name)) ?? [],
+      this.definition()?.fields?.filter(
+        (field) => !NON_EDITABLE_FIELDS.has(field.name),
+      ) ?? [],
   );
 
   protected readonly initialValue = computed(() =>
@@ -238,20 +324,40 @@ export class ResourceCreatePage {
   );
 
   protected async submit(data: Record<string, unknown>): Promise<void> {
+    if (!this.canCreate()) {
+      return;
+    }
     try {
-      await this.dataProvider.create(this.resource(), { data });
-      await this.router.navigate(['/', this.resource()]);
+      const created = await this.dataProvider.create<Record<string, unknown>>(
+        this.resource(),
+        { data },
+      );
+      await this.router.navigate(this.destinationAfterCreate(created['id']));
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : String(err));
       this.authRequired.set(isAuthRequiredError(err));
     }
+  }
+
+  private destinationAfterCreate(id: unknown): unknown[] {
+    if (this.canList()) {
+      return ['/', this.resource()];
+    }
+    if (this.canShow() && (typeof id === 'string' || typeof id === 'number')) {
+      return ['/', this.resource(), id];
+    }
+    return ['/'];
   }
 }
 `;
 
 const RESOURCE_SHOW_PAGE = `import { Component, computed, effect, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { injectDataProvider, injectResources } from '@pidrang/core';
+import {
+  injectDataProvider,
+  injectResources,
+  isResourceActionEnabled,
+} from '@pidrang/core';
 import { MatButtonModule } from '@angular/material/button';
 import { recordLabel } from '../record-label';
 
@@ -260,7 +366,9 @@ import { recordLabel } from '../record-label';
   imports: [RouterLink, MatButtonModule],
   template: \`
     <h1>{{ resource() }} — {{ label() }}</h1>
-    <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    @if (canList()) {
+      <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    }
     @if (error()) {
       <p>{{ error() }}</p>
     } @else if (record(); as record) {
@@ -285,11 +393,14 @@ export class ResourceShowPage {
   private readonly dataProvider = injectDataProvider();
   private readonly resources = injectResources();
 
-  protected readonly fields = computed(
-    () =>
-      this.resources.find((resource) => resource.name === this.resource())
-        ?.fields ?? [],
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
   );
+  protected readonly canList = computed(() =>
+    isResourceActionEnabled(this.definition(), 'list'),
+  );
+
+  protected readonly fields = computed(() => this.definition()?.fields ?? []);
 
   protected readonly label = computed(() => {
     const record = this.record();
@@ -321,7 +432,11 @@ const RESOURCE_EDIT_PAGE = `import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { injectDataProvider, injectResources } from '@pidrang/core';
+import {
+  injectDataProvider,
+  injectResources,
+  isResourceActionEnabled,
+} from '@pidrang/core';
 import { ResourceForm } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
 import { recordLabel } from '../record-label';
@@ -334,7 +449,11 @@ const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
   imports: [RouterLink, ResourceForm, MatButtonModule],
   template: \`
     <h1>Edit {{ resource() }} — {{ label() }}</h1>
-    <a mat-button [routerLink]="['/', resource(), id()]">Back to show</a>
+    @if (canShow()) {
+      <a mat-button [routerLink]="['/', resource(), id()]">Back to show</a>
+    } @else if (canList()) {
+      <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    }
 
     @if (error()) {
       <p>{{ error() }}</p>
@@ -366,13 +485,24 @@ export class ResourceEditPage {
   private readonly router = inject(Router);
   private readonly resources = injectResources();
 
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
+  );
+  protected readonly canShow = computed(() =>
+    isResourceActionEnabled(this.definition(), 'show'),
+  );
+  protected readonly canList = computed(() =>
+    isResourceActionEnabled(this.definition(), 'list'),
+  );
+  private readonly canEdit = computed(() =>
+    isResourceActionEnabled(this.definition(), 'edit'),
+  );
+
   protected readonly fields = computed(
     () =>
-      this.resources
-        .find((resource) => resource.name === this.resource())
-        ?.fields?.filter(
-          (field) => !NON_EDITABLE_FIELDS.has(field.name) && !field.hidden,
-        ) ?? [],
+      this.definition()?.fields?.filter(
+        (field) => !NON_EDITABLE_FIELDS.has(field.name) && !field.hidden,
+      ) ?? [],
   );
 
   protected readonly value = computed(() => {
@@ -406,31 +536,61 @@ export class ResourceEditPage {
   }
 
   protected async submit(data: Record<string, unknown>): Promise<void> {
+    if (!this.canEdit()) {
+      return;
+    }
     try {
       await this.dataProvider.update(this.resource(), { id: this.id(), data });
-      await this.router.navigate(['/', this.resource(), this.id()]);
+      await this.router.navigate(this.destinationAfterSave());
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : String(err));
       this.authRequired.set(isAuthRequiredError(err));
     }
+  }
+
+  private destinationAfterSave(): unknown[] {
+    if (this.canShow()) {
+      return ['/', this.resource(), this.id()];
+    }
+    if (this.canList()) {
+      return ['/', this.resource()];
+    }
+    return ['/'];
   }
 }
 `;
 
 export const RESOURCE_ROUTES_SNIPPET = `import { Route } from '@angular/router';
 
+import { canMatchResourceAction } from './can-match-resource-action';
+import { NotFoundPage } from './pages/not-found-page';
 import { ResourceCreatePage } from './pages/resource-create-page';
 import { ResourceEditPage } from './pages/resource-edit-page';
 import { ResourceListPage } from './pages/resource-list-page';
 import { ResourceShowPage } from './pages/resource-show-page';
 
-// Order matters: more specific segments (create, :id/edit) must be matched
-// before the generic :id and :resource routes.
 export const resourceRoutes: Route[] = [
-  { path: ':resource/create', component: ResourceCreatePage },
-  { path: ':resource/:id/edit', component: ResourceEditPage },
-  { path: ':resource/:id', component: ResourceShowPage },
-  { path: ':resource', component: ResourceListPage },
+  { path: 'not-found', component: NotFoundPage },
+  {
+    path: ':resource/create',
+    component: ResourceCreatePage,
+    canMatch: [canMatchResourceAction('create')],
+  },
+  {
+    path: ':resource/:id/edit',
+    component: ResourceEditPage,
+    canMatch: [canMatchResourceAction('edit')],
+  },
+  {
+    path: ':resource/:id',
+    component: ResourceShowPage,
+    canMatch: [canMatchResourceAction('show')],
+  },
+  {
+    path: ':resource',
+    component: ResourceListPage,
+    canMatch: [canMatchResourceAction('list')],
+  },
 ];
 `;
 
@@ -438,6 +598,11 @@ export function generatePagesBundle(): GeneratedFile[] {
   return [
     { path: 'src/app/auth-required-error.ts', content: AUTH_REQUIRED_ERROR },
     { path: 'src/app/record-label.ts', content: RECORD_LABEL },
+    {
+      path: 'src/app/can-match-resource-action.ts',
+      content: CAN_MATCH_RESOURCE_ACTION,
+    },
+    { path: 'src/app/pages/not-found-page.ts', content: NOT_FOUND_PAGE },
     {
       path: 'src/app/pages/resource-list-page.ts',
       content: RESOURCE_LIST_PAGE,
