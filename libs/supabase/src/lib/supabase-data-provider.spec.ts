@@ -1,8 +1,14 @@
+import { PidrangError } from '@pidrang/core';
 import { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 
 import { SupabaseDataProvider } from './supabase-data-provider';
 
-function fakeClient(result: { data: unknown; error: PostgrestError | null; count?: number | null }) {
+function fakeClient(result: {
+  data: unknown;
+  error: PostgrestError | null;
+  count?: number | null;
+  status?: number;
+}) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
@@ -13,15 +19,27 @@ function fakeClient(result: { data: unknown; error: PostgrestError | null; count
     delete: vi.fn(() => builder),
     single: vi.fn(() => builder),
     then: (resolve: (value: unknown) => void) =>
-      resolve({ data: result.data, error: result.error, count: result.count ?? null }),
+      resolve({
+        data: result.data,
+        error: result.error,
+        count: result.count ?? null,
+        status: result.status ?? 200,
+      }),
   };
 
-  return { client: { from: vi.fn(() => builder) } as unknown as SupabaseClient, builder };
+  return {
+    client: { from: vi.fn(() => builder) } as unknown as SupabaseClient,
+    builder,
+  };
 }
 
 describe('SupabaseDataProvider', () => {
   it('getList maps rows and count into a ListResult', async () => {
-    const { client, builder } = fakeClient({ data: [{ id: '1' }], count: 1, error: null });
+    const { client, builder } = fakeClient({
+      data: [{ id: '1' }],
+      count: 1,
+      error: null,
+    });
     const provider = new SupabaseDataProvider(client);
 
     const result = await provider.getList('users', {
@@ -100,14 +118,18 @@ describe('SupabaseDataProvider', () => {
     const { client } = fakeClient({ data: { id: '1' }, error: null });
     const provider = new SupabaseDataProvider(client);
 
-    await expect(provider.getOne('users', { id: '1' })).resolves.toEqual({ id: '1' });
+    await expect(provider.getOne('users', { id: '1' })).resolves.toEqual({
+      id: '1',
+    });
   });
 
   it('create inserts and returns the created row', async () => {
     const { client, builder } = fakeClient({ data: { id: '1' }, error: null });
     const provider = new SupabaseDataProvider(client);
 
-    await expect(provider.create('users', { data: { name: 'Ada' } })).resolves.toEqual({ id: '1' });
+    await expect(
+      provider.create('users', { data: { name: 'Ada' } }),
+    ).resolves.toEqual({ id: '1' });
     expect(builder.insert).toHaveBeenCalledWith({ name: 'Ada' });
   });
 
@@ -115,7 +137,9 @@ describe('SupabaseDataProvider', () => {
     const { client, builder } = fakeClient({ data: { id: '1' }, error: null });
     const provider = new SupabaseDataProvider(client);
 
-    await expect(provider.update('users', { id: '1', data: { name: 'Ada' } })).resolves.toEqual({
+    await expect(
+      provider.update('users', { id: '1', data: { name: 'Ada' } }),
+    ).resolves.toEqual({
       id: '1',
     });
     expect(builder.eq).toHaveBeenCalledWith('id', '1');
@@ -125,15 +149,87 @@ describe('SupabaseDataProvider', () => {
     const { client, builder } = fakeClient({ data: { id: '1' }, error: null });
     const provider = new SupabaseDataProvider(client);
 
-    await expect(provider.delete('users', { id: '1' })).resolves.toEqual({ id: '1' });
+    await expect(provider.delete('users', { id: '1' })).resolves.toEqual({
+      id: '1',
+    });
     expect(builder.eq).toHaveBeenCalledWith('id', '1');
   });
 
-  it('normalizes a Postgrest error into a plain Error', async () => {
-    const error = { message: 'boom', details: '', hint: '', code: '500' } as PostgrestError;
-    const { client } = fakeClient({ data: null, error });
+  it('categorizes an anonymous privilege error as unauthenticated and keeps its metadata', async () => {
+    const error = {
+      message: 'permission denied for table products',
+      details: '',
+      hint: '',
+      code: '42501',
+    } as PostgrestError;
+    const { client } = fakeClient({ data: null, error, status: 401 });
     const provider = new SupabaseDataProvider(client);
 
-    await expect(provider.getOne('users', { id: '1' })).rejects.toThrow('boom');
+    const failure = await provider
+      .create('products', { data: { name: 'x' } })
+      .catch((err: unknown) => err);
+
+    expect(failure).toBeInstanceOf(PidrangError);
+    expect(failure).toMatchObject({
+      message: 'permission denied for table products',
+      category: 'unauthenticated',
+      code: '42501',
+      status: 401,
+      cause: error,
+    });
+  });
+
+  it('categorizes an authenticated row-level security denial as forbidden', async () => {
+    const error = {
+      message:
+        'new row violates row-level security policy for table "products"',
+      details: '',
+      hint: '',
+      code: '42501',
+    } as PostgrestError;
+    const { client } = fakeClient({ data: null, error, status: 403 });
+    const provider = new SupabaseDataProvider(client);
+
+    await expect(
+      provider.update('products', { id: '1', data: { name: 'x' } }),
+    ).rejects.toMatchObject({
+      category: 'forbidden',
+      status: 403,
+    });
+  });
+
+  it('categorizes a missing single row as not-found', async () => {
+    const error = {
+      message: 'JSON object requested, multiple (or no) rows returned',
+      details: '',
+      hint: '',
+      code: 'PGRST116',
+    } as PostgrestError;
+    const { client } = fakeClient({ data: null, error, status: 406 });
+    const provider = new SupabaseDataProvider(client);
+
+    await expect(
+      provider.getOne('products', { id: '1' }),
+    ).rejects.toMatchObject({
+      category: 'not-found',
+      code: 'PGRST116',
+    });
+  });
+
+  it('falls back to unknown for other failures', async () => {
+    const error = {
+      message: 'boom',
+      details: '',
+      hint: '',
+      code: 'XX000',
+    } as PostgrestError;
+    const { client } = fakeClient({ data: null, error, status: 500 });
+    const provider = new SupabaseDataProvider(client);
+
+    await expect(provider.getOne('users', { id: '1' })).rejects.toMatchObject({
+      message: 'boom',
+      category: 'unknown',
+      status: 500,
+    });
   });
 });

@@ -39,59 +39,59 @@ export class SupabaseDataProvider implements DataProvider {
     const from = (current - 1) * pageSize;
     query = query.range(from, from + pageSize - 1);
 
-    const { data, count, error } = await query;
+    const { data, count, error, status } = await query;
     if (error) {
-      throw toError(error);
+      throw toError(error, status);
     }
     return { data: (data ?? []) as T[], total: count ?? 0 };
   }
 
   async getOne<T>(resource: string, params: GetOneParams): Promise<T> {
-    const { data, error } = await this.client
+    const { data, error, status } = await this.client
       .from(resource)
       .select('*')
       .eq('id', params.id)
       .single();
     if (error) {
-      throw toError(error);
+      throw toError(error, status);
     }
     return data as T;
   }
 
   async create<T>(resource: string, params: CreateParams<T>): Promise<T> {
-    const { data, error } = await this.client
+    const { data, error, status } = await this.client
       .from(resource)
       .insert(params.data as never)
       .select()
       .single();
     if (error) {
-      throw toError(error);
+      throw toError(error, status);
     }
     return data as T;
   }
 
   async update<T>(resource: string, params: UpdateParams<T>): Promise<T> {
-    const { data, error } = await this.client
+    const { data, error, status } = await this.client
       .from(resource)
       .update(params.data as never)
       .eq('id', params.id)
       .select()
       .single();
     if (error) {
-      throw toError(error);
+      throw toError(error, status);
     }
     return data as T;
   }
 
   async delete<T>(resource: string, params: DeleteParams): Promise<T> {
-    const { data, error } = await this.client
+    const { data, error, status } = await this.client
       .from(resource)
       .delete()
       .eq('id', params.id)
       .select()
       .single();
     if (error) {
-      throw toError(error);
+      throw toError(error, status);
     }
     return data as T;
   }
