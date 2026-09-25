@@ -4,12 +4,14 @@ import {
 } from './generate-pages-bundle';
 
 describe('generatePagesBundle', () => {
-  it('returns the 6 generic files at their expected paths', () => {
+  it('returns the 8 generic files at their expected paths', () => {
     const files = generatePagesBundle();
 
     expect(files.map((file) => file.path)).toEqual([
       'src/app/auth-required-error.ts',
       'src/app/record-label.ts',
+      'src/app/can-match-resource-action.ts',
+      'src/app/pages/not-found-page.ts',
       'src/app/pages/resource-list-page.ts',
       'src/app/pages/resource-create-page.ts',
       'src/app/pages/resource-show-page.ts',
@@ -65,6 +67,33 @@ describe('generatePagesBundle', () => {
       "sorters: [{ field: 'id', order: 'asc' }]",
     );
     expect(listPage?.content).not.toContain('list.value()?.data');
+  });
+
+  it('guards every resource route with its action flag', () => {
+    for (const action of ['create', 'edit', 'show', 'list']) {
+      expect(RESOURCE_ROUTES_SNIPPET).toContain(
+        `canMatch: [canMatchResourceAction('${action}')]`,
+      );
+    }
+    expect(RESOURCE_ROUTES_SNIPPET.indexOf("'not-found'")).toBeLessThan(
+      RESOURCE_ROUTES_SNIPPET.indexOf("':resource'"),
+    );
+  });
+
+  it('gates generated mutation handlers on their action flag', () => {
+    const files = generatePagesBundle();
+    const content = (path: string) =>
+      files.find((file) => file.path === path)?.content ?? '';
+
+    expect(content('src/app/pages/resource-list-page.ts')).toContain(
+      'if (!this.canDelete())',
+    );
+    expect(content('src/app/pages/resource-create-page.ts')).toContain(
+      'if (!this.canCreate())',
+    );
+    expect(content('src/app/pages/resource-edit-page.ts')).toContain(
+      'if (!this.canEdit())',
+    );
   });
 
   it('exports each page component name once', () => {
