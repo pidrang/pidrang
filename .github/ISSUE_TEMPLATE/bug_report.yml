@@ -1,0 +1,55 @@
+name: Bug report
+description: Report something that does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, do not open an issue. Follow the instructions in SECURITY.md instead.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - '@pidrang/core'
+        - '@pidrang/supabase'
+        - '@pidrang/material'
+        - '@pidrang/tailwind'
+        - 'pidrang CLI'
+        - Demo apps
+        - Documentation
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: angular-version
+    attributes:
+      label: Angular version
+      placeholder: 22.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: A minimal reproduction (a repository or a code snippet) is the fastest way to a fix.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Errors and logs
+      render: shell

@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Pidrang hasn't shipped a tagged release yet (every package is at `0.0.0`). Until the first tagged release, only the latest commit on `main` is supported — please report against that.
+Pidrang is pre-1.0. Only the latest published minor version of each package is supported, and fixes are released as a new patch or minor version. Until the first release is published, only the latest commit on `main` is supported; please report against that.
 
 ## Reporting a Vulnerability
 
