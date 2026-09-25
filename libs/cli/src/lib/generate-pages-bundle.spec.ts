@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import * as ts from 'typescript';
 
 import {
@@ -164,6 +166,17 @@ describe('generatePagesBundle', () => {
       expect(commentTexts(content)).toEqual([]);
       expect(content).not.toContain('<!--');
       expect(content).not.toMatch(/\$any\(|:\s*any\b|\bas any\b/);
+    }
+  });
+
+  it('emits exactly the demo-material pages covered by its regression tests', () => {
+    for (const file of generatePagesBundle()) {
+      expect(file.content).toBe(
+        readFileSync(
+          join(__dirname, '../../../../apps/demo-material', file.path),
+          'utf8',
+        ),
+      );
     }
   });
 });

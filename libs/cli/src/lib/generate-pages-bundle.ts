@@ -240,7 +240,15 @@ export class ResourceListPage {
 }
 `;
 
-const RESOURCE_CREATE_PAGE = `import { Component, computed, inject, input, signal } from '@angular/core';
+const RESOURCE_CREATE_PAGE = `import {
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  input,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   Field,
@@ -253,6 +261,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { isAuthRequiredError } from '../auth-required-error';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
+
+interface SaveFailure {
+  message: string;
+  authRequired: boolean;
+}
 
 function defaultValueForField(field: Field): unknown {
   switch (field.type) {
@@ -277,12 +290,13 @@ function defaultValueForField(field: Field): unknown {
     <lib-resource-form
       [fields]="fields()"
       [value]="initialValue()"
+      [pending]="saving()"
       (save)="submit($event)"
     />
 
-    @if (error()) {
-      <p>{{ error() }}</p>
-      @if (authRequired()) {
+    @if (saveFailure(); as failure) {
+      <p role="alert">{{ failure.message }}</p>
+      @if (failure.authRequired) {
         <p>
           You may need to <a routerLink="/login">sign in</a> to make changes.
         </p>
@@ -293,12 +307,16 @@ function defaultValueForField(field: Field): unknown {
 export class ResourceCreatePage {
   readonly resource = input.required<string>();
 
-  protected readonly error = signal<string | null>(null);
-  protected readonly authRequired = signal(false);
+  protected readonly saving = signal(false);
+  protected readonly saveFailure = linkedSignal<string, SaveFailure | null>({
+    source: () => this.resource(),
+    computation: () => null,
+  });
 
   private readonly dataProvider = injectDataProvider();
   private readonly router = inject(Router);
   private readonly resources = injectResources();
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly definition = computed(() =>
     this.resources.find((resource) => resource.name === this.resource()),
@@ -327,18 +345,29 @@ export class ResourceCreatePage {
   );
 
   protected async submit(data: Record<string, unknown>): Promise<void> {
-    if (!this.canCreate()) {
+    if (!this.canCreate() || this.saving()) {
       return;
     }
+    const resource = this.resource();
+    this.saving.set(true);
+    this.saveFailure.set(null);
     try {
       const created = await this.dataProvider.create<Record<string, unknown>>(
-        this.resource(),
+        resource,
         { data },
       );
-      await this.router.navigate(this.destinationAfterCreate(created['id']));
+      if (this.isCurrent(resource)) {
+        await this.router.navigate(this.destinationAfterCreate(created['id']));
+      }
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : String(err));
-      this.authRequired.set(isAuthRequiredError(err));
+      if (this.isCurrent(resource)) {
+        this.saveFailure.set({
+          message: err instanceof Error ? err.message : String(err),
+          authRequired: isAuthRequiredError(err),
+        });
+      }
+    } finally {
+      this.saving.set(false);
     }
   }
 
@@ -351,10 +380,14 @@ export class ResourceCreatePage {
     }
     return ['/'];
   }
+
+  private isCurrent(resource: string): boolean {
+    return !this.destroyRef.destroyed && resource === this.resource();
+  }
 }
 `;
 
-const RESOURCE_SHOW_PAGE = `import { Component, computed, effect, input, signal } from '@angular/core';
+const RESOURCE_SHOW_PAGE = `import { Component, computed, input, resource } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   injectDataProvider,
@@ -372,9 +405,15 @@ import { recordLabel } from '../record-label';
     @if (canList()) {
       <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     }
-    @if (error()) {
-      <p>{{ error() }}</p>
-    } @else if (record(); as record) {
+    @if (record.isLoading()) {
+      <p role="status">Loading…</p>
+    }
+    @if (record.error(); as loadError) {
+      <p role="alert">{{ loadError.message }}</p>
+      <button mat-stroked-button type="button" (click)="record.reload()">
+        Retry
+      </button>
+    } @else if (record.value(); as record) {
       <dl>
         @for (field of fields(); track field.name) {
           <dt>{{ field.label ?? field.name }}</dt>
@@ -388,13 +427,16 @@ export class ResourceShowPage {
   readonly resource = input.required<string>();
   readonly id = input.required<string>();
 
-  protected readonly record = signal<Record<string, unknown> | undefined>(
-    undefined,
-  );
-  protected readonly error = signal<string | null>(null);
-
   private readonly dataProvider = injectDataProvider();
   private readonly resources = injectResources();
+
+  protected readonly record = resource({
+    params: () => ({ resource: this.resource(), id: this.id() }),
+    loader: ({ params }) =>
+      this.dataProvider.getOne<Record<string, unknown>>(params.resource, {
+        id: params.id,
+      }),
+  });
 
   private readonly definition = computed(() =>
     this.resources.find((resource) => resource.name === this.resource()),
@@ -405,31 +447,20 @@ export class ResourceShowPage {
 
   protected readonly fields = computed(() => this.definition()?.fields ?? []);
 
-  protected readonly label = computed(() => {
-    const record = this.record();
-    return record ? recordLabel(record) : this.id();
-  });
-
-  constructor() {
-    effect(() => {
-      const resource = this.resource();
-      const id = this.id();
-      this.dataProvider.getOne<Record<string, unknown>>(resource, { id }).then(
-        (record) => this.record.set(record),
-        (err) =>
-          this.error.set(err instanceof Error ? err.message : String(err)),
-      );
-    });
-  }
+  protected readonly label = computed(() =>
+    this.record.hasValue() ? recordLabel(this.record.value()) : this.id(),
+  );
 }
 `;
 
 const RESOURCE_EDIT_PAGE = `import {
   Component,
+  DestroyRef,
   computed,
-  effect,
   inject,
   input,
+  linkedSignal,
+  resource,
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
@@ -445,6 +476,11 @@ import { isAuthRequiredError } from '../auth-required-error';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
 
+interface SaveFailure {
+  message: string;
+  authRequired: boolean;
+}
+
 @Component({
   selector: 'app-resource-edit-page',
   imports: [RouterLink, ResourceForm, MatButtonModule],
@@ -456,19 +492,29 @@ const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
       <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     }
 
-    @if (error()) {
-      <p>{{ error() }}</p>
-      @if (authRequired()) {
-        <p>
-          You may need to <a routerLink="/login">sign in</a> to make changes.
-        </p>
-      }
+    @if (record.isLoading()) {
+      <p role="status">Loading…</p>
+    }
+    @if (record.error(); as loadError) {
+      <p role="alert">{{ loadError.message }}</p>
+      <button mat-stroked-button type="button" (click)="record.reload()">
+        Retry
+      </button>
     } @else if (value(); as value) {
       <lib-resource-form
         [fields]="fields()"
         [value]="value"
+        [pending]="saving()"
         (save)="submit($event)"
       />
+      @if (saveFailure(); as failure) {
+        <p role="alert">{{ failure.message }}</p>
+        @if (failure.authRequired) {
+          <p>
+            You may need to <a routerLink="/login">sign in</a> to make changes.
+          </p>
+        }
+      }
     }
   \`,
 })
@@ -476,15 +522,27 @@ export class ResourceEditPage {
   readonly resource = input.required<string>();
   readonly id = input.required<string>();
 
-  protected readonly record = signal<Record<string, unknown> | undefined>(
-    undefined,
-  );
-  protected readonly error = signal<string | null>(null);
-  protected readonly authRequired = signal(false);
+  protected readonly saving = signal(false);
+  protected readonly saveFailure = linkedSignal<
+    { resource: string; id: string },
+    SaveFailure | null
+  >({
+    source: () => ({ resource: this.resource(), id: this.id() }),
+    computation: () => null,
+  });
 
   private readonly dataProvider = injectDataProvider();
   private readonly router = inject(Router);
   private readonly resources = injectResources();
+  private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly record = resource({
+    params: () => ({ resource: this.resource(), id: this.id() }),
+    loader: ({ params }) =>
+      this.dataProvider.getOne<Record<string, unknown>>(params.resource, {
+        id: params.id,
+      }),
+  });
 
   private readonly definition = computed(() =>
     this.resources.find((resource) => resource.name === this.resource()),
@@ -507,43 +565,41 @@ export class ResourceEditPage {
   );
 
   protected readonly value = computed(() => {
-    const record = this.record();
-    if (!record) {
+    if (!this.record.hasValue()) {
       return undefined;
     }
+    const record = this.record.value();
     return Object.fromEntries(
       this.fields().map((field) => [field.name, record[field.name]]),
     );
   });
 
-  protected readonly label = computed(() => {
-    const record = this.record();
-    return record ? recordLabel(record) : this.id();
-  });
-
-  constructor() {
-    effect(() => {
-      const resource = this.resource();
-      const id = this.id();
-      this.record.set(undefined);
-      this.dataProvider.getOne<Record<string, unknown>>(resource, { id }).then(
-        (record) => this.record.set(record),
-        (err) =>
-          this.error.set(err instanceof Error ? err.message : String(err)),
-      );
-    });
-  }
+  protected readonly label = computed(() =>
+    this.record.hasValue() ? recordLabel(this.record.value()) : this.id(),
+  );
 
   protected async submit(data: Record<string, unknown>): Promise<void> {
-    if (!this.canEdit()) {
+    if (!this.canEdit() || this.saving()) {
       return;
     }
+    const resource = this.resource();
+    const id = this.id();
+    this.saving.set(true);
+    this.saveFailure.set(null);
     try {
-      await this.dataProvider.update(this.resource(), { id: this.id(), data });
-      await this.router.navigate(this.destinationAfterSave());
+      await this.dataProvider.update(resource, { id, data });
+      if (this.isCurrent(resource, id)) {
+        await this.router.navigate(this.destinationAfterSave());
+      }
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : String(err));
-      this.authRequired.set(isAuthRequiredError(err));
+      if (this.isCurrent(resource, id)) {
+        this.saveFailure.set({
+          message: err instanceof Error ? err.message : String(err),
+          authRequired: isAuthRequiredError(err),
+        });
+      }
+    } finally {
+      this.saving.set(false);
     }
   }
 
@@ -555,6 +611,14 @@ export class ResourceEditPage {
       return ['/', this.resource()];
     }
     return ['/'];
+  }
+
+  private isCurrent(resource: string, id: string): boolean {
+    return (
+      !this.destroyRef.destroyed &&
+      resource === this.resource() &&
+      id === this.id()
+    );
   }
 }
 `;
