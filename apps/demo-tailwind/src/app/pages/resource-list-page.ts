@@ -11,6 +11,7 @@ import {
   injectDataProvider,
   injectResourceList,
   injectResources,
+  isResourceActionEnabled,
 } from '@pidrang/core';
 import { ResourceTable } from '@pidrang/tailwind';
 
@@ -23,11 +24,13 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
   imports: [RouterLink, ResourceTable],
   template: `
     <h1 class="text-2xl font-semibold text-gray-900">{{ resource() }}</h1>
-    <a
-      [routerLink]="['/', resource(), 'create']"
-      class="mt-2 inline-block rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-      >Create</a
-    >
+    @if (canCreate()) {
+      <a
+        [routerLink]="['/', resource(), 'create']"
+        class="mt-2 inline-block rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+        >Create</a
+      >
+    }
 
     @if (list.isLoading()) {
       <p class="mt-4 text-gray-500">Loading...</p>
@@ -40,26 +43,36 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
       } @else if (list.hasValue()) {
         <div class="mt-4">
           <lib-resource-table [fields]="fields()" [data]="list.value().data">
-            <ng-template #actions let-row>
-              <a
-                [routerLink]="['/', resource(), row.id]"
-                class="text-blue-600 hover:underline"
-                >Show</a
-              >
-              <a
-                [routerLink]="['/', resource(), row.id, 'edit']"
-                class="ml-3 text-blue-600 hover:underline"
-                >Edit</a
-              >
-              <button
-                type="button"
-                [disabled]="list.isLoading()"
-                (click)="remove(row.id)"
-                class="ml-3 text-red-600 hover:underline disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </ng-template>
+            @if (canShow() || canEdit() || canDelete()) {
+              <ng-template #actions let-row>
+                <span class="flex gap-3">
+                  @if (canShow()) {
+                    <a
+                      [routerLink]="['/', resource(), row.id]"
+                      class="text-blue-600 hover:underline"
+                      >Show</a
+                    >
+                  }
+                  @if (canEdit()) {
+                    <a
+                      [routerLink]="['/', resource(), row.id, 'edit']"
+                      class="text-blue-600 hover:underline"
+                      >Edit</a
+                    >
+                  }
+                  @if (canDelete()) {
+                    <button
+                      type="button"
+                      [disabled]="list.isLoading()"
+                      (click)="remove(row.id)"
+                      class="text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  }
+                </span>
+              </ng-template>
+            }
           </lib-resource-table>
         </div>
       }
@@ -139,11 +152,23 @@ export class ResourceListPage {
   protected readonly lastPage = computed(() =>
     Math.max(1, Math.ceil((this.total() ?? 0) / this.pageSize())),
   );
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
+  );
+  protected readonly canCreate = computed(() =>
+    isResourceActionEnabled(this.definition(), 'create'),
+  );
+  protected readonly canShow = computed(() =>
+    isResourceActionEnabled(this.definition(), 'show'),
+  );
+  protected readonly canEdit = computed(() =>
+    isResourceActionEnabled(this.definition(), 'edit'),
+  );
+  protected readonly canDelete = computed(() =>
+    isResourceActionEnabled(this.definition(), 'delete'),
+  );
   protected readonly fields = computed(
-    () =>
-      this.resources
-        .find((resource) => resource.name === this.resource())
-        ?.fields?.filter((field) => !field.hidden) ?? [],
+    () => this.definition()?.fields?.filter((field) => !field.hidden) ?? [],
   );
 
   constructor() {
@@ -168,6 +193,9 @@ export class ResourceListPage {
   }
 
   protected async remove(id: string): Promise<void> {
+    if (!this.canDelete()) {
+      return;
+    }
     await this.dataProvider.delete(this.resource(), { id });
     this.list.reload();
   }

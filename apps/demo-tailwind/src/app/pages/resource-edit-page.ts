@@ -7,7 +7,11 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { injectDataProvider, injectResources } from '@pidrang/core';
+import {
+  injectDataProvider,
+  injectResources,
+  isResourceActionEnabled,
+} from '@pidrang/core';
 import { ResourceForm } from '@pidrang/tailwind';
 import { recordLabel } from '../record-label';
 import { isAuthRequiredError } from '../auth-required-error';
@@ -21,11 +25,17 @@ const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
     <h1 class="text-2xl font-semibold text-gray-900">
       Edit {{ resource() }} — {{ label() }}
     </h1>
-    <a
-      [routerLink]="['/', resource(), id()]"
-      class="text-blue-600 hover:underline"
-      >Back to show</a
-    >
+    @if (canShow()) {
+      <a
+        [routerLink]="['/', resource(), id()]"
+        class="text-blue-600 hover:underline"
+        >Back to show</a
+      >
+    } @else if (canList()) {
+      <a [routerLink]="['/', resource()]" class="text-blue-600 hover:underline"
+        >Back to list</a
+      >
+    }
 
     @if (error()) {
       <p class="mt-4 text-red-600">{{ error() }}</p>
@@ -63,13 +73,24 @@ export class ResourceEditPage {
   private readonly router = inject(Router);
   private readonly resources = injectResources();
 
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
+  );
+  protected readonly canShow = computed(() =>
+    isResourceActionEnabled(this.definition(), 'show'),
+  );
+  protected readonly canList = computed(() =>
+    isResourceActionEnabled(this.definition(), 'list'),
+  );
+  private readonly canEdit = computed(() =>
+    isResourceActionEnabled(this.definition(), 'edit'),
+  );
+
   protected readonly fields = computed(
     () =>
-      this.resources
-        .find((resource) => resource.name === this.resource())
-        ?.fields?.filter(
-          (field) => !NON_EDITABLE_FIELDS.has(field.name) && !field.hidden,
-        ) ?? [],
+      this.definition()?.fields?.filter(
+        (field) => !NON_EDITABLE_FIELDS.has(field.name) && !field.hidden,
+      ) ?? [],
   );
 
   protected readonly value = computed(() => {
@@ -101,12 +122,25 @@ export class ResourceEditPage {
   }
 
   protected async submit(data: Record<string, unknown>): Promise<void> {
+    if (!this.canEdit()) {
+      return;
+    }
     try {
       await this.dataProvider.update(this.resource(), { id: this.id(), data });
-      await this.router.navigate(['/', this.resource(), this.id()]);
+      await this.router.navigate(this.destinationAfterSave());
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : String(err));
       this.authRequired.set(isAuthRequiredError(err));
     }
+  }
+
+  private destinationAfterSave(): unknown[] {
+    if (this.canShow()) {
+      return ['/', this.resource(), this.id()];
+    }
+    if (this.canList()) {
+      return ['/', this.resource()];
+    }
+    return ['/'];
   }
 }

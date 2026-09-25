@@ -1,6 +1,11 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { Field, injectDataProvider, injectResources } from '@pidrang/core';
+import {
+  Field,
+  injectDataProvider,
+  injectResources,
+  isResourceActionEnabled,
+} from '@pidrang/core';
 import { ResourceForm } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
 import { isAuthRequiredError } from '../auth-required-error';
@@ -23,7 +28,9 @@ function defaultValueForField(field: Field): unknown {
   imports: [RouterLink, ResourceForm, MatButtonModule],
   template: `
     <h1>Create {{ resource() }}</h1>
-    <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    @if (canList()) {
+      <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    }
 
     <lib-resource-form
       [fields]="fields()"
@@ -51,11 +58,24 @@ export class ResourceCreatePage {
   private readonly router = inject(Router);
   private readonly resources = injectResources();
 
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
+  );
+  protected readonly canList = computed(() =>
+    isResourceActionEnabled(this.definition(), 'list'),
+  );
+  private readonly canCreate = computed(() =>
+    isResourceActionEnabled(this.definition(), 'create'),
+  );
+  private readonly canShow = computed(() =>
+    isResourceActionEnabled(this.definition(), 'show'),
+  );
+
   protected readonly fields = computed(
     () =>
-      this.resources
-        .find((resource) => resource.name === this.resource())
-        ?.fields?.filter((field) => !NON_EDITABLE_FIELDS.has(field.name)) ?? [],
+      this.definition()?.fields?.filter(
+        (field) => !NON_EDITABLE_FIELDS.has(field.name),
+      ) ?? [],
   );
 
   protected readonly initialValue = computed(() =>
@@ -65,12 +85,28 @@ export class ResourceCreatePage {
   );
 
   protected async submit(data: Record<string, unknown>): Promise<void> {
+    if (!this.canCreate()) {
+      return;
+    }
     try {
-      await this.dataProvider.create(this.resource(), { data });
-      await this.router.navigate(['/', this.resource()]);
+      const created = await this.dataProvider.create<Record<string, unknown>>(
+        this.resource(),
+        { data },
+      );
+      await this.router.navigate(this.destinationAfterCreate(created['id']));
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : String(err));
       this.authRequired.set(isAuthRequiredError(err));
     }
+  }
+
+  private destinationAfterCreate(id: unknown): unknown[] {
+    if (this.canList()) {
+      return ['/', this.resource()];
+    }
+    if (this.canShow() && (typeof id === 'string' || typeof id === 'number')) {
+      return ['/', this.resource(), id];
+    }
+    return ['/'];
   }
 }

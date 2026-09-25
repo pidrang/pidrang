@@ -4,6 +4,7 @@ import {
   injectAuthProvider,
   injectAuthSession,
   injectResources,
+  isResourceActionEnabled,
 } from '@pidrang/core';
 import { environment } from '../../environments/environment';
 import { MatButtonModule } from '@angular/material/button';
@@ -27,11 +28,19 @@ import { MatButtonModule } from '@angular/material/button';
 
     <ul>
       @for (resource of resources; track resource.name) {
-        <li>
-          <a mat-button [routerLink]="[resource.name]">{{
-            resource.label ?? resource.name
-          }}</a>
-        </li>
+        @if (isResourceActionEnabled(resource, 'list')) {
+          <li>
+            <a mat-button [routerLink]="[resource.name]">{{
+              resource.label ?? resource.name
+            }}</a>
+          </li>
+        } @else if (isResourceActionEnabled(resource, 'create')) {
+          <li>
+            <a mat-button [routerLink]="[resource.name, 'create']"
+              >Create {{ resource.label ?? resource.name }}</a
+            >
+          </li>
+        }
       }
     </ul>
 
@@ -44,6 +53,7 @@ import { MatButtonModule } from '@angular/material/button';
 export class HomePage {
   protected readonly tailwindDemoUrl = environment.tailwindDemoUrl;
   protected readonly resources = injectResources();
+  protected readonly isResourceActionEnabled = isResourceActionEnabled;
   protected readonly session = injectAuthSession();
 
   private readonly authProvider = injectAuthProvider();
