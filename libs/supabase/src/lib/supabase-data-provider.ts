@@ -6,6 +6,7 @@ import {
   ListParams,
   ListResult,
   UpdateParams,
+  validateListParams,
 } from '@pidrang/core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -14,7 +15,12 @@ import { toError } from './to-error';
 export class SupabaseDataProvider implements DataProvider {
   constructor(private readonly client: SupabaseClient) {}
 
-  async getList<T>(resource: string, params?: ListParams): Promise<ListResult<T>> {
+  async getList<T>(
+    resource: string,
+    params?: ListParams,
+  ): Promise<ListResult<T>> {
+    validateListParams(params);
+
     let query = this.client.from(resource).select('*', { count: 'exact' });
 
     for (const [column, value] of Object.entries(params?.filters ?? {})) {
