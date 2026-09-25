@@ -2,6 +2,16 @@
 
 Tailwind CSS UI layer for `@pidrang/core`. Schema-driven components that render from a `Resource`'s `Field[]` instead of hand-written markup per resource, styled with Tailwind utility classes instead of a component library.
 
+## Installation
+
+```bash
+npm install @pidrang/tailwind @pidrang/core tailwindcss
+```
+
+## Documentation
+
+See the [getting started guide](https://github.com/pidrang/pidrang/blob/main/docs/getting-started.md) and the [main repository](https://github.com/pidrang/pidrang).
+
 ## Exports
 
 - `ResourceTable<T>` — renders `fields: Field[]` / `data: T[]` as a plain `<table>`. Project an `#actions` template to add a trailing actions column:

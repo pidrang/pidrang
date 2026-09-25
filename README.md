@@ -1,82 +1,92 @@
 # Pidrang
 
+[![CI](https://github.com/pidrang/pidrang/actions/workflows/ci.yml/badge.svg)](https://github.com/pidrang/pidrang/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@pidrang/core?label=%40pidrang%2Fcore)](https://www.npmjs.com/package/@pidrang/core)
+[![License: MIT](https://img.shields.io/github/license/pidrang/pidrang)](./LICENCE)
+
 > Build Angular admin applications faster.
 
 Pidrang is an open-source, headless framework designed to eliminate boilerplate code when building Angular administration panels, dashboards, and internal tools. Inspired by the architecture of Refine, it brings data providers, authentication management, and state tracking to the Angular ecosystem.
 
----
+Pidrang is pre-1.0: the public API may change between minor versions.
 
-## 🚀 Features (Roadmap)
+## Features
 
-- 🔌 **Headless Architecture:** Decoupled from the UI. Use Angular Material, PrimeNG, Tailwind, or custom styles.
-- ⚡ **Signal-First:** Built from the ground up leveraging Angular Signals for fine-grained reactivity.
-- 🗄️ **Data Providers:** First-class support for Supabase (REST, GraphQL, and custom backends coming soon).
-- 🔐 **Auth Provider:** Simplified authentication flow integration.
-- 🎨 **Material UI Layer:** Schema-driven `ResourceTable`/`ResourceForm` built on Angular Material and Signal Forms.
-- 🌬️ **Tailwind UI Layer:** Same schema-driven `ResourceTable`/`ResourceForm`, styled with Tailwind utility classes instead of a component library.
-- 📦 **Monorepo Structure:** Clean modular architecture (`@pidrang/core`, `@pidrang/supabase`, `@pidrang/material`, `@pidrang/tailwind`).
+- **Headless architecture:** decoupled from the UI. Use Angular Material or Tailwind today, or build your own layer on the same contracts.
+- **Signal-first:** built on Angular Signals and the native `resource()` API for fine-grained reactivity.
+- **Data providers:** first-class Supabase support, with a small `DataProvider` contract for any other backend.
+- **Auth provider:** sign-in, sign-out and a signal-based session, with the same pluggable design.
+- **Schema-driven UI:** `ResourceTable` and `ResourceForm` render from a `Resource` definition instead of hand-written markup per table.
+- **CLI:** `pidrang init` introspects a Supabase schema and scaffolds `Resource` definitions and CRUD pages.
 
----
+## Packages
 
-## 🛠️ Project Structure
+| Package                                | Description                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------ |
+| [`@pidrang/core`](./libs/core)         | Contracts, `providePidrang` and signal-based state. Depends on `@angular/core` only. |
+| [`@pidrang/supabase`](./libs/supabase) | `DataProvider` and `AuthProvider` backed by Supabase.                                |
+| [`@pidrang/material`](./libs/material) | `ResourceTable` and `ResourceForm` on Angular Material and Signal Forms.             |
+| [`@pidrang/tailwind`](./libs/tailwind) | The same components styled with Tailwind utility classes.                            |
 
-```text
-pidrang/
-├── apps/
-│   ├── demo-material/  # Angular test application (Material UI)
-│   └── demo-tailwind/  # Angular test application (Tailwind UI)
-└── libs/
-    ├── core/           # Headless primitives & contracts (@pidrang/core)
-    ├── supabase/       # Supabase DataProvider implementation (@pidrang/supabase)
-    ├── material/       # Angular Material UI layer (@pidrang/material)
-    └── tailwind/       # Tailwind CSS UI layer (@pidrang/tailwind)
+## Quick look
+
+```ts
+import { providePidrang } from '@pidrang/core';
+import { provideSupabaseDataProvider } from '@pidrang/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+export const appConfig = {
+  providers: [
+    providePidrang({
+      dataProvider: provideSupabaseDataProvider({ client }),
+      resources: [
+        {
+          name: 'products',
+          fields: [
+            { name: 'id', type: 'text' },
+            { name: 'name', type: 'text' },
+            { name: 'price', type: 'number' },
+          ],
+        },
+      ],
+    }),
+  ],
+};
 ```
 
-## Quick start
-
+```html
+<lib-resource-table [fields]="fields()" [data]="list.value()?.data ?? []" />
 ```
+
+The full walkthrough, from a new Angular app to a working list, create and edit flow, is in [`docs/getting-started.md`](./docs/getting-started.md).
+
+## Documentation
+
+- [Getting started](./docs/getting-started.md)
+- [Architecture](./docs/architecture.md)
+- [Roadmap](./ROADMAP.md)
+- [Changelog](./CHANGELOG.md)
+
+## Demos
+
+`apps/demo-material` and `apps/demo-tailwind` show the same three resources (`users`, `products`, `orders`) with two different UI layers, both backed by the public `pidrang` Supabase project.
+
+## Development
+
+```bash
 pnpm install
-pnpm exec nx test core
-pnpm exec nx build core
+pnpm exec nx run-many -t lint test build
+pnpm exec nx serve demo-material
 ```
 
-To run `apps/demo-material` against a local Supabase instance instead of the hosted project:
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the branching and commit conventions.
 
-```
-# in a clone of pidrang/supabase
-supabase start
+## Security
 
-# in this repo
-pnpm exec nx serve demo-material --configuration=local
-```
-
-## Architecture
-
-`@pidrang/core` is framework-native (Angular) but UI-agnostic: it depends on `@angular/core` only, never on a component library. Everything else builds on top of it:
-
-- `Resource` (optionally described with `Field`/`FieldType` for a typed form/table), `DataProvider`, `ListParams`/`ListResult<T>`, `GetOneParams`/`CreateParams<T>`/`UpdateParams<T>`/`DeleteParams`
-- `providePidrang({ dataProvider, resources })` for app-wide configuration
-- `injectDataProvider()`, `injectResources()`, `injectResource(name)` for reading that configuration
-- `injectResourceList<T>(resourceName, params?)`, a signal-based list loader built on Angular's native `resource()`
-
-`@pidrang/supabase` implements `DataProvider` against `@supabase/supabase-js` (`SupabaseDataProvider`, `provideSupabaseDataProvider({ client })`). UI packages (`@pidrang/material`, `@pidrang/tailwind`, later `primeng`) consume core's reactive primitives without knowing which `DataProvider` is wired in.
-
-`AuthProvider` (`login`, `logout`, `getIdentity`) follows the same pattern as `DataProvider`: `providePidrang({ authProvider, ... })` registers it, `injectAuthProvider()` reads it, and `injectAuthSession()` wraps it in a signal-based `resource()` for the current identity (`value()` is `AuthIdentity | null | undefined` while loading/signed-out/signed-in). `@pidrang/supabase` implements it with `SupabaseAuthProvider` / `provideSupabaseAuthProvider({ client })`, backed by Supabase Auth.
-
-`SupabaseDataProvider` and `SupabaseAuthProvider` perform no authorization themselves — every access guarantee comes from the Row Level Security policies on the integrator's own Supabase project. Pidrang assumes those policies are correctly configured; it does not enforce or verify them.
-
-`@pidrang/material` is the first UI layer: schema-driven components (`ResourceTable`, `ResourceForm`) that render from a `Resource`'s `Field[]` instead of hand-written markup per resource. It depends only on `@pidrang/core` and `@angular/material` — never on a specific `DataProvider` — so it works with `@pidrang/supabase` today and any future `DataProvider` without changes. `ResourceTable` supports a projected `#actions` template (`contentChild` + `ngTemplateOutlet`) for per-row buttons/links rendered as a real trailing column. `ResourceForm` is built on Angular's Signal Forms (`@angular/forms/signals`), with a `linkedSignal` draft that resets whenever its `value` input changes without mutating the caller's original object.
-
-`@pidrang/tailwind` is a second UI layer with the same `ResourceTable`/`ResourceForm` API, styled with Tailwind utility classes instead of a component library. It ships no CSS of its own — the consuming app's Tailwind build (its own `@source` scan) is what turns the classes used in the library's templates into real styles.
-
-## Roadmap
-
-See [`ROADMAP.md`](./ROADMAP.md) for current progress.
-
-## Contributing
-
-...
+Pidrang performs no authorization of its own: access control comes from the Row Level Security policies on your Supabase project. To report a vulnerability, see [`SECURITY.md`](./SECURITY.md).
 
 ## License
 
-MIT
+MIT, see [`LICENCE`](./LICENCE).
