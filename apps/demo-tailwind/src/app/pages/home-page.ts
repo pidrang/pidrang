@@ -4,6 +4,7 @@ import {
   injectAuthProvider,
   injectAuthSession,
   injectResources,
+  isResourceActionEnabled,
 } from '@pidrang/core';
 import { environment } from '../../environments/environment';
 
@@ -36,13 +37,23 @@ import { environment } from '../../environments/environment';
 
     <ul class="mt-4 flex flex-col gap-1">
       @for (resource of resources; track resource.name) {
-        <li>
-          <a
-            [routerLink]="[resource.name]"
-            class="text-blue-600 hover:underline"
-            >{{ resource.label ?? resource.name }}</a
-          >
-        </li>
+        @if (isResourceActionEnabled(resource, 'list')) {
+          <li>
+            <a
+              [routerLink]="[resource.name]"
+              class="text-blue-600 hover:underline"
+              >{{ resource.label ?? resource.name }}</a
+            >
+          </li>
+        } @else if (isResourceActionEnabled(resource, 'create')) {
+          <li>
+            <a
+              [routerLink]="[resource.name, 'create']"
+              class="text-blue-600 hover:underline"
+              >Create {{ resource.label ?? resource.name }}</a
+            >
+          </li>
+        }
       }
     </ul>
 
@@ -57,6 +68,7 @@ import { environment } from '../../environments/environment';
 export class HomePage {
   protected readonly materialDemoUrl = environment.materialDemoUrl;
   protected readonly resources = injectResources();
+  protected readonly isResourceActionEnabled = isResourceActionEnabled;
   protected readonly session = injectAuthSession();
 
   private readonly authProvider = injectAuthProvider();

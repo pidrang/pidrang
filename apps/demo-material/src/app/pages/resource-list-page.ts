@@ -11,6 +11,7 @@ import {
   injectDataProvider,
   injectResourceList,
   injectResources,
+  isResourceActionEnabled,
 } from '@pidrang/core';
 import { ResourceTable } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
@@ -25,12 +26,14 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
   imports: [RouterLink, ResourceTable, MatButtonModule, MatPaginatorModule],
   template: `
     <h1>{{ resource() }}</h1>
-    <a
-      mat-flat-button
-      color="primary"
-      [routerLink]="['/', resource(), 'create']"
-      >Create</a
-    >
+    @if (canCreate()) {
+      <a
+        mat-flat-button
+        color="primary"
+        [routerLink]="['/', resource(), 'create']"
+        >Create</a
+      >
+    }
 
     @if (list.isLoading()) {
       <p>Loading...</p>
@@ -42,21 +45,29 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
         <p>No records yet.</p>
       } @else if (list.hasValue()) {
         <lib-resource-table [fields]="fields()" [data]="list.value().data">
-          <ng-template #actions let-row>
-            <a mat-button [routerLink]="['/', resource(), row.id]">Show</a>
-            <a mat-button [routerLink]="['/', resource(), row.id, 'edit']"
-              >Edit</a
-            >
-            <button
-              mat-stroked-button
-              color="warn"
-              type="button"
-              [disabled]="list.isLoading()"
-              (click)="remove(row.id)"
-            >
-              Delete
-            </button>
-          </ng-template>
+          @if (canShow() || canEdit() || canDelete()) {
+            <ng-template #actions let-row>
+              @if (canShow()) {
+                <a mat-button [routerLink]="['/', resource(), row.id]">Show</a>
+              }
+              @if (canEdit()) {
+                <a mat-button [routerLink]="['/', resource(), row.id, 'edit']"
+                  >Edit</a
+                >
+              }
+              @if (canDelete()) {
+                <button
+                  mat-stroked-button
+                  color="warn"
+                  type="button"
+                  [disabled]="list.isLoading()"
+                  (click)="remove(row.id)"
+                >
+                  Delete
+                </button>
+              }
+            </ng-template>
+          }
         </lib-resource-table>
       }
       <mat-paginator
@@ -104,11 +115,23 @@ export class ResourceListPage {
         ? previous.value
         : undefined),
   });
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
+  );
+  protected readonly canCreate = computed(() =>
+    isResourceActionEnabled(this.definition(), 'create'),
+  );
+  protected readonly canShow = computed(() =>
+    isResourceActionEnabled(this.definition(), 'show'),
+  );
+  protected readonly canEdit = computed(() =>
+    isResourceActionEnabled(this.definition(), 'edit'),
+  );
+  protected readonly canDelete = computed(() =>
+    isResourceActionEnabled(this.definition(), 'delete'),
+  );
   protected readonly fields = computed(
-    () =>
-      this.resources
-        .find((resource) => resource.name === this.resource())
-        ?.fields?.filter((field) => !field.hidden) ?? [],
+    () => this.definition()?.fields?.filter((field) => !field.hidden) ?? [],
   );
 
   constructor() {
@@ -135,6 +158,9 @@ export class ResourceListPage {
   }
 
   protected async remove(id: string): Promise<void> {
+    if (!this.canDelete()) {
+      return;
+    }
     await this.dataProvider.delete(this.resource(), { id });
     this.list.reload();
   }

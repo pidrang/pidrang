@@ -1,6 +1,10 @@
 import { Component, computed, effect, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { injectDataProvider, injectResources } from '@pidrang/core';
+import {
+  injectDataProvider,
+  injectResources,
+  isResourceActionEnabled,
+} from '@pidrang/core';
 import { MatButtonModule } from '@angular/material/button';
 import { recordLabel } from '../record-label';
 
@@ -9,7 +13,9 @@ import { recordLabel } from '../record-label';
   imports: [RouterLink, MatButtonModule],
   template: `
     <h1>{{ resource() }} — {{ label() }}</h1>
-    <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    @if (canList()) {
+      <a mat-button [routerLink]="['/', resource()]">Back to list</a>
+    }
     @if (error()) {
       <p>{{ error() }}</p>
     } @else if (record(); as record) {
@@ -34,11 +40,14 @@ export class ResourceShowPage {
   private readonly dataProvider = injectDataProvider();
   private readonly resources = injectResources();
 
-  protected readonly fields = computed(
-    () =>
-      this.resources.find((resource) => resource.name === this.resource())
-        ?.fields ?? [],
+  private readonly definition = computed(() =>
+    this.resources.find((resource) => resource.name === this.resource()),
   );
+  protected readonly canList = computed(() =>
+    isResourceActionEnabled(this.definition(), 'list'),
+  );
+
+  protected readonly fields = computed(() => this.definition()?.fields ?? []);
 
   protected readonly label = computed(() => {
     const record = this.record();
