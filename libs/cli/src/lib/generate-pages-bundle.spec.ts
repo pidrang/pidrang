@@ -113,6 +113,18 @@ describe('generatePagesBundle', () => {
       expect(matches).toHaveLength(1);
     }
   });
+
+  it('emits no comments or any casts', () => {
+    const contents = [
+      ...generatePagesBundle().map((file) => file.content),
+      RESOURCE_ROUTES_SNIPPET,
+    ];
+
+    for (const content of contents) {
+      expect(content).not.toMatch(/^\s*\/\/|\/\*|<!--/m);
+      expect(content).not.toMatch(/\$any\(|:\s*any\b|\bas any\b/);
+    }
+  });
 });
 
 describe('RESOURCE_ROUTES_SNIPPET', () => {

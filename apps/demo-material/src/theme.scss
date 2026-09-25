@@ -11,8 +11,6 @@ html {
   );
 }
 
-// mat.theme()'s color="warn" support only covers M2-compatible themes; M3
-// needs the warn palette re-declared scoped to [color="warn"] to render red.
 [color='warn'] {
   @include mat.theme(
     (

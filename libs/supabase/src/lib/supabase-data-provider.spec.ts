@@ -2,8 +2,6 @@ import { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 
 import { SupabaseDataProvider } from './supabase-data-provider';
 
-// Minimal chainable stand-in for Supabase's PostgrestFilterBuilder: every
-// method returns the same object, which resolves like the real builder does.
 function fakeClient(result: {
   data: unknown;
   error: PostgrestError | null;

@@ -26,15 +26,6 @@ interface IntrospectionResponse {
   errors?: { message: string }[];
 }
 
-// pg_graphql exposes each table as a Relay-style `<table>Collection` field on
-// Query, returning `{ edges { node { ...columns, nodeId } } }`. `edges` is
-// wrapped as `NON_NULL(LIST(NON_NULL(OBJECT)))` and `node` as
-// `NON_NULL(OBJECT)`, and `__Type.fields` is only populated for an
-// OBJECT/INTERFACE kind (null otherwise, verified against a real pg_graphql
-// schema) — so reaching the actual columns needs `fields` re-queried after
-// each `ofType` unwrap, at every hop (Query -> Collection -> edges -> Edge ->
-// node -> Node -> columns). GraphQL has no recursive query syntax, so this
-// generates a bounded-depth query instead of hand-writing the nesting.
 function typeSelection(depth: number): string {
   if (depth <= 0) {
     return `kind name ofType { kind name ofType { kind name } }`;
@@ -54,8 +45,6 @@ function typeSelection(depth: number): string {
   `;
 }
 
-// Deep enough to cover Collection -> edges (3 unwraps) -> Edge -> node
-// (1 unwrap) -> Node -> columns, with margin.
 const INTROSPECTION_QUERY = `
   query IntrospectSchema {
     __schema {
@@ -96,9 +85,6 @@ async function runIntrospection(
   return body.data?.__schema.queryType.fields ?? [];
 }
 
-// Walks `ofType` until it finds a level where `fields` is populated (i.e. an
-// OBJECT/INTERFACE kind), since a NON_NULL/LIST wrapper's own `fields` is
-// always null.
 function unwrapObjectFields(
   type: IntrospectionType | null | undefined,
 ): IntrospectionField[] {
@@ -143,7 +129,9 @@ export function createGraphQlSchemaProvider(
         (field) => field.name === `${table}Collection`,
       );
       if (!collectionField) {
-        throw new Error(`Table "${table}" not found in Supabase GraphQL schema`);
+        throw new Error(
+          `Table "${table}" not found in Supabase GraphQL schema`,
+        );
       }
 
       const collectionFields = unwrapObjectFields(collectionField.type);

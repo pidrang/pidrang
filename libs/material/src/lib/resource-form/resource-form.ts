@@ -41,9 +41,6 @@ export class ResourceForm<T extends Record<string, unknown>> {
   protected readonly draft = linkedSignal(() => this.value());
   protected readonly model = form(this.draft);
 
-  // The field name comes from the runtime Resource.fields schema, not from T's
-  // keys, so it can't be typed against the model without losing the dynamism
-  // fields() is there for.
   protected fieldTree(
     name: string,
   ): SignalField<string | number | boolean | Date | null> {

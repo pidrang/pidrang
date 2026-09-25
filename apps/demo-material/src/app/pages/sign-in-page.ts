@@ -19,19 +19,21 @@ import { MatInputModule } from '@angular/material/input';
           <mat-form-field>
             <mat-label>Email</mat-label>
             <input
+              #emailInput
               matInput
               type="email"
               [value]="email()"
-              (input)="email.set($any($event.target).value)"
+              (input)="email.set(emailInput.value)"
             />
           </mat-form-field>
           <mat-form-field>
             <mat-label>Password</mat-label>
             <input
+              #passwordInput
               matInput
               type="password"
               [value]="password()"
-              (input)="password.set($any($event.target).value)"
+              (input)="password.set(passwordInput.value)"
             />
           </mat-form-field>
           @if (error()) {
