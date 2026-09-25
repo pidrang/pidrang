@@ -1,7 +1,17 @@
 import { AuthIdentity, AuthProvider, LoginParams } from '@pidrang/core';
-import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  AuthChangeEvent,
+  SupabaseClient,
+  isAuthSessionMissingError,
+} from '@supabase/supabase-js';
 
 import { toError } from './to-error';
+
+const SESSION_CHANGE_EVENTS = new Set<AuthChangeEvent>([
+  'SIGNED_IN',
+  'SIGNED_OUT',
+  'USER_UPDATED',
+]);
 
 export class SupabaseAuthProvider implements AuthProvider {
   constructor(private readonly client: SupabaseClient) {}
@@ -22,9 +32,24 @@ export class SupabaseAuthProvider implements AuthProvider {
 
   async getIdentity(): Promise<AuthIdentity | null> {
     const { data, error } = await this.client.auth.getUser();
-    if (error || !data.user) {
-      return null;
+    if (error) {
+      if (
+        isAuthSessionMissingError(error) ||
+        error.code === 'session_not_found'
+      ) {
+        return null;
+      }
+      throw toError(error);
     }
-    return { id: data.user.id, email: data.user.email };
+    return data.user ? { id: data.user.id, email: data.user.email } : null;
+  }
+
+  onSessionChange(listener: () => void): () => void {
+    const { data } = this.client.auth.onAuthStateChange((event) => {
+      if (SESSION_CHANGE_EVENTS.has(event)) {
+        setTimeout(listener);
+      }
+    });
+    return () => data.subscription.unsubscribe();
   }
 }
