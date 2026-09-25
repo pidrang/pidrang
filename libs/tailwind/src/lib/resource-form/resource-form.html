@@ -1,6 +1,7 @@
 <form
   [formRoot]="model"
   (submit)="onSubmit($event)"
+  [attr.aria-busy]="pending()"
   class="flex max-w-xl flex-col items-stretch gap-4"
 >
   @for (field of fields(); track field.name) { @if (field.type === 'boolean') {
@@ -25,8 +26,9 @@
 
   <button
     type="submit"
-    class="self-start rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+    [disabled]="pending()"
+    class="self-start rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
   >
-    Save
+    {{ pending() ? 'Saving…' : 'Save' }}
   </button>
 </form>

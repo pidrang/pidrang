@@ -62,4 +62,39 @@ describe('ResourceForm', () => {
       fixture.nativeElement.querySelector('input[type="checkbox"]'),
     ).toBeTruthy();
   });
+
+  it('disables save and ignores submits while pending', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('fields', [{ name: 'name', type: 'text' }]);
+    fixture.componentRef.setInput('value', { name: 'USB-C dock' });
+    fixture.componentRef.setInput('pending', true);
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const button: HTMLButtonElement =
+      fixture.nativeElement.querySelector('button');
+    const formElement: HTMLFormElement =
+      fixture.nativeElement.querySelector('form');
+    formElement.dispatchEvent(new Event('submit', { cancelable: true }));
+    await fixture.whenStable();
+
+    expect(button.disabled).toBe(true);
+    expect(button.textContent?.trim()).toBe('Saving…');
+    expect(formElement.getAttribute('aria-busy')).toBe('true');
+    expect(saved).toEqual([]);
+
+    fixture.componentRef.setInput('pending', false);
+    await fixture.whenStable();
+    button.click();
+    await fixture.whenStable();
+
+    expect(button.disabled).toBe(false);
+    expect(saved).toEqual([{ name: 'USB-C dock' }]);
+  });
 });
