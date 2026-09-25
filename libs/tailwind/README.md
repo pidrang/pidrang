@@ -22,7 +22,7 @@ See the [getting started guide](https://github.com/pidrang/pidrang/blob/main/doc
     </ng-template>
   </lib-resource-table>
   ```
-- `ResourceForm<T>` — renders `fields: Field[]` into one labeled `<input>`/checkbox per field (based on `FieldType`), pre-filled from a `value: T` input, emits the edited value via `(save)` on submit. Built on Signal Forms (`@angular/forms/signals`); never mutates the `value` input.
+- `ResourceForm<T>` — renders `fields: Field[]` into one labeled `<input>`/checkbox per field (based on `FieldType`), pre-filled from a `value: T` input, emits the edited value via `(save)` on submit. A `pending` input disables the submit button (showing "Saving…", `aria-busy` on the form) and ignores submits while a save is in flight. Built on Signal Forms (`@angular/forms/signals`); never mutates the `value` input.
 
 ## Dependencies
 
