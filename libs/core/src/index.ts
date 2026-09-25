@@ -1,4 +1,6 @@
 export * from './lib/resource';
+export * from './lib/resource-action';
+export * from './lib/is-resource-action-enabled';
 export * from './lib/field';
 export * from './lib/list-params';
 export * from './lib/validate-list-params';
