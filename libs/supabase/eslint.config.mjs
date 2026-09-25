@@ -42,7 +42,8 @@ export default [
   },
   {
     files: ['**/*.html'],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      '@angular-eslint/template/no-any': 'error',
+    },
   },
 ];

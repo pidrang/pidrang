@@ -41,8 +41,26 @@ export default [
     },
   },
   {
+    files: ['src/**/*.ts'],
+    ignores: ['src/**/*.spec.ts', 'src/test-setup.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@angular/core$|\\.{1,2}/)',
+              message: '@pidrang/core may only import @angular/core.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.html'],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      '@angular-eslint/template/no-any': 'error',
+    },
   },
 ];

@@ -1,5 +1,24 @@
 import nx from '@nx/eslint-plugin';
 
+const noComments = {
+  meta: {
+    type: 'problem',
+    messages: { comment: 'Comments are not allowed in Pidrang sources.' },
+    schema: [],
+  },
+  create(context) {
+    return {
+      Program() {
+        for (const comment of context.sourceCode.getAllComments()) {
+          if (comment.type !== 'Shebang') {
+            context.report({ loc: comment.loc, messageId: 'comment' });
+          }
+        }
+      },
+    };
+  },
+};
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -36,7 +55,10 @@ export default [
       '**/*.cjs',
       '**/*.mjs',
     ],
-    // Override or add rules here
-    rules: {},
+    plugins: { pidrang: { rules: { 'no-comments': noComments } } },
+    rules: {
+      'pidrang/no-comments': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
   },
 ];
