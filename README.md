@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/pidrang/pidrang/actions/workflows/ci.yml/badge.svg)](https://github.com/pidrang/pidrang/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@pidrang/core?label=%40pidrang%2Fcore)](https://www.npmjs.com/package/@pidrang/core)
-[![License: MIT](https://img.shields.io/github/license/pidrang/pidrang)](./LICENCE)
+[![License: MIT](https://img.shields.io/github/license/pidrang/pidrang)](./LICENSE)
 
 > Build Angular admin applications faster.
 
@@ -17,7 +17,7 @@ Pidrang is pre-1.0: the public API may change between minor versions.
 - **Data providers:** first-class Supabase support, with a small `DataProvider` contract for any other backend.
 - **Auth provider:** sign-in, sign-out and a signal-based session, with the same pluggable design.
 - **Schema-driven UI:** `ResourceTable` and `ResourceForm` render from a `Resource` definition instead of hand-written markup per table.
-- **CLI:** `pidrang init` introspects a Supabase schema and scaffolds `Resource` definitions and CRUD pages.
+- **CLI (from a clone of this repository, not yet published to npm):** `pidrang init` introspects a Supabase schema and scaffolds `Resource` definitions and CRUD pages.
 
 ## Packages
 
@@ -89,4 +89,4 @@ Pidrang performs no authorization of its own: access control comes from the Row 
 
 ## License
 
-MIT, see [`LICENCE`](./LICENCE).
+MIT, see [`LICENSE`](./LICENSE).

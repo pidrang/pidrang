@@ -42,7 +42,6 @@ This is the same command CI runs. To limit it to one project, use `-p`, for exam
 ## Code style
 
 - Follow the official Angular conventions: standalone APIs, signals over `Observable` state, `inject()` over constructor injection.
-- Avoid code comments. Make the code self-explanatory through naming and small functions, and put context in the commit message or pull request description.
 - Add or update tests next to the code they cover.
 
 ## Branching
