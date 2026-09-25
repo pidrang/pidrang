@@ -7,7 +7,8 @@ export interface SupabaseDataProviderConfig {
   client: SupabaseClient;
 }
 
-// Returns a plain DataProvider, meant to be passed as providePidrang({ dataProvider: ... }).
-export function provideSupabaseDataProvider(config: SupabaseDataProviderConfig): DataProvider {
+export function provideSupabaseDataProvider(
+  config: SupabaseDataProviderConfig,
+): DataProvider {
   return new SupabaseDataProvider(config.client);
 }

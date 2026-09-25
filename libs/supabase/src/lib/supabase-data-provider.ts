@@ -59,8 +59,6 @@ export class SupabaseDataProvider implements DataProvider {
   }
 
   async create<T>(resource: string, params: CreateParams<T>): Promise<T> {
-    // Cast needed: without a typed Database schema, postgrest-js can't unify
-    // its insert row type with our unconstrained generic T.
     const { data, error } = await this.client
       .from(resource)
       .insert(params.data as never)
@@ -73,7 +71,6 @@ export class SupabaseDataProvider implements DataProvider {
   }
 
   async update<T>(resource: string, params: UpdateParams<T>): Promise<T> {
-    // Same cast reason as create(): no typed Database schema to unify with T.
     const { data, error } = await this.client
       .from(resource)
       .update(params.data as never)

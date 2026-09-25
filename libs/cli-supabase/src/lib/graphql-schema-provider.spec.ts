@@ -7,10 +7,6 @@ const connection: GraphQlConnection = {
   anonKey: 'anon-key',
 };
 
-// Mirrors the real shape pg_graphql returns (verified against a live local
-// Supabase instance): `edges` is NON_NULL(LIST(NON_NULL(OBJECT Edge))) and
-// `node` is NON_NULL(OBJECT Node) — `fields` only appears once you unwrap
-// down to the OBJECT kind, it's null on every wrapper level in between.
 function collectionField(
   name: string,
   columns: { name: string; typeName: string }[],
@@ -57,12 +53,19 @@ function collectionField(
                               type: {
                                 kind: 'NON_NULL',
                                 name: null,
-                                ofType: { kind: 'SCALAR', name: column.typeName },
+                                ofType: {
+                                  kind: 'SCALAR',
+                                  name: column.typeName,
+                                },
                               },
                             })),
                             {
                               name: 'author',
-                              type: { kind: 'OBJECT', name: 'users', ofType: null },
+                              type: {
+                                kind: 'OBJECT',
+                                name: 'users',
+                                ofType: null,
+                              },
                             },
                           ],
                         },

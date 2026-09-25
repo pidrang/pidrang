@@ -41,9 +41,9 @@ describe('runInitWizard', () => {
     const definition = fakeDefinition('supabase', schemaProvider);
 
     vi.mocked(checkbox)
-      .mockResolvedValueOnce(['products']) // table selection
-      .mockResolvedValueOnce(['list', 'create']) // actions
-      .mockResolvedValueOnce([]); // hidden fields
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list', 'create'])
+      .mockResolvedValueOnce([]);
 
     const plan = await runInitWizard([definition]);
 

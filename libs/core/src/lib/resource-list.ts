@@ -8,19 +8,13 @@ interface ListRequest {
   listParams: ListParams | undefined;
 }
 
-// Wraps DataProvider.getList in Angular's resource() so callers get
-// signal-based value/status/error/reload without depending on any UI layer.
-//
-// resourceName can be a reactive function (e.g. a route param signal) so
-// callers reusing the same component instance across resources still reload.
-// Returning undefined from `params` skips loading (Angular resource()
-// convention).
 export function injectResourceList<T>(
   resourceName: string | (() => string),
   params?: () => ListParams | undefined,
 ): ResourceRef<ListResult<T> | undefined> {
   const dataProvider = injectDataProvider();
-  const resourceNameFn = typeof resourceName === 'function' ? resourceName : () => resourceName;
+  const resourceNameFn =
+    typeof resourceName === 'function' ? resourceName : () => resourceName;
 
   return resource({
     params: (): ListRequest | undefined => {
@@ -30,6 +24,7 @@ export function injectResourceList<T>(
       }
       return { resourceName: resourceNameFn(), listParams };
     },
-    loader: ({ params: request }) => dataProvider.getList<T>(request.resourceName, request.listParams),
+    loader: ({ params: request }) =>
+      dataProvider.getList<T>(request.resourceName, request.listParams),
   });
 }

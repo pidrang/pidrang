@@ -417,8 +417,6 @@ export class ResourceShowPage {
   });
 
   constructor() {
-    // Re-runs whenever resource() or id() changes, so navigating between
-    // records on the same component instance still refetches.
     effect(() => {
       const resource = this.resource();
       const id = this.id();
@@ -530,8 +528,6 @@ export class ResourceEditPage {
   });
 
   constructor() {
-    // Re-runs whenever resource() or id() changes, so navigating between
-    // records on the same component instance still reloads the record.
     effect(() => {
       const resource = this.resource();
       const id = this.id();
