@@ -92,7 +92,7 @@
       "pattern": "v{version}"
     },
     "version": {
-      "preVersionCommand": "pnpm exec nx run-many -t build -p core supabase material tailwind && for lib in core supabase material tailwind; do cp LICENCE dist/libs/$lib/LICENCE; done",
+      "preVersionCommand": "pnpm exec nx run-many -t build -p core supabase material tailwind && for lib in core supabase material tailwind; do cp LICENSE dist/libs/$lib/LICENSE; done",
       "conventionalCommits": true,
       "manifestRootsToUpdate": [
         "{projectRoot}",

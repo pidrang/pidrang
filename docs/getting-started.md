@@ -147,14 +147,29 @@ injectResourceList<Row>(
     <button type="button" (click)="remove(row.id)">Delete</button>
   </ng-template>
 </lib-resource-table>
+
+@if (deleteError(); as message) {
+<p role="alert">{{ message }}</p>
+}
 ```
+
+The template uses `routerLink`, so add `RouterLink` from `@angular/router` to the `imports` of the component. Deleting is irreversible, so ask for confirmation and surface a failure (for example a Row Level Security rejection) instead of letting the promise reject silently.
 
 ```ts
 private readonly dataProvider = injectDataProvider();
+protected readonly deleteError = signal<string | null>(null);
 
 protected async remove(id: string): Promise<void> {
-  await this.dataProvider.delete(this.resource(), { id });
-  this.list.reload();
+  if (!confirm('Delete this record?')) {
+    return;
+  }
+  try {
+    await this.dataProvider.delete(this.resource(), { id });
+    this.deleteError.set(null);
+    this.list.reload();
+  } catch (error) {
+    this.deleteError.set(error instanceof Error ? error.message : String(error));
+  }
 }
 ```
 

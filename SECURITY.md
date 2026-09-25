@@ -8,7 +8,9 @@ Pidrang is pre-1.0. Only the latest published minor version of each package is s
 
 Please do not open a public GitHub issue for a security vulnerability.
 
-Instead, report it privately by emailing the maintainers:
+Instead, report it privately through GitHub: open the Security tab of the repository and choose "Report a vulnerability", or go to <https://github.com/pidrang/pidrang/security/advisories/new>. The report stays private to the maintainers until a fix is released.
+
+If you cannot use GitHub, email the maintainers:
 
 - rakoto.tsira@gmail.com
 - fetrarij@gmail.com

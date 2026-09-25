@@ -21,7 +21,7 @@ How a new version of the published packages reaches npm. Maintainers only.
 
 Releases run from the `Release` GitHub Actions workflow, never from a laptop. The workflow lints, tests and builds, then runs `nx release`, which:
 
-1. builds the four packages and copies `LICENCE` into each `dist` folder,
+1. builds the four packages and copies `LICENSE` into each `dist` folder,
 2. computes the new version and writes it to each `package.json` and its `dist` copy,
 3. prepends the new section to `CHANGELOG.md`,
 4. commits `chore(release): vX.Y.Z`, tags `vX.Y.Z` and pushes both,
