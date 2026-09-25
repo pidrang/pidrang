@@ -1,4 +1,4 @@
-import { Component, computed, effect, input, signal } from '@angular/core';
+import { Component, computed, input, resource } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   injectDataProvider,
@@ -16,9 +16,15 @@ import { recordLabel } from '../record-label';
     @if (canList()) {
       <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     }
-    @if (error()) {
-      <p>{{ error() }}</p>
-    } @else if (record(); as record) {
+    @if (record.isLoading()) {
+      <p role="status">Loading…</p>
+    }
+    @if (record.error(); as loadError) {
+      <p role="alert">{{ loadError.message }}</p>
+      <button mat-stroked-button type="button" (click)="record.reload()">
+        Retry
+      </button>
+    } @else if (record.value(); as record) {
       <dl>
         @for (field of fields(); track field.name) {
           <dt>{{ field.label ?? field.name }}</dt>
@@ -32,13 +38,16 @@ export class ResourceShowPage {
   readonly resource = input.required<string>();
   readonly id = input.required<string>();
 
-  protected readonly record = signal<Record<string, unknown> | undefined>(
-    undefined,
-  );
-  protected readonly error = signal<string | null>(null);
-
   private readonly dataProvider = injectDataProvider();
   private readonly resources = injectResources();
+
+  protected readonly record = resource({
+    params: () => ({ resource: this.resource(), id: this.id() }),
+    loader: ({ params }) =>
+      this.dataProvider.getOne<Record<string, unknown>>(params.resource, {
+        id: params.id,
+      }),
+  });
 
   private readonly definition = computed(() =>
     this.resources.find((resource) => resource.name === this.resource()),
@@ -49,20 +58,7 @@ export class ResourceShowPage {
 
   protected readonly fields = computed(() => this.definition()?.fields ?? []);
 
-  protected readonly label = computed(() => {
-    const record = this.record();
-    return record ? recordLabel(record) : this.id();
-  });
-
-  constructor() {
-    effect(() => {
-      const resource = this.resource();
-      const id = this.id();
-      this.dataProvider.getOne<Record<string, unknown>>(resource, { id }).then(
-        (record) => this.record.set(record),
-        (err) =>
-          this.error.set(err instanceof Error ? err.message : String(err)),
-      );
-    });
-  }
+  protected readonly label = computed(() =>
+    this.record.hasValue() ? recordLabel(this.record.value()) : this.id(),
+  );
 }
