@@ -36,6 +36,7 @@ const INPUT_TYPE_BY_FIELD_TYPE: Record<
 export class ResourceForm<T extends Record<string, unknown>> {
   readonly fields = input.required<Field[]>();
   readonly value = input.required<T>();
+  readonly pending = input(false);
   readonly save = output<T>();
 
   protected readonly draft = linkedSignal(() => this.value());
@@ -64,6 +65,9 @@ export class ResourceForm<T extends Record<string, unknown>> {
 
   protected onSubmit(event: Event): void {
     event.preventDefault();
+    if (this.pending()) {
+      return;
+    }
     this.save.emit(this.draft());
   }
 }
