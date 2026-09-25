@@ -1,4 +1,8 @@
-<form [formRoot]="model" (submit)="onSubmit($event)">
+<form
+  [formRoot]="model"
+  (submit)="onSubmit($event)"
+  [attr.aria-busy]="pending()"
+>
   @for (field of fields(); track field.name) { @if (field.type === 'boolean') {
   <mat-checkbox [formField]="fieldTree(field.name)"
     >{{ fieldLabel(field) }}</mat-checkbox
@@ -14,5 +18,7 @@
   </mat-form-field>
   } }
 
-  <button mat-flat-button color="primary" type="submit">Save</button>
+  <button mat-flat-button color="primary" type="submit" [disabled]="pending()">
+    {{ pending() ? 'Saving…' : 'Save' }}
+  </button>
 </form>
