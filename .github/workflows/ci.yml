@@ -21,3 +21,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm exec nx run-many -t lint test build
+
+      - run: pnpm run verify:artifacts
