@@ -1,7 +1,31 @@
 {
   "name": "pidrang",
   "version": "0.0.1",
-  "private": true,
+  "description": "The pidrang command line: scaffold Resource definitions and CRUD pages from a Supabase schema.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pidrang/pidrang.git",
+    "directory": "apps/pidrang-cli"
+  },
+  "homepage": "https://github.com/pidrang/pidrang#readme",
+  "bugs": {
+    "url": "https://github.com/pidrang/pidrang/issues"
+  },
+  "keywords": [
+    "pidrang",
+    "cli",
+    "scaffold",
+    "supabase",
+    "angular",
+    "admin"
+  ],
+  "engines": {
+    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",

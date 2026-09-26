@@ -1,7 +1,30 @@
 {
   "name": "@pidrang/cli-supabase",
   "version": "0.0.1",
-  "private": true,
+  "description": "Supabase schema introspection for the pidrang CLI: GraphQL, service role and Postgres strategies.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pidrang/pidrang.git",
+    "directory": "libs/cli-supabase"
+  },
+  "homepage": "https://github.com/pidrang/pidrang#readme",
+  "bugs": {
+    "url": "https://github.com/pidrang/pidrang/issues"
+  },
+  "keywords": [
+    "pidrang",
+    "cli",
+    "supabase",
+    "introspection",
+    "angular"
+  ],
+  "engines": {
+    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
