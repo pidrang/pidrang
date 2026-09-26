@@ -47,6 +47,8 @@ jobs:
 
       - run: pnpm exec nx run-many -t lint test build
 
+      - run: pnpm run verify:artifacts
+
       - name: Configure git identity
         run: |
           git config user.name "github-actions[bot]"
