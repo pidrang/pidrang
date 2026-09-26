@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { injectAuthProvider } from '@pidrang/core';
+import { DEMO_ACCOUNT, DemoAccount } from '../demo-account';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -45,6 +46,28 @@ import { MatInputModule } from '@angular/material/input';
             Sign in
           </button>
         </form>
+
+        @if (demoAccount; as account) {
+          <section class="demo-account" aria-labelledby="demo-account-title">
+            <h2 id="demo-account-title">Demo account</h2>
+            <p>
+              Every visitor shares this account. Its credentials cannot be
+              changed.
+            </p>
+            <p>
+              <code>{{ account.email }}</code
+              ><br />
+              <code>{{ account.password }}</code>
+            </p>
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="signInAsDemo(account)"
+            >
+              Sign in as the demo account
+            </button>
+          </section>
+        }
       </mat-card-content>
     </mat-card>
   `,
@@ -71,8 +94,17 @@ import { MatInputModule } from '@angular/material/input';
       gap: 8px;
     }
 
-    button {
+    form button {
       align-self: flex-end;
+    }
+
+    .demo-account {
+      margin-top: 24px;
+    }
+
+    .demo-account h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
     }
   `,
 })
@@ -80,9 +112,16 @@ export class SignInPage {
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly error = signal<string | null>(null);
+  protected readonly demoAccount = inject(DEMO_ACCOUNT);
 
   private readonly authProvider = injectAuthProvider();
   private readonly router = inject(Router);
+
+  protected async signInAsDemo(account: DemoAccount): Promise<void> {
+    this.email.set(account.email);
+    this.password.set(account.password);
+    await this.submit();
+  }
 
   protected async submit(): Promise<void> {
     try {
