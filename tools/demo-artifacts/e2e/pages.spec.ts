@@ -16,6 +16,18 @@ const PRODUCT = {
   created_at: '2026-09-01T00:00:00Z',
 };
 
+const DEMO_USER = {
+  id: '00000000-0000-0000-0000-000000000001',
+  aud: 'authenticated',
+  role: 'authenticated',
+  email: 'demo@pidrang.dev',
+  app_metadata: {},
+  user_metadata: {},
+  created_at: '2026-09-01T00:00:00Z',
+};
+
+const ACCESS_TOKEN = 'test-access-token';
+
 const DEMOS = [
   { path: 'demo-material', sibling: 'https://pidrang.dev/demo-tailwind/' },
   { path: 'demo-tailwind', sibling: 'https://pidrang.dev/demo-material/' },
@@ -34,6 +46,32 @@ async function mockSupabase(page: Page): Promise<void> {
     const request = route.request();
     if (request.method() === 'OPTIONS') {
       return route.fulfill({ status: 204, headers: CORS_HEADERS });
+    }
+    if (request.url().includes('/auth/v1/token')) {
+      return route.fulfill({
+        status: 200,
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: ACCESS_TOKEN,
+          token_type: 'bearer',
+          expires_in: 3600,
+          refresh_token: 'test-refresh-token',
+          user: DEMO_USER,
+        }),
+      });
+    }
+    if (request.url().includes('/auth/v1/user')) {
+      const signedIn =
+        request.headers()['authorization'] === `Bearer ${ACCESS_TOKEN}`;
+      return route.fulfill({
+        status: signedIn ? 200 : 401,
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          signedIn ? DEMO_USER : { message: 'Auth session missing' },
+        ),
+      });
     }
     if (request.url().includes('/auth/v1/')) {
       return route.fulfill({
@@ -105,6 +143,26 @@ for (const demo of DEMOS) {
         );
       });
     }
+
+    test('shows the shared demo account on the sign-in page and signs in with it', async ({
+      page,
+    }) => {
+      await page.goto(`/${demo.path}/login`);
+
+      await expect(
+        page.getByRole('heading', { name: 'Demo account' }),
+      ).toBeVisible();
+      await expect(page.getByText('demo@pidrang.dev').first()).toBeVisible();
+
+      await page
+        .getByRole('button', { name: 'Sign in as the demo account' })
+        .click();
+
+      await expect(page).toHaveURL(`/${demo.path}/`);
+      await expect(
+        page.getByText('Signed in as demo@pidrang.dev'),
+      ).toBeVisible();
+    });
 
     test('keeps the query string and the hash of a deep link', async ({
       page,

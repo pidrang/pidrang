@@ -36,6 +36,12 @@ demos/
 | `origin`, `demos`                                  | Public origin and the path and URL of each demo.                                                        |
 | `packages`                                         | Version of each `@pidrang/*` library in the source.                                                     |
 
+## Demo account
+
+The sign-in page of the Pages build shows a shared demo account, `demo@pidrang.dev`, with a button that signs in with it. Its credentials come from `demoAccount` in each demo's `environment.pages.ts` and are public on purpose. Local and development builds do not show it (`demoAccount` is `null`).
+
+The hosted Supabase project keeps sign-ups closed, so the demo account and the team accounts are the only accounts, and a trigger in `pidrang/supabase` rejects any change to the demo account's password, email or phone. To change the demo password, follow the README of that repository, then update both `environment.pages.ts` files.
+
 ## Deep links
 
 GitHub Pages serves only static files and uses the `404.html` at the root of the site for any unknown path. A demo cannot have its own. The artifact therefore ships one generic `404.html` that must be copied to the root of the site.
