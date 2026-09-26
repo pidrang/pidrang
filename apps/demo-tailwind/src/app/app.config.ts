@@ -14,11 +14,13 @@ import { createClient } from '@supabase/supabase-js';
 
 import { environment } from '../environments/environment';
 import { appRoutes } from './app.routes';
+import { DEMO_ACCOUNT } from './demo-account';
 import { isSupabaseConfigured } from './is-supabase-configured';
 
 const providers: (Provider | EnvironmentProviders)[] = [
   provideBrowserGlobalErrorListeners(),
   provideRouter(appRoutes, withComponentInputBinding()),
+  { provide: DEMO_ACCOUNT, useValue: environment.demoAccount },
 ];
 
 if (
