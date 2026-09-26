@@ -1,0 +1,53 @@
+name: Demo artifacts
+
+on:
+  pull_request:
+    paths:
+      - apps/demo-material/**
+      - apps/demo-tailwind/**
+      - libs/**
+      - tools/demo-artifacts/**
+      - .github/workflows/demo-artifacts.yml
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build. Defaults to the branch the workflow is run from.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: node tools/demo-artifacts/build.mjs
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm exec playwright test -c tools/demo-artifacts/playwright.config.mts
+
+      - id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: demos-${{ steps.source.outputs.sha }}
+          path: dist/pages
+          if-no-files-found: error
+          retention-days: 30
