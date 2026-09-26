@@ -76,3 +76,5 @@ They depend on `@pidrang/core` and their own styling stack, never on a specific 
 ## Adding a data source or UI package
 
 New packages such as `@pidrang/rest`, `@pidrang/graphql` or `@pidrang/primeng` depend on `@pidrang/core` only. If adding one requires changing core, treat that as a design smell and re-examine the core contract first.
+
+The reasons behind non-obvious implementation choices are in [Design notes](./design-notes.md).
