@@ -74,6 +74,12 @@ The pages written by `pidrang init` are the generic pages of `apps/demo-material
 
 Angular matches routes in order and `:resource` matches any single segment. More specific patterns (`:resource/create`, `:resource/:id/edit`) must come before `:resource/:id` and `:resource`, and fixed paths such as `login` must come before `:resource`, or they are captured by it.
 
+### Action flags guard the resource routes
+
+`apps/demo-material/src/app/can-match-resource-action.ts`, `apps/demo-tailwind/src/app/can-match-resource-action.ts`, `CAN_MATCH_RESOURCE_ACTION` in `libs/cli/src/lib/generate-pages-bundle.ts`
+
+`Resource.list`, `create`, `show`, `edit` and `delete` default to enabled when omitted. Each resource route has a `canMatch` guard. For a segment that is not a registered resource, the guard returns `false`, so an app route declared after the resource routes (such as `/settings`) can still match. For a registered resource whose action is disabled, it redirects to `RESOURCE_UNAVAILABLE_PATH` (`resource-unavailable`) with `skipLocationChange`, so `/products/create` with `create: false` does not fall through to the show route with `create` as an id. The path lives in one constant so an app can rename it if it clashes with its own routes. Flags control what the UI offers; they are not authorization, which stays with Row Level Security.
+
 ## Demo apps
 
 ### Local Supabase key
