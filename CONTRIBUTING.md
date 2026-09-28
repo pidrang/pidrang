@@ -33,7 +33,7 @@ pnpm exec nx serve demo-material --configuration=local
 pnpm exec nx run-many -t lint test build
 ```
 
-This is the same command CI runs. To limit it to one project, use `-p`, for example `pnpm exec nx run-many -t lint test -p core`.
+CI runs this command and then `pnpm run verify:artifacts`, which packs the packages and installs them in an empty directory (it needs network access). To limit it to one project, use `-p`, for example `pnpm exec nx run-many -t lint test -p core`.
 
 ## Architecture rule
 
