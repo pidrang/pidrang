@@ -11,9 +11,9 @@ Wires `@pidrang/cli`'s wizard to `@pidrang/cli-supabase`'s Supabase provider (th
 
 It never edits the app's own `app.routes.ts`/`app.config.ts`; it prints the routes snippet and `providePidrang({...})` call to paste in manually, since those files already exist and their exact shape varies per app.
 
-## Known limitation
+## Packaging
 
-`libs/cli`/`libs/cli-supabase` aren't published to npm yet (tracked in #25), so running this from a plain `node dist/apps/pidrang-cli/src/main.js` outside this workspace's pnpm-linked `node_modules` won't resolve `@pidrang/cli`. The wizard/codegen logic itself is unit tested; full end-to-end execution needs either that npm publish or a dev-mode runner, neither of which exists yet.
+`pidrang`, `@pidrang/cli` and `@pidrang/cli-supabase` are prepared for npm but not published yet (tracked in #25 and #57). `pnpm run verify:artifacts` packs them, installs the tarballs in an empty directory and runs the installed `pidrang` binary, so the published package is tested without workspace links. See `docs/releasing.md`.
 
 ## Running unit tests
 
