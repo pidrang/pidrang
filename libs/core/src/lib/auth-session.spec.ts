@@ -220,5 +220,55 @@ describe('injectAuthSession', () => {
     await settle();
 
     expect(session.error()).toBe(failure);
+    expect(session.value()).toBeUndefined();
+  });
+
+  it('keeps the current identity while a session change reloads it', async () => {
+    let resolveIdentity: (identity: AuthIdentity | null) => void = () =>
+      undefined;
+    let first = true;
+    const auth = subscribableAuthProvider(() => {
+      if (first) {
+        first = false;
+        return Promise.resolve({ id: '1' });
+      }
+      return new Promise((resolve) => (resolveIdentity = resolve));
+    });
+    configure(auth.provider);
+
+    const session = TestBed.runInInjectionContext(() => injectAuthSession());
+    await settle();
+    expect(session.value()).toEqual({ id: '1' });
+
+    auth.notify();
+    TestBed.tick();
+    expect(session.isLoading()).toBe(true);
+    expect(session.value()).toEqual({ id: '1' });
+
+    resolveIdentity({ id: '2' });
+    await settle();
+    expect(session.value()).toEqual({ id: '2' });
+  });
+
+  it('keeps a signed-out null while a session change reloads it', async () => {
+    let loaded = false;
+    const auth = subscribableAuthProvider(() => {
+      if (!loaded) {
+        loaded = true;
+        return Promise.resolve(null);
+      }
+      return new Promise(() => undefined);
+    });
+    configure(auth.provider);
+
+    const session = TestBed.runInInjectionContext(() => injectAuthSession());
+    await settle();
+    expect(session.value()).toBeNull();
+
+    auth.notify();
+    TestBed.tick();
+
+    expect(session.isLoading()).toBe(true);
+    expect(session.value()).toBeNull();
   });
 });

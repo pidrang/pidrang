@@ -7,11 +7,7 @@ import {
 
 import { toError } from './to-error';
 
-const SESSION_CHANGE_EVENTS = new Set<AuthChangeEvent>([
-  'SIGNED_IN',
-  'SIGNED_OUT',
-  'USER_UPDATED',
-]);
+const IDENTITY_EVENTS = new Set<AuthChangeEvent>(['SIGNED_IN', 'SIGNED_OUT']);
 
 export class SupabaseAuthProvider implements AuthProvider {
   constructor(private readonly client: SupabaseClient) {}
@@ -45,8 +41,15 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   onSessionChange(listener: () => void): () => void {
-    const { data } = this.client.auth.onAuthStateChange((event) => {
-      if (SESSION_CHANGE_EVENTS.has(event)) {
+    let currentUserId: string | null | undefined;
+    const { data } = this.client.auth.onAuthStateChange((event, session) => {
+      const userId = session?.user.id ?? null;
+      const userChanged = userId !== currentUserId;
+      currentUserId = userId;
+      if (
+        event === 'USER_UPDATED' ||
+        (IDENTITY_EVENTS.has(event) && userChanged)
+      ) {
         setTimeout(listener);
       }
     });

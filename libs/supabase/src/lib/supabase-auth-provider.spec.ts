@@ -129,21 +129,24 @@ describe('SupabaseAuthProvider', () => {
     afterEach(() => vi.useRealTimers());
 
     function subscribe() {
-      let emit: (event: AuthChangeEvent) => void = () => undefined;
+      type AuthCallback = (
+        event: AuthChangeEvent,
+        session: { user: { id: string } } | null,
+      ) => void;
+      let emit: AuthCallback = () => undefined;
       const unsubscribe = vi.fn();
-      const onAuthStateChange = vi.fn(
-        (callback: (event: AuthChangeEvent) => void) => {
-          emit = callback;
-          return { data: { subscription: { unsubscribe } } };
-        },
-      );
+      const onAuthStateChange = vi.fn((callback: AuthCallback) => {
+        emit = callback;
+        return { data: { subscription: { unsubscribe } } };
+      });
       const provider = new SupabaseAuthProvider(
         fakeClient({ onAuthStateChange }),
       );
       const listener = vi.fn();
       const cleanup = provider.onSessionChange(listener);
       return {
-        emit: (event: AuthChangeEvent) => emit(event),
+        emit: (event: AuthChangeEvent, userId?: string) =>
+          emit(event, userId ? { user: { id: userId } } : null),
         listener,
         cleanup,
         unsubscribe,
@@ -153,15 +156,29 @@ describe('SupabaseAuthProvider', () => {
     it('notifies after sign-in, sign-out and user updates, outside the auth callback', () => {
       const { emit, listener } = subscribe();
 
-      emit('SIGNED_IN');
+      emit('SIGNED_IN', 'ada');
       expect(listener).not.toHaveBeenCalled();
       vi.runAllTimers();
       expect(listener).toHaveBeenCalledTimes(1);
 
+      emit('USER_UPDATED', 'ada');
       emit('SIGNED_OUT');
-      emit('USER_UPDATED');
       vi.runAllTimers();
       expect(listener).toHaveBeenCalledTimes(3);
+    });
+
+    it('ignores a repeated SIGNED_IN for the same user, as sent when the tab regains focus', () => {
+      const { emit, listener } = subscribe();
+
+      emit('INITIAL_SESSION', 'ada');
+      emit('SIGNED_IN', 'ada');
+      emit('SIGNED_IN', 'ada');
+      vi.runAllTimers();
+      expect(listener).not.toHaveBeenCalled();
+
+      emit('SIGNED_IN', 'grace');
+      vi.runAllTimers();
+      expect(listener).toHaveBeenCalledTimes(1);
     });
 
     it('ignores events that do not change the identity', () => {
