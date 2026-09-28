@@ -4,13 +4,14 @@ import {
 } from './generate-pages-bundle';
 
 describe('generatePagesBundle', () => {
-  it('returns the 8 generic files at their expected paths', () => {
+  it('returns the 9 generic files at their expected paths', () => {
     const files = generatePagesBundle();
 
     expect(files.map((file) => file.path)).toEqual([
       'src/app/auth-required-error.ts',
       'src/app/record-label.ts',
       'src/app/can-match-resource-action.ts',
+      'src/app/resource-unavailable-path.ts',
       'src/app/pages/not-found-page.ts',
       'src/app/pages/resource-list-page.ts',
       'src/app/pages/resource-create-page.ts',
@@ -75,9 +76,9 @@ describe('generatePagesBundle', () => {
         `canMatch: [canMatchResourceAction('${action}')]`,
       );
     }
-    expect(RESOURCE_ROUTES_SNIPPET.indexOf("'not-found'")).toBeLessThan(
-      RESOURCE_ROUTES_SNIPPET.indexOf("':resource'"),
-    );
+    expect(
+      RESOURCE_ROUTES_SNIPPET.indexOf('path: RESOURCE_UNAVAILABLE_PATH'),
+    ).toBeLessThan(RESOURCE_ROUTES_SNIPPET.indexOf("':resource'"));
   });
 
   it('gates generated mutation handlers on their action flag', () => {

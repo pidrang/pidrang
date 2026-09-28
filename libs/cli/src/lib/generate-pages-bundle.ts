@@ -36,20 +36,29 @@ import {
   isResourceActionEnabled,
 } from '@pidrang/core';
 
+import { RESOURCE_UNAVAILABLE_PATH } from './resource-unavailable-path';
+
 export function canMatchResourceAction(action: ResourceAction): CanMatchFn {
   return (_route, segments) => {
     const router = inject(Router);
     const resource = inject(RESOURCES, { optional: true })?.find(
       (candidate) => candidate.name === segments[0]?.path,
     );
+    if (!resource) {
+      return false;
+    }
     return (
       isResourceActionEnabled(resource, action) ||
-      new RedirectCommand(router.parseUrl('/not-found'), {
-        skipLocationChange: true,
-      })
+      new RedirectCommand(
+        router.createUrlTree(['/', RESOURCE_UNAVAILABLE_PATH]),
+        { skipLocationChange: true },
+      )
     );
   };
 }
+`;
+
+const RESOURCE_UNAVAILABLE_PATH_FILE = `export const RESOURCE_UNAVAILABLE_PATH = 'resource-unavailable';
 `;
 
 const NOT_FOUND_PAGE = `import { Component } from '@angular/core';
@@ -563,6 +572,7 @@ export class ResourceEditPage {
 export const RESOURCE_ROUTES_SNIPPET = `import { Route } from '@angular/router';
 
 import { canMatchResourceAction } from './can-match-resource-action';
+import { RESOURCE_UNAVAILABLE_PATH } from './resource-unavailable-path';
 import { NotFoundPage } from './pages/not-found-page';
 import { ResourceCreatePage } from './pages/resource-create-page';
 import { ResourceEditPage } from './pages/resource-edit-page';
@@ -570,7 +580,7 @@ import { ResourceListPage } from './pages/resource-list-page';
 import { ResourceShowPage } from './pages/resource-show-page';
 
 export const resourceRoutes: Route[] = [
-  { path: 'not-found', component: NotFoundPage },
+  { path: RESOURCE_UNAVAILABLE_PATH, component: NotFoundPage },
   {
     path: ':resource/create',
     component: ResourceCreatePage,
@@ -601,6 +611,10 @@ export function generatePagesBundle(): GeneratedFile[] {
     {
       path: 'src/app/can-match-resource-action.ts',
       content: CAN_MATCH_RESOURCE_ACTION,
+    },
+    {
+      path: 'src/app/resource-unavailable-path.ts',
+      content: RESOURCE_UNAVAILABLE_PATH_FILE,
     },
     { path: 'src/app/pages/not-found-page.ts', content: NOT_FOUND_PAGE },
     {

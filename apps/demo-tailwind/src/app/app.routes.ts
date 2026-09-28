@@ -1,6 +1,7 @@
 import { Route } from '@angular/router';
 
 import { canMatchResourceAction } from './can-match-resource-action';
+import { RESOURCE_UNAVAILABLE_PATH } from './resource-unavailable-path';
 import { HomePage } from './pages/home-page';
 import { NotFoundPage } from './pages/not-found-page';
 import { ResourceCreatePage } from './pages/resource-create-page';
@@ -12,7 +13,7 @@ import { SignInPage } from './pages/sign-in-page';
 export const appRoutes: Route[] = [
   { path: '', component: HomePage },
   { path: 'login', component: SignInPage },
-  { path: 'not-found', component: NotFoundPage },
+  { path: RESOURCE_UNAVAILABLE_PATH, component: NotFoundPage },
   {
     path: ':resource/create',
     component: ResourceCreatePage,
