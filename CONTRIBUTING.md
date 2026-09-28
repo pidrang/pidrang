@@ -37,12 +37,12 @@ CI runs this command and then `pnpm run verify:artifacts`, which packs the packa
 
 ## Architecture rule
 
-`@pidrang/core` depends on `@angular/core` only: no component library, no `@angular/common`, `@angular/forms`, `@angular/platform-browser` or `@angular/router`. A change that seems to need one of those belongs in a UI package. See [`docs/architecture.md`](./docs/architecture.md).
+`@pidrang/core` depends on `@angular/core` only: no component library, no `@angular/common`, `@angular/forms`, `@angular/platform-browser` or `@angular/router`. Subpaths of `@angular/core`, such as `@angular/core/rxjs-interop`, are allowed; `rxjs` and every other package are not. Lint enforces this. A change that seems to need one of those belongs in a UI package. See [`docs/architecture.md`](./docs/architecture.md).
 
 ## Code style
 
 - Follow the official Angular conventions: standalone APIs, signals over `Observable` state, `inject()` over constructor injection.
-- Do not write code comments, including doc blocks. Lint rejects them. Make the code self-explanatory through naming and small functions, and put the reason for a non-obvious choice in the commit message, the pull request description or [`docs/design-notes.md`](./docs/design-notes.md).
+- Do not write code comments, including doc blocks. Lint rejects them. Lint suppressions such as `eslint-disable` and `@ts-expect-error` are comments too, so they are not allowed either. Make the code self-explanatory through naming and small functions, and put the reason for a non-obvious choice in the commit message, the pull request description or [`docs/design-notes.md`](./docs/design-notes.md).
 - Add or update tests next to the code they cover.
 
 ## Branching
