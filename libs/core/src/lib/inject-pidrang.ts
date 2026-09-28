@@ -12,9 +12,7 @@ export function injectDataProvider(): DataProvider {
 export function injectAuthProvider(): AuthProvider {
   const authProvider = inject(AUTH_PROVIDER, { optional: true });
   if (!authProvider) {
-    throw new Error(
-      'Pidrang: no auth provider configured, pass authProvider to providePidrang()',
-    );
+    throw new Error('Pidrang: no auth provider configured, pass authProvider to providePidrang()');
   }
   return authProvider;
 }

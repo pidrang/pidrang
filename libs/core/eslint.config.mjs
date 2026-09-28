@@ -49,8 +49,9 @@ export default [
         {
           patterns: [
             {
-              regex: '^(?!@angular/core$|\\.{1,2}/)',
-              message: '@pidrang/core may only import @angular/core.',
+              regex: '^(?!@angular/core(/|$)|\\.{1,2}/)',
+              message:
+                '@pidrang/core may only import @angular/core and its subpaths, not rxjs or any other package.',
             },
           ],
         },

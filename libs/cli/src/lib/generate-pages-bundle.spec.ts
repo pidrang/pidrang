@@ -1,7 +1,47 @@
+import * as ts from 'typescript';
+
 import {
   generatePagesBundle,
   RESOURCE_ROUTES_SNIPPET,
 } from './generate-pages-bundle';
+
+function commentTexts(content: string): string[] {
+  const source = ts.createSourceFile(
+    'generated.ts',
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const comments = new Map<number, string>();
+  const collect = (ranges: ts.CommentRange[] | undefined): void => {
+    for (const range of ranges ?? []) {
+      comments.set(range.pos, content.slice(range.pos, range.end));
+    }
+  };
+  const visit = (node: ts.Node): void => {
+    collect(ts.getLeadingCommentRanges(content, node.getFullStart()));
+    collect(ts.getTrailingCommentRanges(content, node.getEnd()));
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return [...comments.values()];
+}
+
+describe('commentTexts', () => {
+  it('finds leading, trailing and block comments', () => {
+    expect(
+      commentTexts('/* a */\nconst x = 1; // b\nconst y = 2;\n// c\n'),
+    ).toEqual(['/* a */', '// b', '// c']);
+  });
+
+  it('ignores comment-like text inside strings and templates', () => {
+    expect(
+      commentTexts(
+        "const url = 'http://example.com';\nconst t = `// not /* a */ comment`;\n",
+      ),
+    ).toEqual([]);
+  });
+});
 
 describe('generatePagesBundle', () => {
   it('returns the 9 generic files at their expected paths', () => {
@@ -121,7 +161,8 @@ describe('generatePagesBundle', () => {
     ];
 
     for (const content of contents) {
-      expect(content).not.toMatch(/^\s*\/\/|\/\*|<!--/m);
+      expect(commentTexts(content)).toEqual([]);
+      expect(content).not.toContain('<!--');
       expect(content).not.toMatch(/\$any\(|:\s*any\b|\bas any\b/);
     }
   });

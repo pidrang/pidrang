@@ -13,8 +13,7 @@ export function injectResourceList<T>(
   params?: () => ListParams | undefined,
 ): ResourceRef<ListResult<T> | undefined> {
   const dataProvider = injectDataProvider();
-  const resourceNameFn =
-    typeof resourceName === 'function' ? resourceName : () => resourceName;
+  const resourceNameFn = typeof resourceName === 'function' ? resourceName : () => resourceName;
 
   return resource({
     params: (): ListRequest | undefined => {
@@ -24,7 +23,6 @@ export function injectResourceList<T>(
       }
       return { resourceName: resourceNameFn(), listParams };
     },
-    loader: ({ params: request }) =>
-      dataProvider.getList<T>(request.resourceName, request.listParams),
+    loader: ({ params: request }) => dataProvider.getList<T>(request.resourceName, request.listParams),
   });
 }
