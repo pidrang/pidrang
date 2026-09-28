@@ -1,3 +1,4 @@
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import {
   Router,
@@ -218,5 +219,35 @@ describe('resource routes', () => {
     await page['submit']({ name: 'Mouse' });
 
     expect(TestBed.inject(Router).url).toBe('/products');
+  });
+});
+
+@Component({ selector: 'app-settings-stub', template: 'Settings' })
+class SettingsStubPage {}
+
+describe('resource routes next to app routes', () => {
+  it('lets an app route declared after them match a one-segment path', async () => {
+    const calls: string[] = [];
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(
+          [
+            ...appRoutes.slice(0, -1),
+            { path: 'settings', component: SettingsStubPage },
+            ...appRoutes.slice(-1),
+          ],
+          withComponentInputBinding(),
+        ),
+        providePidrang({
+          dataProvider: recordingDataProvider(calls),
+          resources: [{ name: 'products' }],
+        }),
+      ],
+    });
+    const harness = await RouterTestingHarness.create();
+
+    await harness.navigateByUrl('/settings', SettingsStubPage);
+
+    expect(calls).toEqual([]);
   });
 });
