@@ -38,7 +38,7 @@ export const resources: Resource[] = [
 ];
 ```
 
-`name` must match the Supabase table name. Field types are `'text'`, `'number'`, `'boolean'` and `'date'`. `label` overrides the column header and form label; `hidden: true` marks a field a generic list or edit page should skip.
+`name` must match the Supabase table name. Field types are `'text'`, `'number'`, `'boolean'` and `'date'`. `label` overrides the column header and form label; `hidden: true` marks a field a generic list or edit page should skip. `list`, `create`, `show`, `edit` and `delete` are optional flags, enabled when omitted; set one to `false` to hide that action and refuse its route in the generic pages.
 
 Instead of writing this by hand, the `pidrang init` CLI can introspect your Supabase schema and generate `resources.ts` for you. See [Generating resources](#generating-resources).
 
