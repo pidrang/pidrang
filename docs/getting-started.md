@@ -211,7 +211,7 @@ export class ResourceCreatePage {
 }
 ```
 
-An edit page is the same component fed with `dataProvider.getOne(resource, { id })` as the initial value and `dataProvider.update(resource, { id, data })` on save. The complete List, Create, Show and Edit pages live in [`apps/demo-material`](../apps/demo-material/src/app/pages).
+Bind `[pending]` to a signal that is `true` while the save runs: the form then disables its submit button and ignores further submits, so a double click cannot create two rows. An edit page is the same component fed with `dataProvider.getOne(resource, { id })` as the initial value and `dataProvider.update(resource, { id, data })` on save. The complete List, Create, Show and Edit pages live in [`apps/demo-material`](../apps/demo-material/src/app/pages).
 
 ## 7. Sign in
 
