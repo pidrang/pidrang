@@ -20,7 +20,7 @@ See the [getting started guide](https://github.com/pidrang/pidrang/blob/main/doc
 - `providePidrang({ dataProvider, resources, authProvider? })`
 - `injectDataProvider()`, `injectAuthProvider()`, `injectResources()`, `injectResource(name)`
 - `injectResourceList<T>(resourceName, params?)` — signal-based list loader built on Angular's native `resource()`
-- `injectAuthSession()` — signal-based current identity, built on `resource()`
+- `injectAuthSession()` — signal-based current identity (`AuthSessionRef`), built on `resource()`, reloads on session changes, never throws from `value()`
 
 ## Running unit tests
 

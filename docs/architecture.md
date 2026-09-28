@@ -39,16 +39,17 @@ Framework-native (Angular) but UI-agnostic. It depends on `@angular/core` only, 
 - `providePidrang({ dataProvider, resources, authProvider? })` for app-wide configuration
 - `injectDataProvider()`, `injectAuthProvider()`, `injectResources()`, `injectResource(name)` for reading that configuration
 - `injectResourceList<T>(resourceName, params?)`, a signal-based list loader built on Angular's native `resource()`
-- `injectAuthSession()`, a signal-based view of the current identity
+- `injectAuthSession()`, a signal-based view of the current identity, returned as an `AuthSessionRef`
+- `PidrangError`, the error type data and auth providers throw, with a `category` (`unauthenticated`, `forbidden`, `not-found`, `unknown`) plus `code`, `status` and `cause`
 
-`AuthProvider` (`login`, `logout`, `getIdentity`) follows the same pattern as `DataProvider`: `providePidrang` registers it, `injectAuthProvider()` reads it, and `injectAuthSession()` wraps it in a `resource()` whose `value()` is `AuthIdentity | null | undefined` while loading, signed out or signed in.
+`AuthProvider` (`login`, `logout`, `getIdentity`, optional `onSessionChange`) follows the same pattern as `DataProvider`: `providePidrang` registers it, `injectAuthProvider()` reads it, and `injectAuthSession()` returns an `AuthSessionRef` built on `resource()`. Its `value()` is `AuthIdentity | null | undefined` (signed in, signed out, not loaded yet), keeps the previous identity while a session change reloads it, and never throws: a provider failure goes to `error()` and leaves `value()` `undefined`. A provider that implements `onSessionChange(listener)` makes every live `injectAuthSession()` reload on login, logout or an external auth change, and unsubscribes it when destroyed. `reload()` also works for providers without it.
 
 ## `@pidrang/supabase`
 
 Implements `DataProvider` and `AuthProvider` against `@supabase/supabase-js`:
 
-- `SupabaseDataProvider` and `provideSupabaseDataProvider({ client })` map `ListParams` to `.eq()`, `.order()` and `.range()` and normalize `PostgrestError` to a plain `Error`. `getList` always adds `id` ascending as a final sort, unless a sorter already targets `id`, so pages never repeat or skip rows.
-- `SupabaseAuthProvider` and `provideSupabaseAuthProvider({ client })` wrap Supabase Auth and treat a missing session as a `null` identity rather than an error.
+- `SupabaseDataProvider` and `provideSupabaseDataProvider({ client })` map `ListParams` to `.eq()`, `.order()` and `.range()` and normalize `PostgrestError` to a `PidrangError` whose `category` comes from the HTTP status, so an app can ask for sign-in on `unauthenticated` only, never on a signed-in user's Row Level Security denial. `getList` always adds `id` ascending as a final sort, unless a sorter already targets `id`, so pages never repeat or skip rows.
+- `SupabaseAuthProvider` and `provideSupabaseAuthProvider({ client })` wrap Supabase Auth. A missing session (`AuthSessionMissingError`, `session_not_found`) is a `null` identity; network and server failures are thrown as `PidrangError`. Supabase auth events drive `onSessionChange`, and a repeated `SIGNED_IN` for the same user (sent when a tab regains focus) is ignored.
 
 Both factories return plain objects and do not use Angular DI. The app wires them in through `providePidrang`.
 

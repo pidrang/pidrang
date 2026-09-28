@@ -224,7 +224,7 @@ const authProvider = injectAuthProvider();
 await authProvider.login({ email, password });
 ```
 
-`injectAuthSession()` returns a signal-based `resource()` of the current identity: `undefined` while loading, `null` when signed out, an `AuthIdentity` when signed in.
+`injectAuthSession()` returns an `AuthSessionRef` for the current identity: `value()` is `undefined` while loading, `null` when signed out, an `AuthIdentity` when signed in. It updates on its own after login and logout, and it never throws: check `error()` for a provider failure.
 
 ```ts
 protected readonly session = injectAuthSession();
