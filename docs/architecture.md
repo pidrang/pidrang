@@ -33,7 +33,7 @@ pidrang/
 
 ## `@pidrang/core`
 
-Framework-native (Angular) but UI-agnostic. It depends on `@angular/core` only, never on a component library, `@angular/common`, `@angular/forms` or `@angular/router`. That boundary is what lets any UI layer or data source be added without touching core.
+Framework-native (Angular) but UI-agnostic. It depends on `@angular/core` only, never on a component library, `@angular/common`, `@angular/forms` or `@angular/router`. Subpaths of `@angular/core` are allowed, `rxjs` is not. That boundary is what lets any UI layer or data source be added without touching core.
 
 - `Resource` (optionally described with `Field` and `FieldType` for a typed form or table), `DataProvider`, `ListParams` and `ListResult<T>`, `GetOneParams`, `CreateParams<T>`, `UpdateParams<T>`, `DeleteParams`
 - `providePidrang({ dataProvider, resources, authProvider? })` for app-wide configuration
