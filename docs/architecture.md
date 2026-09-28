@@ -47,7 +47,7 @@ Framework-native (Angular) but UI-agnostic. It depends on `@angular/core` only, 
 
 Implements `DataProvider` and `AuthProvider` against `@supabase/supabase-js`:
 
-- `SupabaseDataProvider` and `provideSupabaseDataProvider({ client })` map `ListParams` to `.eq()`, `.order()` and `.range()` and normalize `PostgrestError` to a plain `Error`.
+- `SupabaseDataProvider` and `provideSupabaseDataProvider({ client })` map `ListParams` to `.eq()`, `.order()` and `.range()` and normalize `PostgrestError` to a plain `Error`. `getList` always adds `id` ascending as a final sort, unless a sorter already targets `id`, so pages never repeat or skip rows.
 - `SupabaseAuthProvider` and `provideSupabaseAuthProvider({ client })` wrap Supabase Auth and treat a missing session as a `null` identity rather than an error.
 
 Both factories return plain objects and do not use Angular DI. The app wires them in through `providePidrang`.

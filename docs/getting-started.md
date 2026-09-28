@@ -123,7 +123,7 @@ provideRouter(appRoutes, withComponentInputBinding());
 
 Open `/products` and the table renders one column per non-hidden field.
 
-To page, sort or filter, pass a params function as the second argument. Returning `undefined` from it skips loading.
+To page, sort or filter, pass a params function as the second argument. Returning `undefined` from it skips loading. Without pagination, `getList` returns the first 10 rows. `current` and `pageSize` must be positive integers; anything else is rejected before a request is sent. `ListResult.total` holds the full row count, so you can build a pager.
 
 ```ts
 injectResourceList<Row>(
