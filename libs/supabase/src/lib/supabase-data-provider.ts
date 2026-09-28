@@ -27,8 +27,12 @@ export class SupabaseDataProvider implements DataProvider {
       query = query.eq(column, value);
     }
 
-    for (const sorter of params?.sorters ?? []) {
+    const sorters = params?.sorters ?? [];
+    for (const sorter of sorters) {
       query = query.order(sorter.field, { ascending: sorter.order === 'asc' });
+    }
+    if (!sorters.some((sorter) => sorter.field === 'id')) {
+      query = query.order('id', { ascending: true });
     }
 
     const { current = 1, pageSize = 10 } = params?.pagination ?? {};
