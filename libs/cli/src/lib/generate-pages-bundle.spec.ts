@@ -132,10 +132,10 @@ describe('generatePagesBundle', () => {
       'if (!this.canDelete())',
     );
     expect(content('src/app/pages/resource-create-page.ts')).toContain(
-      'if (!this.canCreate())',
+      'if (!this.canCreate() || this.saving())',
     );
     expect(content('src/app/pages/resource-edit-page.ts')).toContain(
-      'if (!this.canEdit())',
+      'if (!this.canEdit() || this.saving())',
     );
   });
 
