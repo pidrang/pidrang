@@ -4,9 +4,16 @@
   "sourceRoot": "libs/cli/src",
   "projectType": "library",
   "tags": [],
+  "implicitDependencies": ["demo-material"],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
+      "dependsOn": [
+        {
+          "target": "build",
+          "projects": ["core"]
+        }
+      ],
       "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/libs/cli",
@@ -19,31 +26,6 @@
       "options": {
         "packageRoot": "dist/{projectRoot}"
       }
-    },
-    "test": {
-      "inputs": [
-        "default",
-        "^production",
-        {
-          "fileset": "{projectRoot}/tsconfig.spec.json",
-          "dependencies": true
-        },
-        {
-          "fileset": "{projectRoot}/tsconfig.storybook.json",
-          "dependencies": true
-        },
-        {
-          "externalDependencies": ["vitest"]
-        },
-        {
-          "env": "CI"
-        },
-        {
-          "dependentTasksOutputFiles": "**/*.js",
-          "transitive": true
-        },
-        "{workspaceRoot}/apps/demo-material/src/app/**/*.ts"
-      ]
     }
   }
 }
