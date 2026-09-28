@@ -129,9 +129,7 @@ export function createGraphQlSchemaProvider(
         (field) => field.name === `${table}Collection`,
       );
       if (!collectionField) {
-        throw new Error(
-          `Table "${table}" not found in Supabase GraphQL schema`,
-        );
+        throw new Error(`Table "${table}" not found in Supabase GraphQL schema`);
       }
 
       const collectionFields = unwrapObjectFields(collectionField.type);

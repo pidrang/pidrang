@@ -53,19 +53,12 @@ function collectionField(
                               type: {
                                 kind: 'NON_NULL',
                                 name: null,
-                                ofType: {
-                                  kind: 'SCALAR',
-                                  name: column.typeName,
-                                },
+                                ofType: { kind: 'SCALAR', name: column.typeName },
                               },
                             })),
                             {
                               name: 'author',
-                              type: {
-                                kind: 'OBJECT',
-                                name: 'users',
-                                ofType: null,
-                              },
+                              type: { kind: 'OBJECT', name: 'users', ofType: null },
                             },
                           ],
                         },

@@ -7,8 +7,6 @@ export interface SupabaseDataProviderConfig {
   client: SupabaseClient;
 }
 
-export function provideSupabaseDataProvider(
-  config: SupabaseDataProviderConfig,
-): DataProvider {
+export function provideSupabaseDataProvider(config: SupabaseDataProviderConfig): DataProvider {
   return new SupabaseDataProvider(config.client);
 }
