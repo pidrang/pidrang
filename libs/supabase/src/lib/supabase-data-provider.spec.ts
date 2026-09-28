@@ -50,8 +50,31 @@ describe('SupabaseDataProvider', () => {
     expect(result).toEqual({ data: [{ id: '1' }], total: 1 });
     expect(client.from).toHaveBeenCalledWith('users');
     expect(builder.eq).toHaveBeenCalledWith('active', true);
-    expect(builder.order).toHaveBeenCalledWith('name', { ascending: true });
+    expect(builder.order.mock.calls).toEqual([
+      ['name', { ascending: true }],
+      ['id', { ascending: true }],
+    ]);
     expect(builder.range).toHaveBeenCalledWith(5, 9);
+  });
+
+  it('getList orders by id when no sorter is given', async () => {
+    const { client, builder } = fakeClient({ data: [], count: 0, error: null });
+    const provider = new SupabaseDataProvider(client);
+
+    await provider.getList('users');
+
+    expect(builder.order.mock.calls).toEqual([['id', { ascending: true }]]);
+  });
+
+  it('getList does not add a second id order when id is already sorted', async () => {
+    const { client, builder } = fakeClient({ data: [], count: 0, error: null });
+    const provider = new SupabaseDataProvider(client);
+
+    await provider.getList('users', {
+      sorters: [{ field: 'id', order: 'desc' }],
+    });
+
+    expect(builder.order.mock.calls).toEqual([['id', { ascending: false }]]);
   });
 
   it('getList orders deterministically and pages 23 rows across three pages', async () => {
