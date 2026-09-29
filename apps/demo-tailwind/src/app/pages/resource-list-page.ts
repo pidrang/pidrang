@@ -113,7 +113,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
           Rows per page
           <select
             class="rounded border border-gray-300 px-2 py-1"
-            [disabled]="list.isLoading()"
+            [disabled]="list.isLoading() || deleting() !== null"
             (change)="changePageSize($event)"
           >
             @for (size of pageSizeOptions; track size) {
@@ -128,7 +128,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
         <button
           type="button"
           class="rounded border border-gray-300 px-3 py-1 disabled:opacity-50"
-          [disabled]="list.isLoading() || page() <= 1"
+          [disabled]="list.isLoading() || deleting() !== null || page() <= 1"
           (click)="page.set(page() - 1)"
         >
           Previous
@@ -136,7 +136,9 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
         <button
           type="button"
           class="rounded border border-gray-300 px-3 py-1 disabled:opacity-50"
-          [disabled]="list.isLoading() || page() >= lastPage()"
+          [disabled]="
+            list.isLoading() || deleting() !== null || page() >= lastPage()
+          "
           (click)="page.set(page() + 1)"
         >
           Next
@@ -249,7 +251,7 @@ export class ResourceListPage {
         this.list.reload();
       }
     } catch (err) {
-      if (this.resource() === resource) {
+      if (this.deleting() === operation) {
         this.deleteFailure.set({
           message: err instanceof Error ? err.message : String(err),
           category: err instanceof PidrangError ? err.category : 'unknown',

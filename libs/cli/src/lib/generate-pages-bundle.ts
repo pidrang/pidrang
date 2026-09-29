@@ -177,7 +177,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
         [pageIndex]="page() - 1"
         [pageSize]="pageSize()"
         [pageSizeOptions]="pageSizeOptions"
-        [disabled]="list.isLoading()"
+        [disabled]="list.isLoading() || deleting() !== null"
         (page)="changePage($event)"
       />
     }
@@ -286,7 +286,7 @@ export class ResourceListPage {
         this.list.reload();
       }
     } catch (err) {
-      if (this.resource() === resource) {
+      if (this.deleting() === operation) {
         this.deleteFailure.set({
           message: err instanceof Error ? err.message : String(err),
           category: err instanceof PidrangError ? err.category : 'unknown',

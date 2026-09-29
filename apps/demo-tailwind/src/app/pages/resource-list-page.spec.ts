@@ -74,6 +74,17 @@ function deleteButtons(element: HTMLElement): HTMLButtonElement[] {
   ).filter((button) => /Delet/.test(button.textContent ?? ''));
 }
 
+function pageSizeDisabled(element: HTMLElement): boolean {
+  const native = element.querySelector('select');
+  if (native) {
+    return native.disabled;
+  }
+  return (
+    element.querySelector('mat-select')?.getAttribute('aria-disabled') ===
+    'true'
+  );
+}
+
 function alertText(element: HTMLElement): string {
   return element.querySelector('[role="alert"]')?.textContent ?? '';
 }
@@ -240,5 +251,42 @@ describe('ResourceListPage delete', () => {
     expect(
       deleteButtons(fixture.nativeElement).every((button) => !button.disabled),
     ).toBe(true);
+  });
+
+  it('does not show a stale failure after leaving and coming back to the resource', async () => {
+    const pending = deferred<unknown>();
+    const { fixture } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.componentRef.setInput('resource', 'orders');
+    await settle(fixture);
+    fixture.componentRef.setInput('resource', 'products');
+    await settle(fixture);
+
+    pending.reject(
+      new PidrangError('permission denied for table products', {
+        category: 'forbidden',
+      }),
+    );
+    await settle(fixture);
+
+    expect(alertText(fixture.nativeElement)).toBe('');
+  });
+
+  it('locks pagination while a delete is in flight', async () => {
+    const pending = deferred<unknown>();
+    const { fixture } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    expect(pageSizeDisabled(fixture.nativeElement)).toBe(false);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.detectChanges();
+    expect(pageSizeDisabled(fixture.nativeElement)).toBe(true);
+
+    pending.resolve({});
+    await settle(fixture);
+    await settle(fixture);
+    expect(pageSizeDisabled(fixture.nativeElement)).toBe(false);
   });
 });
