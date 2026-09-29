@@ -173,6 +173,8 @@ protected async remove(id: string): Promise<void> {
 }
 ```
 
+The list pages of `apps/demo-material` and `apps/demo-tailwind`, and the pages `pidrang init` generates, go further: they block repeated clicks while a delete is in flight, keep the row on failure, and use the `PidrangError` `category` to offer sign-in on `unauthenticated` or say the user is not allowed on `forbidden`.
+
 `DataProvider` exposes `getList`, `getOne`, `create`, `update` and `delete`. Each takes the resource name and a params object (`{ id }`, `{ data }` or `{ id, data }`).
 
 ## 6. Create and edit forms

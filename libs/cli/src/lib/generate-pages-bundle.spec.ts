@@ -129,7 +129,7 @@ describe('generatePagesBundle', () => {
       files.find((file) => file.path === path)?.content ?? '';
 
     expect(content('src/app/pages/resource-list-page.ts')).toContain(
-      'if (!this.canDelete())',
+      'if (!this.canDelete() ||',
     );
     expect(content('src/app/pages/resource-create-page.ts')).toContain(
       'if (!this.canCreate() || this.saving())',
