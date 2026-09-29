@@ -133,12 +133,16 @@ export class ResourceListPage {
   private readonly window = inject(DOCUMENT).defaultView;
   private readonly dataProvider = injectDataProvider();
   private readonly resources = injectResources();
+  private readonly revision = signal(0);
   protected readonly list = injectResourceList<Row>(
     () => this.resource(),
-    () => ({
-      pagination: { current: this.page(), pageSize: this.pageSize() },
-      sorters: [{ field: 'id', order: 'asc' }],
-    }),
+    () => {
+      this.revision();
+      return {
+        pagination: { current: this.page(), pageSize: this.pageSize() },
+        sorters: [{ field: 'id', order: 'asc' }],
+      };
+    },
   );
   protected readonly total = linkedSignal<
     { resource: string; total: number | undefined },
@@ -210,7 +214,7 @@ export class ResourceListPage {
     try {
       await this.dataProvider.delete(resource, { id: row.id });
       if (this.resource() === resource) {
-        this.list.reload();
+        this.revision.update((revision) => revision + 1);
       }
     } catch (err) {
       if (this.deleting() === operation) {
