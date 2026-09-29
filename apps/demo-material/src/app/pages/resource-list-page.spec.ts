@@ -290,3 +290,88 @@ describe('ResourceListPage delete', () => {
     expect(pageSizeDisabled(fixture.nativeElement)).toBe(false);
   });
 });
+
+describe('ResourceListPage delete consistency', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('shows the database state after two deletes whose refreshes overlap', async () => {
+    let rows = [...ROWS];
+    let holdLists = false;
+    const listGates: Deferred<void>[] = [];
+    const deleteCalls = new Map<string, Deferred<void>>();
+    const dataProvider: DataProvider = {
+      getList: <T>() => {
+        const snapshot = { data: [...rows] as T[], total: rows.length };
+        if (!holdLists) {
+          return Promise.resolve(snapshot);
+        }
+        const gate = deferred<void>();
+        listGates.push(gate);
+        return gate.promise.then(() => snapshot);
+      },
+      getOne: () => Promise.reject(new Error('unused')),
+      create: () => Promise.reject(new Error('unused')),
+      update: () => Promise.reject(new Error('unused')),
+      delete: <T>(_resource: string, params: { id: string | number }) => {
+        const id = String(params.id);
+        const call = deferred<void>();
+        deleteCalls.set(id, call);
+        return call.promise.then(() => {
+          rows = rows.filter((row) => row.id !== id);
+          return {} as T;
+        });
+      },
+    };
+    TestBed.configureTestingModule({
+      imports: [ResourceListPage],
+      providers: [
+        provideRouter([]),
+        providePidrang({
+          dataProvider,
+          resources: [
+            { name: 'products', fields: [{ name: 'name', type: 'text' }] },
+            { name: 'orders', fields: [{ name: 'name', type: 'text' }] },
+          ],
+        }),
+      ],
+    });
+    const fixture = TestBed.createComponent(ResourceListPage);
+    fixture.componentRef.setInput('resource', 'products');
+    await settle(fixture);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.componentRef.setInput('resource', 'orders');
+    await settle(fixture);
+    fixture.componentRef.setInput('resource', 'products');
+    await settle(fixture);
+    deleteButtons(fixture.nativeElement)[1].click();
+    fixture.detectChanges();
+
+    holdLists = true;
+    deleteCalls.get('1')?.resolve();
+    await flush(fixture);
+    deleteCalls.get('2')?.resolve();
+    await flush(fixture);
+    holdLists = false;
+    for (const gate of listGates) {
+      gate.resolve();
+      await flush(fixture);
+    }
+    await settle(fixture);
+
+    expect(rows).toEqual([]);
+    expect(fixture.nativeElement.textContent).not.toContain('Mouse');
+    expect(fixture.nativeElement.textContent).toContain('No records yet.');
+  });
+});
+
+async function flush(
+  fixture: ReturnType<typeof TestBed.createComponent<ResourceListPage>>,
+): Promise<void> {
+  for (let i = 0; i < 5; i += 1) {
+    await Promise.resolve();
+    TestBed.tick();
+  }
+  fixture.detectChanges();
+}
