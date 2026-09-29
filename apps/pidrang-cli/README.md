@@ -7,7 +7,7 @@ The `pidrang` CLI (`npx pidrang init`): scaffolds a `Resource` + working CRUD pa
 Wires `@pidrang/cli`'s wizard to `@pidrang/cli-supabase`'s Supabase provider (the only registered provider today), then writes into the current directory:
 
 - `src/app/resources.ts` — the generated `Resource[]`
-- `src/app/pages/{not-found,resource-list,resource-create,resource-show,resource-edit}-page.ts` and `src/app/pidrang/` (the helpers those pages and the routes snippet import: `auth-required-error.ts`, `can-match-resource-action.ts`, `record-label.ts`, `resource-unavailable-path.ts`, `index.ts`) — the generic `@pidrang/material` CRUD pages, copied once (skipped if a file already exists — never overwritten)
+- `src/app/pages/{not-found,resource-list,resource-create,resource-show,resource-edit}-page.ts` and `src/app/pidrang/` (the page state functions, route guard and helpers those pages and the routes snippet import, plus an `index.ts` barrel) — the generic `@pidrang/material` CRUD pages, copied once (skipped if a file already exists — never overwritten)
 
 It never edits the app's own `app.routes.ts`/`app.config.ts`; it prints the routes snippet and `providePidrang({...})` call to paste in manually, since those files already exist and their exact shape varies per app.
 

@@ -2,7 +2,7 @@
 
 Internal library shared by `apps/demo-material` and `apps/demo-tailwind`. It is private and never published.
 
-It holds what both demos had in identical copies: the Supabase wiring (`demoAppConfig`), the demo resources (`DEMO_RESOURCES`), the route table (`demoRoutes`), the action-flag route guard (`canMatchResourceAction`, `RESOURCE_UNAVAILABLE_PATH`) and small helpers (`recordLabel`, `isAuthRequiredError`, `isSupabaseConfigured`, `DEMO_ACCOUNT`). Each demo keeps only its pages and its theme.
+It holds what both demos had in identical copies: the logic of the List, Create, Edit and Show pages (`injectResourceListState`, `injectResourceCreateState`, `injectResourceEditState`, `injectResourceShowState`, built on `injectResourceDefinition` and `injectResourceRecord`), the Supabase wiring (`demoAppConfig`), the demo resources (`DEMO_RESOURCES`), the route table (`demoRoutes`), the action-flag route guard (`canMatchResourceAction`, `RESOURCE_UNAVAILABLE_PATH`) and small helpers (`recordLabel`, `isAuthRequiredError`, `isSupabaseConfigured`, `DEMO_ACCOUNT`). Each demo page keeps only its template, its inputs and its UI adapters (Material paginator events, Tailwind select), so a behavior fix is made once and both demos, plus the pages `pidrang init` generates, get it.
 
 `pidrang init` copies the helpers its generated pages need into the consumer app under `src/app/pidrang/`, with imports rewritten to relative paths, so a generated app never depends on this library. After changing one of those files, run `pnpm run sync:pages` (see `docs/design-notes.md`).
 

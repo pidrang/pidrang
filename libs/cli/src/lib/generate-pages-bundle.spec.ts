@@ -49,21 +49,24 @@ describe('commentTexts', () => {
 });
 
 describe('generatePagesBundle', () => {
-  it('returns the 10 generic files at their expected paths', () => {
-    const files = generatePagesBundle();
+  it('returns the generic pages and the helpers they import', () => {
+    const paths = generatePagesBundle().map((file) => file.path);
 
-    expect(files.map((file) => file.path)).toEqual([
-      'src/app/pidrang/auth-required-error.ts',
-      'src/app/pidrang/can-match-resource-action.ts',
-      'src/app/pidrang/record-label.ts',
-      'src/app/pidrang/resource-unavailable-path.ts',
+    expect(paths.filter((path) => path.startsWith('src/app/pages/'))).toEqual([
       'src/app/pages/not-found-page.ts',
       'src/app/pages/resource-list-page.ts',
       'src/app/pages/resource-create-page.ts',
       'src/app/pages/resource-show-page.ts',
       'src/app/pages/resource-edit-page.ts',
-      'src/app/pidrang/index.ts',
     ]);
+    expect(paths).toContain('src/app/pidrang/index.ts');
+    expect(
+      paths.every(
+        (path) =>
+          path.startsWith('src/app/pages/') ||
+          path.startsWith('src/app/pidrang/'),
+      ),
+    ).toBe(true);
   });
 
   it('never imports from another UI adapter than @pidrang/material', () => {
@@ -90,27 +93,31 @@ describe('generatePagesBundle', () => {
 
   it('generates list/edit pages that filter out hidden fields', () => {
     const files = generatePagesBundle();
-    const listPage = files.find(
-      (file) => file.path === 'src/app/pages/resource-list-page.ts',
+    const listState = files.find(
+      (file) => file.path === 'src/app/pidrang/resource-list-state.ts',
     );
-    const editPage = files.find(
-      (file) => file.path === 'src/app/pages/resource-edit-page.ts',
+    const editState = files.find(
+      (file) => file.path === 'src/app/pidrang/resource-edit-state.ts',
     );
 
-    expect(listPage?.content).toContain('!field.hidden');
-    expect(editPage?.content).toContain('!field.hidden');
+    expect(listState?.content).toContain('!field.hidden');
+    expect(editState?.content).toContain('!field.hidden');
   });
 
   it('generates a paginated list page with stable id ordering', () => {
-    const listPage = generatePagesBundle().find(
+    const files = generatePagesBundle();
+    const listPage = files.find(
       (file) => file.path === 'src/app/pages/resource-list-page.ts',
+    );
+    const listState = files.find(
+      (file) => file.path === 'src/app/pidrang/resource-list-state.ts',
     );
 
     expect(listPage?.content).toContain('<mat-paginator');
-    expect(listPage?.content).toContain(
-      'pagination: { current: this.page(), pageSize: this.pageSize() }',
+    expect(listState?.content).toContain(
+      'pagination: { current: page(), pageSize: pageSize() }',
     );
-    expect(listPage?.content).toContain(
+    expect(listState?.content).toContain(
       "sorters: [{ field: 'id', order: 'asc' }]",
     );
     expect(listPage?.content).not.toContain('list.value()?.data');
@@ -132,14 +139,14 @@ describe('generatePagesBundle', () => {
     const content = (path: string) =>
       files.find((file) => file.path === path)?.content ?? '';
 
-    expect(content('src/app/pages/resource-list-page.ts')).toContain(
-      'if (!this.canDelete() ||',
+    expect(content('src/app/pidrang/resource-list-state.ts')).toContain(
+      'if (!canDelete() ||',
     );
-    expect(content('src/app/pages/resource-create-page.ts')).toContain(
-      'if (!this.canCreate() || this.saving())',
+    expect(content('src/app/pidrang/resource-create-state.ts')).toContain(
+      'if (!canCreate() || saving())',
     );
-    expect(content('src/app/pages/resource-edit-page.ts')).toContain(
-      'if (!this.canEdit() || this.saving())',
+    expect(content('src/app/pidrang/resource-edit-state.ts')).toContain(
+      'if (!canEdit() || saving())',
     );
   });
 

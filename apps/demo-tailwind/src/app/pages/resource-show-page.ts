@@ -1,11 +1,6 @@
-import { Component, computed, input, resource } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {
-  injectDataProvider,
-  injectResources,
-  isResourceActionEnabled,
-} from '@pidrang/core';
-import { recordLabel } from '@pidrang/demo-shared';
+import { injectResourceShowState } from '@pidrang/demo-shared';
 
 @Component({
   selector: 'app-resource-show-page',
@@ -47,27 +42,9 @@ export class ResourceShowPage {
   readonly resource = input.required<string>();
   readonly id = input.required<string>();
 
-  private readonly dataProvider = injectDataProvider();
-  private readonly resources = injectResources();
-
-  protected readonly record = resource({
-    params: () => ({ resource: this.resource(), id: this.id() }),
-    loader: ({ params }) =>
-      this.dataProvider.getOne<Record<string, unknown>>(params.resource, {
-        id: params.id,
-      }),
-  });
-
-  private readonly definition = computed(() =>
-    this.resources.find((resource) => resource.name === this.resource()),
-  );
-  protected readonly canList = computed(() =>
-    isResourceActionEnabled(this.definition(), 'list'),
-  );
-
-  protected readonly fields = computed(() => this.definition()?.fields ?? []);
-
-  protected readonly label = computed(() =>
-    this.record.hasValue() ? recordLabel(this.record.value()) : this.id(),
-  );
+  private readonly state = injectResourceShowState(this.resource, this.id);
+  protected readonly record = this.state.record;
+  protected readonly label = this.state.label;
+  protected readonly canList = this.state.canList;
+  protected readonly fields = this.state.fields;
 }
