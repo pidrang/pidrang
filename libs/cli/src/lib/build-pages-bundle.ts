@@ -13,7 +13,7 @@ export function buildPagesBundle(
     path: target,
     content: readSource(source).replace(
       SHARED_IMPORT,
-      `from '${posix.relative(posix.dirname(target), SHARED_DIR)}'`,
+      `from '${posix.relative(posix.dirname(target), `${SHARED_DIR}/index`)}'`,
     ),
   }));
   const barrel = files

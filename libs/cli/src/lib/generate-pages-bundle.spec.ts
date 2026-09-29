@@ -32,6 +32,52 @@ function commentTexts(content: string): string[] {
   return [...comments.values()];
 }
 
+function moduleSpecifiers(content: string): string[] {
+  const source = ts.createSourceFile(
+    'generated.ts',
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const specifiers: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      specifiers.push(node.moduleSpecifier.text);
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments[0] &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
+      specifiers.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return specifiers;
+}
+
+describe('moduleSpecifiers', () => {
+  it('finds static, re-export, side-effect and dynamic imports in either quote style', () => {
+    expect(
+      moduleSpecifiers(
+        [
+          `import { a } from "./a";`,
+          `export * from './b';`,
+          `import './c';`,
+          `const d = () => import('./d');`,
+          `const text = "from './not-an-import'";`,
+        ].join('\n'),
+      ),
+    ).toEqual(['./a', './b', './c', './d']);
+  });
+});
+
 describe('commentTexts', () => {
   it('finds leading, trailing and block comments', () => {
     expect(
@@ -180,24 +226,35 @@ describe('generatePagesBundle', () => {
     }
   });
 
-  it('generates self-contained files whose relative imports all resolve inside the bundle', () => {
+  it('generates self-contained files whose relative imports all name a generated file', () => {
     const files = generatePagesBundle();
     const paths = new Set(files.map((file) => file.path));
 
     for (const file of files) {
-      expect(file.content).not.toContain('@pidrang/demo-shared');
-      for (const [, specifier] of file.content.matchAll(
-        /from '(\.{1,2}\/[^']+)'/g,
-      )) {
-        const resolved = posix.join(posix.dirname(file.path), specifier);
-        expect(
-          [`${resolved}.ts`, `${resolved}/index.ts`].some((candidate) =>
-            paths.has(candidate),
-          ),
-          `${file.path} imports ${specifier}`,
-        ).toBe(true);
+      for (const specifier of moduleSpecifiers(file.content)) {
+        expect(specifier, `${file.path} imports ${specifier}`).not.toBe(
+          '@pidrang/demo-shared',
+        );
+        if (specifier.startsWith('.')) {
+          const resolved = posix.join(posix.dirname(file.path), specifier);
+          expect(
+            paths.has(`${resolved}.ts`),
+            `${file.path} imports ${specifier}`,
+          ).toBe(true);
+        }
       }
     }
+  });
+
+  it('returns a fresh bundle on every call', () => {
+    const first = generatePagesBundle();
+    first[0].content = 'changed';
+    first.pop();
+
+    const second = generatePagesBundle();
+
+    expect(second[0].content).not.toBe('changed');
+    expect(second).toHaveLength(first.length + 1);
   });
 
   it('is in sync with its canonical sources (run pnpm run sync:pages)', () => {
