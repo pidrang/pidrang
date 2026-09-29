@@ -49,6 +49,7 @@ async function setup(remove: (id: string) => Promise<unknown>) {
         dataProvider,
         resources: [
           { name: 'products', fields: [{ name: 'name', type: 'text' }] },
+          { name: 'orders', fields: [{ name: 'name', type: 'text' }] },
         ],
       }),
     ],
@@ -182,5 +183,62 @@ describe('ResourceListPage delete', () => {
     expect(alertText(fixture.nativeElement)).toContain('Failed to fetch');
     expect(alertText(fixture.nativeElement)).not.toContain('sign in');
     expect(alertText(fixture.nativeElement)).not.toContain('not allowed');
+  });
+
+  it('re-enables delete buttons after switching to another resource', async () => {
+    const pending = deferred<unknown>();
+    const { fixture } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.detectChanges();
+    expect(
+      deleteButtons(fixture.nativeElement).every((button) => button.disabled),
+    ).toBe(true);
+
+    fixture.componentRef.setInput('resource', 'orders');
+    await settle(fixture);
+
+    expect(
+      deleteButtons(fixture.nativeElement).every((button) => !button.disabled),
+    ).toBe(true);
+
+    pending.resolve({});
+    await settle(fixture);
+  });
+
+  it('keeps a newer delete locked when a stale one settles after a round trip', async () => {
+    const calls: Deferred<unknown>[] = [];
+    const { fixture, deletes } = await setup(() => {
+      const call = deferred<unknown>();
+      calls.push(call);
+      return call.promise;
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.componentRef.setInput('resource', 'orders');
+    await settle(fixture);
+    fixture.componentRef.setInput('resource', 'products');
+    await settle(fixture);
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.detectChanges();
+
+    calls[0].resolve({});
+    await settle(fixture);
+
+    expect(
+      deleteButtons(fixture.nativeElement).every((button) => button.disabled),
+    ).toBe(true);
+    await fixture.componentInstance['remove'](ROWS[1]);
+    expect(deletes).toEqual(['1', '1']);
+
+    calls[1].resolve({});
+    await settle(fixture);
+    await settle(fixture);
+
+    expect(
+      deleteButtons(fixture.nativeElement).every((button) => !button.disabled),
+    ).toBe(true);
   });
 });
