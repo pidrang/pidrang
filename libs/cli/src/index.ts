@@ -4,4 +4,5 @@ export * from './lib/crud-action';
 export * from './lib/generation-plan';
 export * from './lib/wizard';
 export * from './lib/generate-resources-file';
+export * from './lib/generated-file';
 export * from './lib/generate-pages-bundle';

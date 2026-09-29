@@ -2,10 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as ts from 'typescript';
 
+import { buildPagesBundle } from './build-pages-bundle';
 import {
   generatePagesBundle,
   RESOURCE_ROUTES_SNIPPET,
 } from './generate-pages-bundle';
+
+const WORKSPACE_ROOT = join(__dirname, '../../../..');
 
 function commentTexts(content: string): string[] {
   const source = ts.createSourceFile(
@@ -169,15 +172,12 @@ describe('generatePagesBundle', () => {
     }
   });
 
-  it('emits exactly the demo-material pages covered by its regression tests', () => {
-    for (const file of generatePagesBundle()) {
-      expect(file.content).toBe(
-        readFileSync(
-          join(__dirname, '../../../../apps/demo-material', file.path),
-          'utf8',
-        ),
-      );
-    }
+  it('is in sync with its canonical sources (run pnpm run sync:pages)', () => {
+    expect(generatePagesBundle()).toEqual(
+      buildPagesBundle((path) =>
+        readFileSync(join(WORKSPACE_ROOT, path), 'utf8'),
+      ),
+    );
   });
 });
 

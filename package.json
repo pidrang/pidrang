@@ -7,7 +7,8 @@
     "pack:packages": "node tools/pack-packages.mjs",
     "check:tarballs": "node tools/check-tarballs.mjs",
     "check:install": "node tools/check-install.mjs",
-    "verify:artifacts": "node tools/verify-artifacts.mjs"
+    "verify:artifacts": "node tools/verify-artifacts.mjs",
+    "sync:pages": "tsx tools/sync-generated-pages.ts"
   },
   "private": true,
   "packageManager": "pnpm@11.6.0",
