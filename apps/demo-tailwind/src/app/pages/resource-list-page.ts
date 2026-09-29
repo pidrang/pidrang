@@ -23,6 +23,10 @@ import { recordLabel } from '../record-label';
 
 type Row = { id: string } & Record<string, unknown>;
 
+interface DeleteOperation {
+  id: string;
+}
+
 interface DeleteFailure {
   message: string;
   category: PidrangErrorCategory;
@@ -92,7 +96,7 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
                       (click)="remove(row)"
                       class="text-red-600 hover:underline disabled:opacity-50"
                     >
-                      {{ deleting() === row.id ? 'Deleting…' : 'Delete' }}
+                      {{ deleting()?.id === row.id ? 'Deleting…' : 'Delete' }}
                     </button>
                   }
                 </span>
@@ -145,7 +149,10 @@ export class ResourceListPage {
   readonly resource = input.required<string>();
 
   protected readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
-  protected readonly deleting = signal<string | null>(null);
+  protected readonly deleting = linkedSignal<string, DeleteOperation | null>({
+    source: () => this.resource(),
+    computation: () => null,
+  });
   protected readonly deleteFailure = linkedSignal<string, DeleteFailure | null>(
     {
       source: () => this.resource(),
@@ -233,7 +240,8 @@ export class ResourceListPage {
     if (!this.window?.confirm(`Delete ${recordLabel(row)} from ${resource}?`)) {
       return;
     }
-    this.deleting.set(row.id);
+    const operation: DeleteOperation = { id: row.id };
+    this.deleting.set(operation);
     this.deleteFailure.set(null);
     try {
       await this.dataProvider.delete(resource, { id: row.id });
@@ -248,7 +256,9 @@ export class ResourceListPage {
         });
       }
     } finally {
-      this.deleting.set(null);
+      if (this.deleting() === operation) {
+        this.deleting.set(null);
+      }
     }
   }
 }
