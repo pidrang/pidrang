@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { injectAuthProvider } from '@pidrang/core';
-import { DEMO_ACCOUNT, DemoAccount } from '../demo-account';
+import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
 
 @Component({
   selector: 'app-sign-in-page',

@@ -1,7 +1,6 @@
 import { Route } from '@angular/router';
+import { demoRoutes } from '@pidrang/demo-shared';
 
-import { canMatchResourceAction } from './can-match-resource-action';
-import { RESOURCE_UNAVAILABLE_PATH } from './resource-unavailable-path';
 import { HomePage } from './pages/home-page';
 import { NotFoundPage } from './pages/not-found-page';
 import { ResourceCreatePage } from './pages/resource-create-page';
@@ -10,29 +9,12 @@ import { ResourceListPage } from './pages/resource-list-page';
 import { ResourceShowPage } from './pages/resource-show-page';
 import { SignInPage } from './pages/sign-in-page';
 
-export const appRoutes: Route[] = [
-  { path: '', component: HomePage },
-  { path: 'login', component: SignInPage },
-  { path: RESOURCE_UNAVAILABLE_PATH, component: NotFoundPage },
-  {
-    path: ':resource/create',
-    component: ResourceCreatePage,
-    canMatch: [canMatchResourceAction('create')],
-  },
-  {
-    path: ':resource/:id/edit',
-    component: ResourceEditPage,
-    canMatch: [canMatchResourceAction('edit')],
-  },
-  {
-    path: ':resource/:id',
-    component: ResourceShowPage,
-    canMatch: [canMatchResourceAction('show')],
-  },
-  {
-    path: ':resource',
-    component: ResourceListPage,
-    canMatch: [canMatchResourceAction('list')],
-  },
-  { path: '**', component: NotFoundPage },
-];
+export const appRoutes: Route[] = demoRoutes({
+  home: HomePage,
+  signIn: SignInPage,
+  notFound: NotFoundPage,
+  list: ResourceListPage,
+  create: ResourceCreatePage,
+  show: ResourceShowPage,
+  edit: ResourceEditPage,
+});

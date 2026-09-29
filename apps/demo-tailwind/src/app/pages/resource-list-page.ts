@@ -19,7 +19,7 @@ import {
 } from '@pidrang/core';
 import { ResourceTable } from '@pidrang/tailwind';
 
-import { recordLabel } from '../record-label';
+import { recordLabel } from '@pidrang/demo-shared';
 
 type Row = { id: string } & Record<string, unknown>;
 

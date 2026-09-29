@@ -21,7 +21,7 @@ import { ResourceTable } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 
-import { recordLabel } from '../record-label';
+import { recordLabel } from '@pidrang/demo-shared';
 
 type Row = { id: string } & Record<string, unknown>;
 

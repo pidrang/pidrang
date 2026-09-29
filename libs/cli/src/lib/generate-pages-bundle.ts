@@ -3,13 +3,12 @@ import { GENERATED_PAGE_FILES } from './generated-pages';
 
 export const RESOURCE_ROUTES_SNIPPET = `import { Route } from '@angular/router';
 
-import { canMatchResourceAction } from './can-match-resource-action';
-import { RESOURCE_UNAVAILABLE_PATH } from './resource-unavailable-path';
 import { NotFoundPage } from './pages/not-found-page';
 import { ResourceCreatePage } from './pages/resource-create-page';
 import { ResourceEditPage } from './pages/resource-edit-page';
 import { ResourceListPage } from './pages/resource-list-page';
 import { ResourceShowPage } from './pages/resource-show-page';
+import { RESOURCE_UNAVAILABLE_PATH, canMatchResourceAction } from './pidrang';
 
 export const resourceRoutes: Route[] = [
   { path: RESOURCE_UNAVAILABLE_PATH, component: NotFoundPage },

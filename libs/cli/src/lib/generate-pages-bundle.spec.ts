@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import * as ts from 'typescript';
 
 import { buildPagesBundle } from './build-pages-bundle';
@@ -49,19 +49,20 @@ describe('commentTexts', () => {
 });
 
 describe('generatePagesBundle', () => {
-  it('returns the 9 generic files at their expected paths', () => {
+  it('returns the 10 generic files at their expected paths', () => {
     const files = generatePagesBundle();
 
     expect(files.map((file) => file.path)).toEqual([
-      'src/app/auth-required-error.ts',
-      'src/app/record-label.ts',
-      'src/app/can-match-resource-action.ts',
-      'src/app/resource-unavailable-path.ts',
+      'src/app/pidrang/auth-required-error.ts',
+      'src/app/pidrang/can-match-resource-action.ts',
+      'src/app/pidrang/record-label.ts',
+      'src/app/pidrang/resource-unavailable-path.ts',
       'src/app/pages/not-found-page.ts',
       'src/app/pages/resource-list-page.ts',
       'src/app/pages/resource-create-page.ts',
       'src/app/pages/resource-show-page.ts',
       'src/app/pages/resource-edit-page.ts',
+      'src/app/pidrang/index.ts',
     ]);
   });
 
@@ -169,6 +170,26 @@ describe('generatePagesBundle', () => {
       expect(commentTexts(content)).toEqual([]);
       expect(content).not.toContain('<!--');
       expect(content).not.toMatch(/\$any\(|:\s*any\b|\bas any\b/);
+    }
+  });
+
+  it('generates self-contained files whose relative imports all resolve inside the bundle', () => {
+    const files = generatePagesBundle();
+    const paths = new Set(files.map((file) => file.path));
+
+    for (const file of files) {
+      expect(file.content).not.toContain('@pidrang/demo-shared');
+      for (const [, specifier] of file.content.matchAll(
+        /from '(\.{1,2}\/[^']+)'/g,
+      )) {
+        const resolved = posix.join(posix.dirname(file.path), specifier);
+        expect(
+          [`${resolved}.ts`, `${resolved}/index.ts`].some((candidate) =>
+            paths.has(candidate),
+          ),
+          `${file.path} imports ${specifier}`,
+        ).toBe(true);
+      }
     }
   });
 

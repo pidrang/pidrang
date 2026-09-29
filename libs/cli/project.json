@@ -4,7 +4,7 @@
   "sourceRoot": "libs/cli/src",
   "projectType": "library",
   "tags": [],
-  "implicitDependencies": ["demo-material"],
+  "implicitDependencies": ["demo-material", "demo-shared"],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",

@@ -5,7 +5,7 @@ import {
   injectResources,
   isResourceActionEnabled,
 } from '@pidrang/core';
-import { recordLabel } from '../record-label';
+import { recordLabel } from '@pidrang/demo-shared';
 
 @Component({
   selector: 'app-resource-show-page',

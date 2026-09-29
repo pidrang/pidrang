@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { injectAuthProvider } from '@pidrang/core';
-import { DEMO_ACCOUNT, DemoAccount } from '../demo-account';
+import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';

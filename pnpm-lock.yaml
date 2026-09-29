@@ -226,6 +226,24 @@ importers:
         specifier: ^22.1.0
         version: 22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2)
 
+  libs/demo-shared:
+    dependencies:
+      '@angular/core':
+        specifier: ^22.1.0
+        version: 22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2)
+      '@angular/router':
+        specifier: ^22.1.0
+        version: 22.1.6(@angular/common@22.1.6(@angular/core@22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2))(@angular/platform-browser@22.1.6(@angular/common@22.1.6(@angular/core@22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2)))(rxjs@7.8.2)
+      '@pidrang/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pidrang/supabase':
+        specifier: workspace:*
+        version: link:../supabase
+      '@supabase/supabase-js':
+        specifier: ^2.116.0
+        version: 2.116.0
+
   libs/material:
     dependencies:
       '@angular/common':

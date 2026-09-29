@@ -6,7 +6,7 @@ import {
   isResourceActionEnabled,
 } from '@pidrang/core';
 import { MatButtonModule } from '@angular/material/button';
-import { recordLabel } from '../record-label';
+import { recordLabel } from '@pidrang/demo-shared';
 
 @Component({
   selector: 'app-resource-show-page',
