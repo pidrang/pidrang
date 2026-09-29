@@ -1,13 +1,17 @@
 import {
   Component,
+  DOCUMENT,
   computed,
   effect,
+  inject,
   input,
   linkedSignal,
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  PidrangError,
+  PidrangErrorCategory,
   injectDataProvider,
   injectResourceList,
   injectResources,
@@ -15,7 +19,14 @@ import {
 } from '@pidrang/core';
 import { ResourceTable } from '@pidrang/tailwind';
 
+import { recordLabel } from '../record-label';
+
 type Row = { id: string } & Record<string, unknown>;
+
+interface DeleteFailure {
+  message: string;
+  category: PidrangErrorCategory;
+}
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
@@ -34,6 +45,20 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
     @if (list.isLoading()) {
       <p class="mt-4 text-gray-500">Loading...</p>
+    }
+    @if (deleteFailure(); as failure) {
+      <div role="alert" class="mt-4 text-red-600">
+        <p>{{ failure.message }}</p>
+        @if (failure.category === 'unauthenticated') {
+          <p>
+            You may need to
+            <a routerLink="/login" class="underline">sign in</a> to delete
+            records.
+          </p>
+        } @else if (failure.category === 'forbidden') {
+          <p>You are not allowed to delete this record.</p>
+        }
+      </div>
     }
     @if (list.error(); as error) {
       <p class="mt-4 text-red-600">{{ error.message }}</p>
@@ -63,11 +88,11 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
                   @if (canDelete()) {
                     <button
                       type="button"
-                      [disabled]="list.isLoading()"
-                      (click)="remove(row.id)"
+                      [disabled]="list.isLoading() || deleting() !== null"
+                      (click)="remove(row)"
                       class="text-red-600 hover:underline disabled:opacity-50"
                     >
-                      Delete
+                      {{ deleting() === row.id ? 'Deleting…' : 'Delete' }}
                     </button>
                   }
                 </span>
@@ -120,12 +145,20 @@ export class ResourceListPage {
   readonly resource = input.required<string>();
 
   protected readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
+  protected readonly deleting = signal<string | null>(null);
+  protected readonly deleteFailure = linkedSignal<string, DeleteFailure | null>(
+    {
+      source: () => this.resource(),
+      computation: () => null,
+    },
+  );
   protected readonly pageSize = signal(PAGE_SIZE_OPTIONS[0]);
   protected readonly page = linkedSignal({
     source: () => ({ resource: this.resource(), pageSize: this.pageSize() }),
     computation: () => 1,
   });
 
+  private readonly window = inject(DOCUMENT).defaultView;
   private readonly dataProvider = injectDataProvider();
   private readonly resources = injectResources();
   protected readonly list = injectResourceList<Row>(
@@ -192,11 +225,30 @@ export class ResourceListPage {
     }
   }
 
-  protected async remove(id: string): Promise<void> {
-    if (!this.canDelete()) {
+  protected async remove(row: Row): Promise<void> {
+    if (!this.canDelete() || this.deleting() !== null) {
       return;
     }
-    await this.dataProvider.delete(this.resource(), { id });
-    this.list.reload();
+    const resource = this.resource();
+    if (!this.window?.confirm(`Delete ${recordLabel(row)} from ${resource}?`)) {
+      return;
+    }
+    this.deleting.set(row.id);
+    this.deleteFailure.set(null);
+    try {
+      await this.dataProvider.delete(resource, { id: row.id });
+      if (this.resource() === resource) {
+        this.list.reload();
+      }
+    } catch (err) {
+      if (this.resource() === resource) {
+        this.deleteFailure.set({
+          message: err instanceof Error ? err.message : String(err),
+          category: err instanceof PidrangError ? err.category : 'unknown',
+        });
+      }
+    } finally {
+      this.deleting.set(null);
+    }
   }
 }
