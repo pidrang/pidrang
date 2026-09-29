@@ -8,7 +8,7 @@ import { ResourceCreatePage } from './pages/resource-create-page';
 import { ResourceEditPage } from './pages/resource-edit-page';
 import { ResourceListPage } from './pages/resource-list-page';
 import { ResourceShowPage } from './pages/resource-show-page';
-import { RESOURCE_UNAVAILABLE_PATH, canMatchResourceAction } from './pidrang';
+import { RESOURCE_UNAVAILABLE_PATH, canMatchResourceAction } from './pidrang/index';
 
 export const resourceRoutes: Route[] = [
   { path: RESOURCE_UNAVAILABLE_PATH, component: NotFoundPage },
@@ -36,5 +36,5 @@ export const resourceRoutes: Route[] = [
 `;
 
 export function generatePagesBundle(): GeneratedFile[] {
-  return GENERATED_PAGE_FILES;
+  return GENERATED_PAGE_FILES.map((file) => ({ ...file }));
 }
