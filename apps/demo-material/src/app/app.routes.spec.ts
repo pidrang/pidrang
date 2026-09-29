@@ -149,7 +149,7 @@ describe('resource routes', () => {
 
     const page = await harness.navigateByUrl('/products', ResourceListPage);
     await settle(harness);
-    await page['remove']('1');
+    await page['remove']({ id: '1', name: 'Keyboard' });
 
     expect(harness.routeNativeElement?.textContent).not.toContain('Delete');
     expect(calls).not.toContain('delete');
