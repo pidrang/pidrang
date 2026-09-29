@@ -72,7 +72,7 @@ The full walkthrough, from a new Angular app to a working list, create and edit 
 
 ## Demos
 
-`apps/demo-material` and `apps/demo-tailwind` show the same three resources (`users`, `products`, `orders`) with two different UI layers, both backed by the public `pidrang` Supabase project.
+`apps/demo-material` and `apps/demo-tailwind` show the same three resources (`users`, `products`, `orders`) with two different UI layers, both backed by the public `pidrang` Supabase project. Everything they share (Supabase wiring, resources, routes, helpers) lives once in the internal, unpublished `libs/demo-shared`; each demo keeps only its own pages and theme.
 
 ## Development
 

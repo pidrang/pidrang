@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 import { environment } from '../environments/environment';
-import { isSupabaseConfigured } from './is-supabase-configured';
+import { isSupabaseConfigured } from '@pidrang/demo-shared';
 
 @Component({
   imports: [RouterModule],

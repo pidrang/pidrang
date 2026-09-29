@@ -16,7 +16,7 @@ import {
 } from '@pidrang/core';
 import { ResourceForm } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
-import { isAuthRequiredError } from '../auth-required-error';
+import { isAuthRequiredError } from '@pidrang/demo-shared';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
 

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { AuthProvider, DataProvider, providePidrang } from '@pidrang/core';
 
-import { DEMO_ACCOUNT, DemoAccount } from '../demo-account';
+import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
 import { SignInPage } from './sign-in-page';
 
 const dataProvider: DataProvider = {

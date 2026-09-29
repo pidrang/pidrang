@@ -15,7 +15,7 @@ import {
   isResourceActionEnabled,
 } from '@pidrang/core';
 import { ResourceForm } from '@pidrang/tailwind';
-import { isAuthRequiredError } from '../auth-required-error';
+import { isAuthRequiredError } from '@pidrang/demo-shared';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
 
