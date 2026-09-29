@@ -62,9 +62,9 @@ GraphQL has no recursive query syntax, so the query is generated to a fixed dept
 
 ### Generated pages copy `apps/demo-material`
 
-`libs/cli/src/lib/generate-pages-bundle.ts`
+`libs/cli/src/lib/pages-bundle-sources.ts`, `libs/cli/src/lib/build-pages-bundle.ts`, `libs/cli/src/lib/generated-pages.ts`, `tools/sync-generated-pages.ts`
 
-The pages written by `pidrang init` are the generic pages of `apps/demo-material`, embedded as strings. They are resource-agnostic and shared by every table, so they are generated once, not per table. A change to a demo page must be mirrored in the generated string.
+The pages written by `pidrang init` are the generic pages of `apps/demo-material`. They are resource-agnostic and shared by every table, so they are generated once, not per table. `pages-bundle-sources.ts` lists which source file becomes which generated file, and `pnpm run sync:pages` rewrites `generated-pages.ts` from those sources. The published CLI only ships `generated-pages.ts`, so it never reads a repository file at run time. After changing a source page, run `pnpm run sync:pages`: the parity test in `generate-pages-bundle.spec.ts` (and `pnpm run sync:pages --check`) fails while the generated file is out of date.
 
 ## Routing
 
@@ -76,7 +76,7 @@ Angular matches routes in order and `:resource` matches any single segment. More
 
 ### Action flags guard the resource routes
 
-`apps/demo-material/src/app/can-match-resource-action.ts`, `apps/demo-tailwind/src/app/can-match-resource-action.ts`, `CAN_MATCH_RESOURCE_ACTION` in `libs/cli/src/lib/generate-pages-bundle.ts`
+`apps/demo-material/src/app/can-match-resource-action.ts`, `apps/demo-tailwind/src/app/can-match-resource-action.ts`, its generated copy in `libs/cli/src/lib/generated-pages.ts`
 
 `Resource.list`, `create`, `show`, `edit` and `delete` default to enabled when omitted. Each resource route has a `canMatch` guard. For a segment that is not a registered resource, the guard returns `false`, so an app route declared after the resource routes (such as `/settings`) can still match. For a registered resource whose action is disabled, it redirects to `RESOURCE_UNAVAILABLE_PATH` (`resource-unavailable`) with `skipLocationChange`, so `/products/create` with `create: false` does not fall through to the show route with `create` as an id. The path lives in one constant so an app can rename it if it clashes with its own routes. Flags control what the UI offers; they are not authorization, which stays with Row Level Security.
 
