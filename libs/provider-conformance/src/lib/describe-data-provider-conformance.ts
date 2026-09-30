@@ -19,6 +19,18 @@ export interface ConformanceTarget {
 
 const MISSING_ID = '00000000-0000-4000-8000-0000000000ff';
 
+const VALID_VALUES: Record<FilterOperator, unknown> = {
+  eq: 'x',
+  ne: 'x',
+  lt: 'x',
+  lte: 'x',
+  gt: 'x',
+  gte: 'x',
+  in: ['x'],
+  contains: 'x',
+  null: true,
+};
+
 function ids(...numbers: number[]): string[] {
   return numbers.map((n) => CONFORMANCE_ROWS[n - 1].id);
 }
@@ -83,6 +95,27 @@ const FILTER_CASES: {
     name: 'contains with a literal _',
     filters: [{ field: 'name', operator: 'contains', value: 'e_c' }],
     expected: ids(5),
+  },
+  {
+    name: 'contains with a literal *',
+    filters: [{ field: 'name', operator: 'contains', value: '*' }],
+    expected: [],
+  },
+  {
+    name: 'contains with a literal .',
+    filters: [{ field: 'name', operator: 'contains', value: '.' }],
+    expected: [],
+  },
+  {
+    name: 'in with a value holding a comma and quotes',
+    filters: [
+      {
+        field: 'name',
+        operator: 'in',
+        value: ['a,"b"\\c', '100% cotton cover'],
+      },
+    ],
+    expected: ids(4),
   },
   {
     name: 'null true',
@@ -171,7 +204,11 @@ export function describeDataProviderConformance(
     for (const operator of target.unsupported ?? []) {
       it(`rejects the unsupported ${operator} operator before querying`, async () => {
         await expect(
-          list({ filters: [{ field: 'name', operator, value: 'x' }] }),
+          list({
+            filters: [
+              { field: 'name', operator, value: VALID_VALUES[operator] },
+            ],
+          }),
         ).rejects.toThrow(`Unsupported filter operator "${operator}"`);
       });
     }
