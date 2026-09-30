@@ -2,7 +2,7 @@ import { Filter } from './filter';
 import { FilterOperator } from './filter-operator';
 
 export function rejectUnsupportedFilters(
-  filters: Filter[],
+  filters: readonly Filter[],
   supported: readonly FilterOperator[],
 ): void {
   const unsupported = filters.find(

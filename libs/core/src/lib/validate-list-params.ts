@@ -3,17 +3,17 @@ import { FilterOperator } from './filter-operator';
 import { ListParams } from './list-params';
 import { normalizeFilters } from './normalize-filters';
 
-const OPERATORS: readonly FilterOperator[] = [
-  'eq',
-  'ne',
-  'lt',
-  'lte',
-  'gt',
-  'gte',
-  'in',
-  'contains',
-  'null',
-];
+const OPERATORS = Object.keys({
+  eq: true,
+  ne: true,
+  lt: true,
+  lte: true,
+  gt: true,
+  gte: true,
+  in: true,
+  contains: true,
+  null: true,
+} satisfies Record<FilterOperator, true>) as FilterOperator[];
 
 function isPositiveInteger(value: unknown): boolean {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
@@ -60,14 +60,51 @@ function filterProblem(filter: Filter): string | undefined {
   }
 }
 
+function sorterProblem(sorter: unknown): string | undefined {
+  if (typeof sorter !== 'object' || sorter === null) {
+    return 'each sorter must be an object';
+  }
+  if (
+    !('field' in sorter) ||
+    typeof sorter.field !== 'string' ||
+    sorter.field === ''
+  ) {
+    return 'field must be a non-empty string';
+  }
+  if (
+    !('order' in sorter) ||
+    (sorter.order !== 'asc' && sorter.order !== 'desc')
+  ) {
+    return `order on "${sorter.field}" must be "asc" or "desc"`;
+  }
+  return undefined;
+}
+
 export function validateListParams(params: ListParams | undefined): void {
-  const pagination = params?.pagination;
+  const pagination: unknown = params?.pagination;
+  if (
+    pagination !== undefined &&
+    pagination !== null &&
+    (typeof pagination !== 'object' || Array.isArray(pagination))
+  ) {
+    throw new Error('Invalid pagination: expected an object');
+  }
   for (const key of ['current', 'pageSize'] as const) {
-    const value = pagination?.[key];
+    const value = params?.pagination?.[key];
     if (value !== undefined && !isPositiveInteger(value)) {
       throw new Error(
         `Invalid pagination.${key}: expected a positive integer, got ${String(value)}`,
       );
+    }
+  }
+  const sorters: unknown = params?.sorters;
+  if (sorters !== undefined && sorters !== null && !Array.isArray(sorters)) {
+    throw new Error('Invalid sorters: expected an array of sorters');
+  }
+  for (const sorter of Array.isArray(sorters) ? sorters : []) {
+    const problem = sorterProblem(sorter);
+    if (problem) {
+      throw new Error(`Invalid sorter: ${problem}`);
     }
   }
   for (const filter of normalizeFilters(params?.filters)) {

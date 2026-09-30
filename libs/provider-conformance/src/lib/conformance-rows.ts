@@ -16,18 +16,18 @@ export const CONFORMANCE_ROWS: readonly ConformanceRow[] = [
     note: null,
   },
   {
-    id: '00000000-0000-4000-8000-000000000003',
-    name: 'USB mouse pad',
-    price: 10,
-    in_stock: false,
-    note: 'MOUSE accessory',
-  },
-  {
     id: '00000000-0000-4000-8000-000000000004',
     name: '100% cotton cover',
     price: 10,
     in_stock: true,
     note: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000003',
+    name: 'USB mouse pad',
+    price: 10,
+    in_stock: false,
+    note: 'MOUSE accessory',
   },
   {
     id: '00000000-0000-4000-8000-000000000005',

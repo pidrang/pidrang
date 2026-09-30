@@ -1,5 +1,6 @@
 import {
   DataProvider,
+  Filter,
   FilterOperator,
   ListParams,
   PidrangError,
@@ -19,20 +20,22 @@ export interface ConformanceTarget {
 
 const MISSING_ID = '00000000-0000-4000-8000-0000000000ff';
 
-const VALID_VALUES: Record<FilterOperator, unknown> = {
-  eq: 'x',
-  ne: 'x',
-  lt: 'x',
-  lte: 'x',
-  gt: 'x',
-  gte: 'x',
-  in: ['x'],
-  contains: 'x',
-  null: true,
+const VALID_FILTERS: {
+  [K in FilterOperator]: Filter & { operator: K };
+} = {
+  eq: { field: 'name', operator: 'eq', value: 'x' },
+  ne: { field: 'name', operator: 'ne', value: 'x' },
+  lt: { field: 'name', operator: 'lt', value: 'x' },
+  lte: { field: 'name', operator: 'lte', value: 'x' },
+  gt: { field: 'name', operator: 'gt', value: 'x' },
+  gte: { field: 'name', operator: 'gte', value: 'x' },
+  in: { field: 'name', operator: 'in', value: ['x'] },
+  contains: { field: 'name', operator: 'contains', value: 'x' },
+  null: { field: 'name', operator: 'null', value: true },
 };
 
 function ids(...numbers: number[]): string[] {
-  return numbers.map((n) => CONFORMANCE_ROWS[n - 1].id);
+  return numbers.map((n) => `00000000-0000-4000-8000-00000000000${n}`);
 }
 
 const FILTER_CASES: {
@@ -85,6 +88,11 @@ const FILTER_CASES: {
     name: 'contains, case-insensitive',
     filters: [{ field: 'name', operator: 'contains', value: 'MOUSE' }],
     expected: ids(2, 3),
+  },
+  {
+    name: 'contains with an empty string, which matches every non-null value',
+    filters: [{ field: 'note', operator: 'contains', value: '' }],
+    expected: ids(1, 3, 5, 6, 7),
   },
   {
     name: 'contains with a literal %',
@@ -162,7 +170,7 @@ export function describeDataProviderConformance(
 
       expect(result.total).toBe(CONFORMANCE_ROWS.length);
       expect(result.data.map((row) => row.id)).toEqual(
-        CONFORMANCE_ROWS.map((row) => row.id),
+        ids(1, 2, 3, 4, 5, 6, 7),
       );
     });
 
@@ -206,11 +214,7 @@ export function describeDataProviderConformance(
     for (const operator of target.unsupported ?? []) {
       it(`rejects the unsupported ${operator} operator before querying`, async () => {
         await expect(
-          list({
-            filters: [
-              { field: 'name', operator, value: VALID_VALUES[operator] },
-            ],
-          }),
+          list({ filters: [VALID_FILTERS[operator]] }),
         ).rejects.toThrow(`Unsupported filter operator "${operator}"`);
       });
     }
@@ -218,9 +222,74 @@ export function describeDataProviderConformance(
     it('rejects an invalid filter', async () => {
       await expect(
         list({
-          filters: [{ field: 'price', operator: 'eq', value: null }],
+          filters: [
+            {
+              field: 'price',
+              operator: 'eq',
+              value: null,
+            } as unknown as Filter,
+          ],
         }),
       ).rejects.toThrow('Invalid filter');
+    });
+
+    it.each([
+      [
+        'contains on a number column',
+        { filters: [{ field: 'price', operator: 'contains', value: '1' }] },
+      ],
+      [
+        'contains on a number column after a filter that matches nothing',
+        {
+          filters: [
+            { field: 'price', operator: 'gt', value: 1000 },
+            { field: 'price', operator: 'contains', value: '1' },
+          ],
+        },
+      ],
+      [
+        'a filter on an unknown field',
+        { filters: [{ field: 'nme', operator: 'eq', value: 'Mouse' }] },
+      ],
+      ['a legacy record on an unknown field', { filters: { nme: 'Mouse' } }],
+      [
+        'a filter on a field only inherited from Object',
+        { filters: [{ field: 'constructor', operator: 'eq', value: 'x' }] },
+      ],
+      [
+        'a sorter on an unknown field',
+        { sorters: [{ field: 'nme', order: 'asc' }] },
+      ],
+    ] satisfies [string, ListParams][])(
+      'rejects %s, and not as not-found',
+      async (_label, params) => {
+        await expect(list(params)).rejects.toSatisfy(
+          (error: unknown) =>
+            error instanceof Error &&
+            !(error instanceof PidrangError && error.category === 'not-found'),
+        );
+      },
+    );
+
+    it('rejects filters that are neither an array nor a plain object', async () => {
+      await expect(
+        list({ filters: 'name' as unknown as ListParams['filters'] }),
+      ).rejects.toThrow('Invalid filters');
+    });
+
+    it('rejects a sorter without a direction', async () => {
+      await expect(
+        list({
+          sorters: [{ field: 'price' }] as unknown as ListParams['sorters'],
+        }),
+      ).rejects.toThrow('Invalid sorter');
+    });
+
+    it('reports an unknown resource as not-found', async () => {
+      await expect(provider.getList('no_such_resource')).rejects.toSatisfy(
+        (error: unknown) =>
+          error instanceof PidrangError && error.category === 'not-found',
+      );
     });
 
     it('reads one record', async () => {

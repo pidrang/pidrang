@@ -15,7 +15,7 @@ See the [getting started guide](https://github.com/pidrang/pidrang/blob/main/doc
 ## Exports
 
 - `Resource`, `Field` (`name`, `label?`, `type`, `hidden?`), `FieldType`
-- `DataProvider`, `ListParams`, `ListResult<T>`, `Filter`, `FilterOperator`, `normalizeFilters()`, `validateListParams()`, `rejectUnsupportedFilters()`, `GetOneParams`, `CreateParams<T>`, `UpdateParams<T>`, `DeleteParams`
+- `DataProvider`, `ListParams`, `ListResult<T>`, `Filter`, `FilterOperator`, `FilterValue`, `normalizeFilters()`, `validateListParams()`, `rejectUnsupportedFilters()`, `GetOneParams`, `CreateParams<T>`, `UpdateParams<T>`, `DeleteParams`
 - `AuthProvider`, `AuthIdentity`, `LoginParams`
 - `providePidrang({ dataProvider, resources, authProvider? })`
 - `injectDataProvider()`, `injectAuthProvider()`, `injectResources()`, `injectResource(name)`

@@ -4,6 +4,7 @@ export * from './lib/is-resource-action-enabled';
 export * from './lib/field';
 export * from './lib/filter-operator';
 export * from './lib/filter';
+export * from './lib/filter-value';
 export * from './lib/list-params';
 export * from './lib/normalize-filters';
 export * from './lib/reject-unsupported-filters';

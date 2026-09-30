@@ -17,6 +17,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 
 - `Resource`, `DataProvider`, `ListParams`/`ListResult<T>`, `GetOneParams`/`CreateParams<T>`/`UpdateParams<T>`/`DeleteParams`
 - `providePidrang({ dataProvider, resources })`
+- Typed list filters: `Filter` (one member per operator), `FilterValue`, `normalizeFilters()` (legacy equality records), `validateListParams()`, `rejectUnsupportedFilters()`; the shared contract suite lives in the private `libs/provider-conformance` (see `docs/data-providers.md`)
 - `injectDataProvider()`, `injectResources()`, `injectResource(name)`
 - `injectResourceList<T>(resourceName, params?)` — signal-based, `resourceName` may be reactive
 - `Field`/`FieldType`, an optional `Resource.fields` — added later (ticket #4), ahead of Phase 5, so a UI layer can render a typed form/table without guessing types from the data at runtime
@@ -70,6 +71,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 ## Phase 8 — later, without core changes
 
 - `@pidrang/primeng`, `@pidrang/rest`, `@pidrang/graphql`, `@pidrang/strapi`
+- Each new data provider must pass `describeDataProviderConformance` from `libs/provider-conformance` (see `docs/data-providers.md`)
 
 ## Not scheduled as a phase, still needed
 

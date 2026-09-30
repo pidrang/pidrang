@@ -1,5 +1,7 @@
 import { PidrangError, PidrangErrorCategory } from '@pidrang/core';
 
+const UNDEFINED_OPERATOR = '42883';
+
 function categoryFor(
   status: number | undefined,
   code: string | undefined,
@@ -9,6 +11,9 @@ function categoryFor(
   }
   if (status === 403) {
     return 'forbidden';
+  }
+  if (code === UNDEFINED_OPERATOR) {
+    return 'unknown';
   }
   if (status === 404 || code === 'PGRST116') {
     return 'not-found';
