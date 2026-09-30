@@ -45,6 +45,24 @@ export default [
     },
   },
   {
+    files: ['**/*.spec.ts'],
+    rules: {
+      '@nx/enforce-module-boundaries': [
+        'error',
+        {
+          enforceBuildableLibDependency: false,
+          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
+          depConstraints: [
+            {
+              sourceTag: '*',
+              onlyDependOnLibsWithTags: ['*'],
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [
       '**/*.ts',
       '**/*.tsx',

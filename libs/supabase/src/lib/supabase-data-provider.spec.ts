@@ -12,6 +12,15 @@ function fakeClient(result: {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
+    lt: vi.fn(() => builder),
+    lte: vi.fn(() => builder),
+    gt: vi.fn(() => builder),
+    gte: vi.fn(() => builder),
+    in: vi.fn(() => builder),
+    ilike: vi.fn(() => builder),
+    is: vi.fn(() => builder),
+    not: vi.fn(() => builder),
     order: vi.fn(() => builder),
     range: vi.fn(() => builder),
     insert: vi.fn(() => builder),
@@ -112,6 +121,89 @@ describe('SupabaseDataProvider', () => {
       provider.getList('users', { pagination: { current: 1, pageSize: 1.5 } }),
     ).rejects.toThrow('Invalid pagination.pageSize');
     expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['eq', 'eq', 'Mouse', ['name', 'Mouse']],
+    ['ne', 'neq', 'Mouse', ['name', 'Mouse']],
+    ['lt', 'lt', 5, ['name', 5]],
+    ['lte', 'lte', 5, ['name', 5]],
+    ['gt', 'gt', 5, ['name', 5]],
+    ['gte', 'gte', 5, ['name', 5]],
+    ['in', 'in', ['a', 'b'], ['name', ['a', 'b']]],
+    ['contains', 'ilike', 'ous', ['name', '%ous%']],
+    ['contains', 'ilike', '1%_\\', ['name', '%1\\%\\_\\\\%']],
+    ['null', 'is', true, ['name', null]],
+    ['null', 'not', false, ['name', 'is', null]],
+  ] as const)(
+    'getList maps the %s filter to postgrest %s',
+    async (operator, method, value, args) => {
+      const { client, builder } = fakeClient({ data: [], error: null });
+      const provider = new SupabaseDataProvider(client);
+
+      await provider.getList('products', {
+        filters: [{ field: 'name', operator, value }],
+      });
+
+      expect(builder[method]).toHaveBeenCalledWith(...args);
+    },
+  );
+
+  it('getList keeps legacy equality records and reads a legacy null as is-null', async () => {
+    const { client, builder } = fakeClient({ data: [], error: null });
+    const provider = new SupabaseDataProvider(client);
+
+    await provider.getList('products', {
+      filters: { in_stock: true, note: null },
+    });
+
+    expect(builder.eq).toHaveBeenCalledWith('in_stock', true);
+    expect(builder.is).toHaveBeenCalledWith('note', null);
+  });
+
+  it('getList rejects an invalid filter before querying', async () => {
+    const { client } = fakeClient({ data: [], error: null });
+    const provider = new SupabaseDataProvider(client);
+
+    await expect(
+      provider.getList('products', {
+        filters: [{ field: 'name', operator: 'eq', value: null }],
+      }),
+    ).rejects.toThrow('Invalid filter');
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('getList returns an empty page with the filtered total past the last row', async () => {
+    const { client, builder } = fakeClient({ data: null, error: null });
+    const responses = [
+      {
+        data: null,
+        count: null,
+        status: 416,
+        error: {
+          code: 'PGRST103',
+          message: 'Requested range not satisfiable',
+          details: '',
+          hint: '',
+        },
+      },
+      { data: null, count: 2, status: 200, error: null },
+    ];
+    builder.then = (resolve: (value: unknown) => void) =>
+      resolve(responses.shift());
+    const provider = new SupabaseDataProvider(client);
+
+    const result = await provider.getList('products', {
+      pagination: { current: 9, pageSize: 10 },
+      filters: [{ field: 'price', operator: 'gt', value: 5 }],
+    });
+
+    expect(result).toEqual({ data: [], total: 2 });
+    expect(builder.select).toHaveBeenLastCalledWith('*', {
+      count: 'exact',
+      head: true,
+    });
+    expect(builder.gt).toHaveBeenCalledTimes(2);
   });
 
   it('getOne returns the matching row', async () => {
