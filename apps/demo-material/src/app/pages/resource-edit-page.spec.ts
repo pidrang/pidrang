@@ -159,4 +159,56 @@ describe('ResourceEditPage', () => {
 
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
+
+  it('lets the next record save while the previous save is in flight', async () => {
+    const write = deferred<unknown>();
+    const { fixture, updates } = setup(() => write.promise);
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    fixture.componentRef.setInput('id', '2');
+    await fixture.whenStable();
+
+    expect(saveButton(fixture.nativeElement).disabled).toBe(false);
+    saveButton(fixture.nativeElement).click();
+    expect(updates.map((call) => call.id)).toEqual(['1', '2']);
+
+    write.resolve({});
+    await fixture.whenStable();
+  });
+
+  it('ignores a stale save failure after leaving and coming back to the record', async () => {
+    const write = deferred<unknown>();
+    const { fixture } = setup(() => write.promise);
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    fixture.componentRef.setInput('id', '2');
+    await fixture.whenStable();
+    fixture.componentRef.setInput('id', '1');
+    await fixture.whenStable();
+
+    write.reject(new Error('denied'));
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+    expect(saveButton(fixture.nativeElement).disabled).toBe(false);
+  });
+
+  it('does not redirect when a stale save succeeds after leaving and coming back', async () => {
+    const write = deferred<unknown>();
+    const { fixture, navigate } = setup(() => write.promise);
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    fixture.componentRef.setInput('id', '2');
+    await fixture.whenStable();
+    fixture.componentRef.setInput('id', '1');
+    await fixture.whenStable();
+
+    write.resolve({});
+    await fixture.whenStable();
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
 });

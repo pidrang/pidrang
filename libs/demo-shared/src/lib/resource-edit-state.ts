@@ -4,7 +4,6 @@ import {
   computed,
   inject,
   linkedSignal,
-  signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { injectDataProvider, isResourceActionEnabled } from '@pidrang/core';
@@ -26,7 +25,13 @@ export function injectResourceEditState(
   const definition = injectResourceDefinition(resource);
   const { record, label } = injectResourceRecord(resource, id);
 
-  const saving = signal(false);
+  const pending = linkedSignal<{ resource: string; id: string }, object | null>(
+    {
+      source: () => ({ resource: resource(), id: id() }),
+      computation: () => null,
+    },
+  );
+  const saving = computed(() => pending() !== null);
   const saveFailure = linkedSignal<
     { resource: string; id: string },
     SaveFailure | null
@@ -53,12 +58,8 @@ export function injectResourceEditState(
     );
   });
 
-  function isCurrent(currentResource: string, currentId: string): boolean {
-    return (
-      !destroyRef.destroyed &&
-      currentResource === resource() &&
-      currentId === id()
-    );
+  function owns(operation: object): boolean {
+    return !destroyRef.destroyed && pending() === operation;
   }
 
   function destinationAfterSave(): unknown[] {
@@ -77,22 +78,25 @@ export function injectResourceEditState(
     }
     const currentResource = resource();
     const currentId = id();
-    saving.set(true);
+    const operation = {};
+    pending.set(operation);
     saveFailure.set(null);
     try {
       await dataProvider.update(currentResource, { id: currentId, data });
-      if (isCurrent(currentResource, currentId)) {
+      if (owns(operation)) {
         await router.navigate(destinationAfterSave());
       }
     } catch (err) {
-      if (isCurrent(currentResource, currentId)) {
+      if (owns(operation)) {
         saveFailure.set({
           message: err instanceof Error ? err.message : String(err),
           authRequired: isAuthRequiredError(err),
         });
       }
     } finally {
-      saving.set(false);
+      if (pending() === operation) {
+        pending.set(null);
+      }
     }
   }
 
