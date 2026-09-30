@@ -12,7 +12,8 @@ import {
 } from '@pidrang/core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-import { escapeLikePattern } from './escape-like-pattern';
+import { escapeRegex } from './escape-regex';
+import { postgrestInList } from './postgrest-in-list';
 import { toError } from './to-error';
 
 const RANGE_NOT_SATISFIABLE = 'PGRST103';
@@ -80,10 +81,14 @@ export class SupabaseDataProvider implements DataProvider {
           query = query.gte(field, value);
           break;
         case 'in':
-          query = query.in(field, value as unknown[]);
+          query = query.filter(
+            field,
+            'in',
+            postgrestInList(value as unknown[]),
+          );
           break;
         case 'contains':
-          query = query.ilike(field, `%${escapeLikePattern(String(value))}%`);
+          query = query.filter(field, 'imatch', escapeRegex(String(value)));
           break;
         case 'null':
           query = value ? query.is(field, null) : query.not(field, 'is', null);
