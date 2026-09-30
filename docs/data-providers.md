@@ -76,7 +76,7 @@ Keep the backend error in `cause` and its code in `code` so callers can still in
 
 ## Proving it: the conformance suite
 
-`libs/provider-conformance` runs the same scenarios against any provider: pagination, total, sorting, every filter operator on a fixed six-row dataset (`CONFORMANCE_ROWS`), legacy records, invalid and unsupported filters, CRUD return values and `not-found` errors.
+`libs/provider-conformance` runs the same scenarios against any provider: pagination, total, sorting, every filter operator on a fixed seven-row dataset (`CONFORMANCE_ROWS`, including values with `%`, `_`, commas and quotes), legacy records, invalid and unsupported filters, CRUD return values and `not-found` errors.
 
 ```ts
 import {
