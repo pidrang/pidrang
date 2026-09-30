@@ -4,5 +4,14 @@
   "sourceRoot": "libs/provider-conformance/src",
   "projectType": "library",
   "tags": [],
-  "targets": {}
+  "targets": {
+    "typecheck": {
+      "command": "tsc -p libs/provider-conformance/tsconfig.lib.json --noEmit && tsc -p libs/provider-conformance/tsconfig.spec.json --noEmit",
+      "cache": true,
+      "inputs": ["default", "^production"]
+    },
+    "test": {
+      "dependsOn": ["typecheck"]
+    }
+  }
 }

@@ -64,12 +64,12 @@ function notFound(resource: string, id: string): PidrangError {
 }
 
 export function createInMemoryDataProvider(
-  seed: Record<string, readonly Row[]>,
+  seed: Record<string, readonly object[]>,
 ): DataProvider {
   const tables = new Map<string, Row[]>(
     Object.entries(seed).map(([name, rows]) => [
       name,
-      rows.map((row) => ({ ...row })),
+      rows.map((row): Row => ({ ...row })),
     ]),
   );
   const table = (resource: string): Row[] => {
