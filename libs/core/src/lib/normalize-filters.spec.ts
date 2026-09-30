@@ -25,4 +25,8 @@ describe('normalizeFilters', () => {
       { field: 'deleted_at', operator: 'null', value: true },
     ]);
   });
+
+  it('returns no filters for null', () => {
+    expect(normalizeFilters(null as never)).toEqual([]);
+  });
 });

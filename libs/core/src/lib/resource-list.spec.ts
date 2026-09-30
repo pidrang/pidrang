@@ -20,15 +20,22 @@ describe('injectResourceList', () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [providePidrang({ dataProvider, resources: [{ name: 'users' }] })],
+      providers: [
+        providePidrang({ dataProvider, resources: [{ name: 'users' }] }),
+      ],
     });
 
-    const list = TestBed.runInInjectionContext(() => injectResourceList('users'));
+    const list = TestBed.runInInjectionContext(() =>
+      injectResourceList('users'),
+    );
 
     TestBed.tick();
     await TestBed.inject(ApplicationRef).whenStable();
 
-    expect(list.value()).toEqual({ data: [{ id: '1', resource: 'users' }], total: 1 });
+    expect(list.value()).toEqual({
+      data: [{ id: '1', resource: 'users' }],
+      total: 1,
+    });
   });
 
   it('reloads when a reactive resource name changes', async () => {
@@ -46,21 +53,32 @@ describe('injectResourceList', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        providePidrang({ dataProvider, resources: [{ name: 'users' }, { name: 'products' }] }),
+        providePidrang({
+          dataProvider,
+          resources: [{ name: 'users' }, { name: 'products' }],
+        }),
       ],
     });
 
     const resourceName = signal('users');
-    const list = TestBed.runInInjectionContext(() => injectResourceList(resourceName));
+    const list = TestBed.runInInjectionContext(() =>
+      injectResourceList(resourceName),
+    );
 
     TestBed.tick();
     await TestBed.inject(ApplicationRef).whenStable();
-    expect(list.value()).toEqual({ data: [{ id: '1', resource: 'users' }], total: 1 });
+    expect(list.value()).toEqual({
+      data: [{ id: '1', resource: 'users' }],
+      total: 1,
+    });
 
     resourceName.set('products');
     TestBed.tick();
     await TestBed.inject(ApplicationRef).whenStable();
 
-    expect(list.value()).toEqual({ data: [{ id: '1', resource: 'products' }], total: 1 });
+    expect(list.value()).toEqual({
+      data: [{ id: '1', resource: 'products' }],
+      total: 1,
+    });
   });
 });

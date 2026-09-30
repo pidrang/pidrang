@@ -71,6 +71,9 @@ export function validateListParams(params: ListParams | undefined): void {
     }
   }
   for (const filter of normalizeFilters(params?.filters)) {
+    if (typeof filter !== 'object' || filter === null) {
+      throw new Error('Invalid filter: each filter must be an object');
+    }
     const problem = filterProblem(filter);
     if (problem) {
       throw new Error(

@@ -65,4 +65,17 @@ describe('validateListParams', () => {
       'Invalid filter',
     );
   });
+
+  it.each([[[null]], [['price']], [[42]]])(
+    'rejects a filter entry that is not an object: %o',
+    (filters) => {
+      expect(() => validateListParams({ filters: filters as never })).toThrow(
+        'Invalid filter: each filter must be an object',
+      );
+    },
+  );
+
+  it('treats null filters like no filters', () => {
+    expect(() => validateListParams({ filters: null as never })).not.toThrow();
+  });
 });
