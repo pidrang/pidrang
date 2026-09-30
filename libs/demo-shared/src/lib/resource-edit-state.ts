@@ -1,5 +1,6 @@
 import {
   DestroyRef,
+  ErrorHandler,
   Signal,
   computed,
   inject,
@@ -9,8 +10,11 @@ import { Router } from '@angular/router';
 import { injectDataProvider, isResourceActionEnabled } from '@pidrang/core';
 
 import { isAuthRequiredError } from './auth-required-error';
+import { injectEarlierSave } from './earlier-save';
+import { navigationFailure } from './navigation-failure';
 import { injectResourceDefinition } from './resource-definition';
 import { injectResourceRecord } from './resource-record';
+import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
@@ -22,16 +26,25 @@ export function injectResourceEditState(
   const dataProvider = injectDataProvider();
   const router = inject(Router);
   const destroyRef = inject(DestroyRef);
+  const errorHandler = inject(ErrorHandler);
   const definition = injectResourceDefinition(resource);
-  const { record, label } = injectResourceRecord(resource, id);
-
-  const pending = linkedSignal<{ resource: string; id: string }, object | null>(
-    {
-      source: () => ({ resource: resource(), id: id() }),
-      computation: () => null,
-    },
-  );
-  const saving = computed(() => pending() !== null);
+  const target = computed(() => JSON.stringify(['edit', resource(), id()]));
+  const lock = injectSaveLock(target);
+  const saving = lock.locked;
+  const owned = linkedSignal<string, object | null>({
+    source: target,
+    computation: () => null,
+  });
+  const savingElsewhere = computed(() => saving() && owned() === null);
+  const earlierSave = injectEarlierSave(target, savingElsewhere, lock.outcome);
+  const revision = linkedSignal<{ waiting: boolean; saved: number }, number>({
+    source: () => ({ waiting: savingElsewhere(), saved: lock.saved() }),
+    computation: (now, previous) =>
+      previous?.source.waiting && now.saved !== previous.source.saved
+        ? previous.value + 1
+        : (previous?.value ?? 0),
+  });
+  const { record, label } = injectResourceRecord(resource, id, revision);
   const saveFailure = linkedSignal<
     { resource: string; id: string },
     SaveFailure | null
@@ -59,7 +72,7 @@ export function injectResourceEditState(
   });
 
   function owns(operation: object): boolean {
-    return !destroyRef.destroyed && pending() === operation;
+    return !destroyRef.destroyed && owned() === operation;
   }
 
   function destinationAfterSave(): unknown[] {
@@ -72,6 +85,22 @@ export function injectResourceEditState(
     return ['/'];
   }
 
+  async function openNext(
+    operation: object,
+    destination: unknown[],
+  ): Promise<boolean> {
+    let opened = false;
+    try {
+      opened = await router.navigate(destination);
+    } catch (err) {
+      errorHandler.handleError(err);
+    }
+    if (!opened && owns(operation)) {
+      saveFailure.set(navigationFailure());
+    }
+    return opened;
+  }
+
   async function submit(data: Record<string, unknown>): Promise<void> {
     if (!canEdit() || saving()) {
       return;
@@ -79,13 +108,16 @@ export function injectResourceEditState(
     const currentResource = resource();
     const currentId = id();
     const operation = {};
-    pending.set(operation);
+    owned.set(operation);
     saveFailure.set(null);
+    earlierSave.clear();
     try {
-      await dataProvider.update(currentResource, { id: currentId, data });
-      if (owns(operation)) {
-        await router.navigate(destinationAfterSave());
-      }
+      await lock.hold(async () => {
+        await dataProvider.update(currentResource, { id: currentId, data });
+        if (owns(operation)) {
+          await openNext(operation, destinationAfterSave());
+        }
+      });
     } catch (err) {
       if (owns(operation)) {
         saveFailure.set({
@@ -93,15 +125,13 @@ export function injectResourceEditState(
           authRequired: isAuthRequiredError(err),
         });
       }
-    } finally {
-      if (pending() === operation) {
-        pending.set(null);
-      }
     }
   }
 
   return {
     saving,
+    savingElsewhere,
+    earlierSave,
     saveFailure,
     record,
     label,
