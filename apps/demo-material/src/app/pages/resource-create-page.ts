@@ -13,12 +13,32 @@ import { injectResourceCreateState } from '@pidrang/demo-shared';
       <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     }
 
-    <lib-resource-form
-      [fields]="fields()"
-      [value]="initialValue()"
-      [pending]="saving()"
-      (save)="submit($event)"
-    />
+    @if (earlierSave.failure(); as earlierFailure) {
+      <p role="alert">
+        The earlier create failed: {{ earlierFailure.message }}
+      </p>
+      @if (earlierFailure.authRequired) {
+        <p>
+          You may need to <a routerLink="/login">sign in</a> to make changes.
+        </p>
+      }
+    }
+    @if (earlierSave.finished()) {
+      <p role="status">The earlier create finished.</p>
+    }
+    @if (savingElsewhere()) {
+      <p role="status">
+        A create on this resource is still running from an earlier visit. The
+        form comes back when it finishes.
+      </p>
+    } @else if (!created()) {
+      <lib-resource-form
+        [fields]="fields()"
+        [value]="initialValue()"
+        [pending]="saving()"
+        (save)="submit($event)"
+      />
+    }
 
     @if (saveFailure(); as failure) {
       <p role="alert">{{ failure.message }}</p>
@@ -35,6 +55,9 @@ export class ResourceCreatePage {
 
   private readonly state = injectResourceCreateState(this.resource);
   protected readonly saving = this.state.saving;
+  protected readonly savingElsewhere = this.state.savingElsewhere;
+  protected readonly earlierSave = this.state.earlierSave;
+  protected readonly created = this.state.created;
   protected readonly saveFailure = this.state.saveFailure;
   protected readonly canList = this.state.canList;
   protected readonly fields = this.state.fields;

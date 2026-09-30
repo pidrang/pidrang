@@ -8,6 +8,8 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
     'auth-required-error.ts',
     'can-match-resource-action.ts',
     'delete-failure.ts',
+    'earlier-save.ts',
+    'navigation-failure.ts',
     'record-label.ts',
     'resource-create-state.ts',
     'resource-definition.ts',
@@ -18,6 +20,8 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
     'resource-show-state.ts',
     'resource-unavailable-path.ts',
     'save-failure.ts',
+    'save-lock.ts',
+    'save-outcome.ts',
   ].map((file) => ({
     target: `src/app/pidrang/${file}`,
     source: `${DEMO_SHARED}/${file}`,

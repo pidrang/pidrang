@@ -1,5 +1,6 @@
 import {
   DestroyRef,
+  ErrorHandler,
   Signal,
   computed,
   inject,
@@ -13,7 +14,10 @@ import {
 } from '@pidrang/core';
 
 import { isAuthRequiredError } from './auth-required-error';
+import { injectEarlierSave } from './earlier-save';
+import { navigationFailure } from './navigation-failure';
 import { injectResourceDefinition } from './resource-definition';
+import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
@@ -33,13 +37,22 @@ export function injectResourceCreateState(resource: Signal<string>) {
   const dataProvider = injectDataProvider();
   const router = inject(Router);
   const destroyRef = inject(DestroyRef);
+  const errorHandler = inject(ErrorHandler);
   const definition = injectResourceDefinition(resource);
 
-  const pending = linkedSignal<string, object | null>({
-    source: resource,
+  const target = computed(() => JSON.stringify(['create', resource()]));
+  const lock = injectSaveLock(target);
+  const saving = lock.locked;
+  const owned = linkedSignal<string, object | null>({
+    source: target,
     computation: () => null,
   });
-  const saving = computed(() => pending() !== null);
+  const savingElsewhere = computed(() => saving() && owned() === null);
+  const created = linkedSignal<string, boolean>({
+    source: target,
+    computation: () => false,
+  });
+  const earlierSave = injectEarlierSave(target, savingElsewhere, lock.outcome);
   const saveFailure = linkedSignal<string, SaveFailure | null>({
     source: resource,
     computation: () => null,
@@ -62,7 +75,7 @@ export function injectResourceCreateState(resource: Signal<string>) {
   );
 
   function owns(operation: object): boolean {
-    return !destroyRef.destroyed && pending() === operation;
+    return !destroyRef.destroyed && owned() === operation;
   }
 
   function destinationAfterCreate(id: unknown): unknown[] {
@@ -75,22 +88,44 @@ export function injectResourceCreateState(resource: Signal<string>) {
     return ['/'];
   }
 
+  async function openNext(
+    operation: object,
+    destination: unknown[],
+  ): Promise<boolean> {
+    let opened = false;
+    try {
+      opened = await router.navigate(destination);
+    } catch (err) {
+      errorHandler.handleError(err);
+    }
+    if (!opened && owns(operation)) {
+      saveFailure.set(navigationFailure());
+    }
+    return opened;
+  }
+
   async function submit(data: Record<string, unknown>): Promise<void> {
     if (!canCreate() || saving()) {
       return;
     }
     const current = resource();
     const operation = {};
-    pending.set(operation);
+    owned.set(operation);
     saveFailure.set(null);
+    earlierSave.clear();
     try {
-      const created = await dataProvider.create<Record<string, unknown>>(
-        current,
-        { data },
-      );
-      if (owns(operation)) {
-        await router.navigate(destinationAfterCreate(created['id']));
-      }
+      await lock.hold(async () => {
+        const row = await dataProvider.create<Record<string, unknown>>(
+          current,
+          { data },
+        );
+        if (
+          owns(operation) &&
+          !(await openNext(operation, destinationAfterCreate(row?.['id'])))
+        ) {
+          created.set(true);
+        }
+      });
     } catch (err) {
       if (owns(operation)) {
         saveFailure.set({
@@ -98,12 +133,18 @@ export function injectResourceCreateState(resource: Signal<string>) {
           authRequired: isAuthRequiredError(err),
         });
       }
-    } finally {
-      if (pending() === operation) {
-        pending.set(null);
-      }
     }
   }
 
-  return { saving, saveFailure, canList, fields, initialValue, submit };
+  return {
+    saving,
+    savingElsewhere,
+    earlierSave,
+    created,
+    saveFailure,
+    canList,
+    fields,
+    initialValue,
+    submit,
+  };
 }

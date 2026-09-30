@@ -15,6 +15,17 @@ import { injectResourceEditState } from '@pidrang/demo-shared';
       <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     }
 
+    @if (earlierSave.failure(); as earlierFailure) {
+      <p role="alert">The earlier save failed: {{ earlierFailure.message }}</p>
+      @if (earlierFailure.authRequired) {
+        <p>
+          You may need to <a routerLink="/login">sign in</a> to make changes.
+        </p>
+      }
+    }
+    @if (earlierSave.finished()) {
+      <p role="status">The earlier save finished.</p>
+    }
     @if (record.isLoading()) {
       <p role="status">Loading…</p>
     }
@@ -23,6 +34,11 @@ import { injectResourceEditState } from '@pidrang/demo-shared';
       <button mat-stroked-button type="button" (click)="record.reload()">
         Retry
       </button>
+    } @else if (savingElsewhere()) {
+      <p role="status">
+        This record is being saved from an earlier visit. The form comes back
+        when that save finishes.
+      </p>
     } @else if (value(); as value) {
       <lib-resource-form
         [fields]="fields()"
@@ -47,6 +63,8 @@ export class ResourceEditPage {
 
   private readonly state = injectResourceEditState(this.resource, this.id);
   protected readonly saving = this.state.saving;
+  protected readonly savingElsewhere = this.state.savingElsewhere;
+  protected readonly earlierSave = this.state.earlierSave;
   protected readonly saveFailure = this.state.saveFailure;
   protected readonly record = this.state.record;
   protected readonly label = this.state.label;

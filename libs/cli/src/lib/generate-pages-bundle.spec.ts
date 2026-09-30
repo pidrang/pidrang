@@ -78,6 +78,34 @@ describe('moduleSpecifiers', () => {
   });
 });
 
+function importsAfterCode(content: string): string[] {
+  const source = ts.createSourceFile(
+    'file.ts',
+    content,
+    ts.ScriptTarget.Latest,
+  );
+  let codeSeen = false;
+  const late: string[] = [];
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement)) {
+      codeSeen = true;
+    } else if (codeSeen) {
+      late.push(statement.getText(source));
+    }
+  }
+  return late;
+}
+
+describe('importsAfterCode', () => {
+  it('finds an import placed after a declaration, not the ones before it', () => {
+    expect(
+      importsAfterCode(
+        "import { a } from './a';\ninterface B { b: number }\nimport { c } from './c';\n",
+      ),
+    ).toEqual(["import { c } from './c';"]);
+  });
+});
+
 describe('commentTexts', () => {
   it('finds leading, trailing and block comments', () => {
     expect(
@@ -213,7 +241,7 @@ describe('generatePagesBundle', () => {
     }
   });
 
-  it('emits no comments or any casts', () => {
+  it('emits no comments, any casts or imports below code', () => {
     const contents = [
       ...generatePagesBundle().map((file) => file.content),
       RESOURCE_ROUTES_SNIPPET,
@@ -221,6 +249,7 @@ describe('generatePagesBundle', () => {
 
     for (const content of contents) {
       expect(commentTexts(content)).toEqual([]);
+      expect(importsAfterCode(content)).toEqual([]);
       expect(content).not.toContain('<!--');
       expect(content).not.toMatch(/\$any\(|:\s*any\b|\bas any\b/);
     }
