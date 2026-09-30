@@ -2,11 +2,16 @@ import { TestBed } from '@angular/core/testing';
 
 import { AuthProvider } from './auth-provider';
 import { DataProvider } from './data-provider';
-import { injectAuthProvider, injectDataProvider, injectResources } from './inject-pidrang';
+import {
+  injectAuthProvider,
+  injectDataProvider,
+  injectResources,
+} from './inject-pidrang';
 import { providePidrang } from './provide-pidrang';
 
 const noopDataProvider: DataProvider = {
-  getList: <T>() => Promise.resolve({ data: [], total: 0 } as { data: T[]; total: number }),
+  getList: <T>() =>
+    Promise.resolve({ data: [], total: 0 } as { data: T[]; total: number }),
   getOne: <T>() => Promise.resolve({} as T),
   create: <T>() => Promise.resolve({} as T),
   update: <T>() => Promise.resolve({} as T),
@@ -30,8 +35,12 @@ describe('providePidrang', () => {
       ],
     });
 
-    expect(TestBed.runInInjectionContext(injectDataProvider)).toBe(noopDataProvider);
-    expect(TestBed.runInInjectionContext(injectResources)).toEqual([{ name: 'users' }]);
+    expect(TestBed.runInInjectionContext(injectDataProvider)).toBe(
+      noopDataProvider,
+    );
+    expect(TestBed.runInInjectionContext(injectResources)).toEqual([
+      { name: 'users' },
+    ]);
   });
 
   it('registers the auth provider only when one is given', () => {
@@ -45,6 +54,8 @@ describe('providePidrang', () => {
       ],
     });
 
-    expect(TestBed.runInInjectionContext(injectAuthProvider)).toBe(noopAuthProvider);
+    expect(TestBed.runInInjectionContext(injectAuthProvider)).toBe(
+      noopAuthProvider,
+    );
   });
 });

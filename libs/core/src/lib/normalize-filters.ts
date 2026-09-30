@@ -2,7 +2,7 @@ import { Filter } from './filter';
 import { ListParams } from './list-params';
 
 export function normalizeFilters(filters: ListParams['filters']): Filter[] {
-  if (filters === undefined) {
+  if (filters === undefined || filters === null) {
     return [];
   }
   if (Array.isArray(filters)) {

@@ -6,7 +6,8 @@ import { injectAuthProvider, injectResource } from './inject-pidrang';
 import { providePidrang } from './provide-pidrang';
 
 const noopDataProvider: DataProvider = {
-  getList: <T>() => Promise.resolve({ data: [], total: 0 } as { data: T[]; total: number }),
+  getList: <T>() =>
+    Promise.resolve({ data: [], total: 0 } as { data: T[]; total: number }),
   getOne: <T>() => Promise.resolve({} as T),
   create: <T>() => Promise.resolve({} as T),
   update: <T>() => Promise.resolve({} as T),
@@ -37,7 +38,9 @@ describe('injectResource', () => {
   });
 
   it('throws when no resource matches the given name', () => {
-    expect(() => TestBed.runInInjectionContext(() => injectResource('unknown'))).toThrow();
+    expect(() =>
+      TestBed.runInInjectionContext(() => injectResource('unknown')),
+    ).toThrow();
   });
 });
 
@@ -53,12 +56,16 @@ describe('injectAuthProvider', () => {
       ],
     });
 
-    expect(TestBed.runInInjectionContext(injectAuthProvider)).toBe(noopAuthProvider);
+    expect(TestBed.runInInjectionContext(injectAuthProvider)).toBe(
+      noopAuthProvider,
+    );
   });
 
   it('throws when no auth provider is configured', () => {
     TestBed.configureTestingModule({
-      providers: [providePidrang({ dataProvider: noopDataProvider, resources: [] })],
+      providers: [
+        providePidrang({ dataProvider: noopDataProvider, resources: [] }),
+      ],
     });
 
     expect(() => TestBed.runInInjectionContext(injectAuthProvider)).toThrow();
