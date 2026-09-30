@@ -61,9 +61,9 @@ describe('validateListParams', () => {
     expect(() =>
       validateListParams({ filters: { name: 'Mouse', deleted_at: null } }),
     ).not.toThrow();
-    expect(() => validateListParams({ filters: { name: { a: 1 } } })).toThrow(
-      'Invalid filter',
-    );
+    expect(() =>
+      validateListParams({ filters: { name: { a: 1 } } as never }),
+    ).toThrow('Invalid filter');
   });
 
   it.each([[[null]], [['price']], [[42]]])(
@@ -77,5 +77,46 @@ describe('validateListParams', () => {
 
   it('treats null filters like no filters', () => {
     expect(() => validateListParams({ filters: null as never })).not.toThrow();
+  });
+
+  it('accepts sorters on a field with a direction', () => {
+    expect(() =>
+      validateListParams({ sorters: [{ field: 'price', order: 'desc' }] }),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ['a string', 'price'],
+    ['an object', { field: 'price', order: 'asc' }],
+  ])('rejects sorters given as %s', (_label, sorters) => {
+    expect(() => validateListParams({ sorters: sorters as never })).toThrow(
+      'Invalid sorters: expected an array',
+    );
+  });
+
+  it.each([
+    ['no direction', { field: 'price' }],
+    ['an unknown direction', { field: 'price', order: 'up' }],
+    ['an empty field', { field: '', order: 'asc' }],
+    ['no field', { order: 'asc' }],
+    ['null', null],
+  ])('rejects a sorter with %s', (_label, sorter) => {
+    expect(() => validateListParams({ sorters: [sorter as never] })).toThrow(
+      'Invalid sorter',
+    );
+  });
+
+  it.each([
+    ['a string', 'x'],
+    ['a number', 5],
+    ['an array', [1, 10]],
+  ])('rejects pagination given as %s', (_label, pagination) => {
+    expect(() =>
+      validateListParams({ pagination: pagination as never }),
+    ).toThrow('Invalid pagination: expected an object');
+  });
+
+  it('treats null sorters like no sorters', () => {
+    expect(() => validateListParams({ sorters: null as never })).not.toThrow();
   });
 });

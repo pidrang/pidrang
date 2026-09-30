@@ -1,7 +1,11 @@
-import { FilterOperator } from './filter-operator';
+import { FilterValue } from './filter-value';
 
-export interface Filter {
-  field: string;
-  operator: FilterOperator;
-  value: unknown;
-}
+export type Filter =
+  | {
+      field: string;
+      operator: 'eq' | 'ne' | 'lt' | 'lte' | 'gt' | 'gte';
+      value: FilterValue;
+    }
+  | { field: string; operator: 'in'; value: readonly FilterValue[] }
+  | { field: string; operator: 'contains'; value: string }
+  | { field: string; operator: 'null'; value: boolean };

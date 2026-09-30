@@ -12,6 +12,7 @@ import {
 } from '@pidrang/core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+import { assertPostgrestField } from './assert-postgrest-field';
 import { escapeRegex } from './escape-regex';
 import { postgrestInList } from './postgrest-in-list';
 import { toError } from './to-error';
@@ -27,10 +28,16 @@ export class SupabaseDataProvider implements DataProvider {
   ): Promise<ListResult<T>> {
     validateListParams(params);
     const filters = normalizeFilters(params?.filters);
+    const sorters = params?.sorters ?? [];
+    for (const { field } of filters) {
+      assertPostgrestField(field, 'filter');
+    }
+    for (const { field } of sorters) {
+      assertPostgrestField(field, 'sorter');
+    }
 
     let query = this.filteredQuery(resource, filters, false);
 
-    const sorters = params?.sorters ?? [];
     for (const sorter of sorters) {
       query = query.order(sorter.field, { ascending: sorter.order === 'asc' });
     }
@@ -46,7 +53,15 @@ export class SupabaseDataProvider implements DataProvider {
     if (error?.code === RANGE_NOT_SATISFIABLE) {
       const counted = await this.filteredQuery(resource, filters, true);
       if (counted.error) {
-        throw toError(counted.error, counted.status);
+        throw toError(
+          {
+            ...counted.error,
+            message:
+              counted.error.message ||
+              `Could not count the rows of ${resource}`,
+          },
+          counted.status,
+        );
       }
       return { data: [], total: counted.count ?? 0 };
     }
@@ -81,14 +96,10 @@ export class SupabaseDataProvider implements DataProvider {
           query = query.gte(field, value);
           break;
         case 'in':
-          query = query.filter(
-            field,
-            'in',
-            postgrestInList(value as unknown[]),
-          );
+          query = query.filter(field, 'in', postgrestInList(value));
           break;
         case 'contains':
-          query = query.filter(field, 'imatch', escapeRegex(String(value)));
+          query = query.filter(field, 'imatch', escapeRegex(value));
           break;
         case 'null':
           query = value ? query.is(field, null) : query.not(field, 'is', null);

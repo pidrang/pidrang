@@ -1,4 +1,5 @@
 import { Filter } from './filter';
+import { FilterValue } from './filter-value';
 
 export interface ListParams {
   pagination?: {
@@ -9,7 +10,13 @@ export interface ListParams {
     field: string;
     order: 'asc' | 'desc';
   }[];
-  filters?: Filter[] | Record<string, unknown>;
+  filters?:
+    | readonly Filter[]
+    | {
+        [column: string]: FilterValue | null | undefined;
+        field?: never;
+        operator?: never;
+      };
 }
 
 export interface ListResult<T> {

@@ -3,6 +3,7 @@ import {
   DataProvider,
   DeleteParams,
   Filter,
+  FilterValue,
   GetOneParams,
   ListParams,
   ListResult,
@@ -29,11 +30,11 @@ function matches(row: Row, filter: Filter): boolean {
     case 'null':
       return (value === null || value === undefined) === filter.value;
     case 'in':
-      return (filter.value as unknown[]).includes(value);
+      return filter.value.includes(value as FilterValue);
     case 'contains':
       return (
         typeof value === 'string' &&
-        value.toLowerCase().includes(String(filter.value).toLowerCase())
+        value.toLowerCase().includes(filter.value.toLowerCase())
       );
     default:
       if (value === null || value === undefined) {
@@ -54,6 +55,31 @@ function matches(row: Row, filter: Filter): boolean {
       return order > 0;
     default:
       return order >= 0;
+  }
+}
+
+function assertQueryable(rows: Row[], filters: Filter[], fields: string[]) {
+  if (rows.length === 0) {
+    return;
+  }
+  for (const field of fields) {
+    if (!rows.some((row) => Object.prototype.hasOwnProperty.call(row, field))) {
+      throw new Error(`Unknown field "${field}"`);
+    }
+  }
+  for (const filter of filters) {
+    const other = rows.find(
+      (row) =>
+        filter.operator === 'contains' &&
+        row[filter.field] !== null &&
+        row[filter.field] !== undefined &&
+        typeof row[filter.field] !== 'string',
+    );
+    if (other) {
+      throw new Error(
+        `contains needs a text column, "${filter.field}" holds ${typeof other[filter.field]}`,
+      );
+    }
   }
 }
 
@@ -102,6 +128,10 @@ export function createInMemoryDataProvider(
           ? []
           : [{ field: 'id', order: 'asc' as const }]),
       ];
+      assertQueryable(table(resource), filters, [
+        ...filters.map((filter) => filter.field),
+        ...(params?.sorters ?? []).map((sorter) => sorter.field),
+      ]);
       const rows = table(resource)
         .filter((row) => filters.every((filter) => matches(row, filter)))
         .sort((left, right) => {

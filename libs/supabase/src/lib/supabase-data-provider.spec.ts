@@ -1,4 +1,4 @@
-import { PidrangError } from '@pidrang/core';
+import { Filter, PidrangError } from '@pidrang/core';
 import { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 
 import { SupabaseDataProvider } from './supabase-data-provider';
@@ -122,28 +122,83 @@ describe('SupabaseDataProvider', () => {
     expect(client.from).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['eq', 'eq', 'Mouse', ['name', 'Mouse']],
-    ['ne', 'neq', 'Mouse', ['name', 'Mouse']],
-    ['lt', 'lt', 5, ['name', 5]],
-    ['lte', 'lte', 5, ['name', 5]],
-    ['gt', 'gt', 5, ['name', 5]],
-    ['gte', 'gte', 5, ['name', 5]],
-    ['in', 'filter', ['a', 'b'], ['name', 'in', '("a","b")']],
-    ['in', 'filter', ['a,"b"\\c', 3], ['name', 'in', '("a,\\"b\\"\\\\c","3")']],
-    ['contains', 'filter', 'ous', ['name', 'imatch', 'ous']],
-    ['contains', 'filter', 'a*.(b)%_', ['name', 'imatch', 'a\\*\\.\\(b\\)%_']],
-    ['null', 'is', true, ['name', null]],
-    ['null', 'not', false, ['name', 'is', null]],
-  ] as const)(
-    'getList maps the %s filter to postgrest %s',
-    async (operator, method, value, args) => {
+  it.each<{
+    filter: Filter;
+    method: keyof ReturnType<typeof fakeClient>['builder'];
+    args: unknown[];
+  }>([
+    {
+      filter: { field: 'name', operator: 'eq', value: 'Mouse' },
+      method: 'eq',
+      args: ['name', 'Mouse'],
+    },
+    {
+      filter: { field: 'name', operator: 'ne', value: 'Mouse' },
+      method: 'neq',
+      args: ['name', 'Mouse'],
+    },
+    {
+      filter: { field: 'name', operator: 'lt', value: 5 },
+      method: 'lt',
+      args: ['name', 5],
+    },
+    {
+      filter: { field: 'name', operator: 'lte', value: 5 },
+      method: 'lte',
+      args: ['name', 5],
+    },
+    {
+      filter: { field: 'name', operator: 'gt', value: 5 },
+      method: 'gt',
+      args: ['name', 5],
+    },
+    {
+      filter: { field: 'name', operator: 'gte', value: 5 },
+      method: 'gte',
+      args: ['name', 5],
+    },
+    {
+      filter: { field: 'name', operator: 'in', value: ['a', 'b'] },
+      method: 'filter',
+      args: ['name', 'in', '("a","b")'],
+    },
+    {
+      filter: { field: 'name', operator: 'in', value: ['a,"b"\\c', 3] },
+      method: 'filter',
+      args: ['name', 'in', '("a,\\"b\\"\\\\c","3")'],
+    },
+    {
+      filter: { field: 'name', operator: 'contains', value: 'ous' },
+      method: 'filter',
+      args: ['name', 'imatch', 'ous'],
+    },
+    {
+      filter: { field: 'name', operator: 'contains', value: 'a*.(b)%_' },
+      method: 'filter',
+      args: ['name', 'imatch', 'a\\*\\.\\(b\\)%_'],
+    },
+    {
+      filter: { field: 'name', operator: 'contains', value: 'C:\\d' },
+      method: 'filter',
+      args: ['name', 'imatch', 'C:\\\\d'],
+    },
+    {
+      filter: { field: 'name', operator: 'null', value: true },
+      method: 'is',
+      args: ['name', null],
+    },
+    {
+      filter: { field: 'name', operator: 'null', value: false },
+      method: 'not',
+      args: ['name', 'is', null],
+    },
+  ])(
+    'getList maps the $filter.operator filter to postgrest $method',
+    async ({ filter, method, args }) => {
       const { client, builder } = fakeClient({ data: [], error: null });
       const provider = new SupabaseDataProvider(client);
 
-      await provider.getList('products', {
-        filters: [{ field: 'name', operator, value }],
-      });
+      await provider.getList('products', { filters: [filter] });
 
       expect(builder[method]).toHaveBeenCalledWith(...args);
     },
@@ -167,10 +222,109 @@ describe('SupabaseDataProvider', () => {
 
     await expect(
       provider.getList('products', {
-        filters: [{ field: 'name', operator: 'eq', value: null }],
+        filters: [
+          { field: 'name', operator: 'eq', value: null } as unknown as Filter,
+        ],
       }),
     ).rejects.toThrow('Invalid filter');
     expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'select',
+    'columns',
+    'order',
+    'limit',
+    'offset',
+    'on_conflict',
+    'or',
+    'and',
+    'items.limit',
+    'a,b',
+    'count(id)',
+    'data->name',
+  ])(
+    'getList rejects the filter field %s, which PostgREST would not read as a column',
+    async (field) => {
+      const { client } = fakeClient({ data: [], error: null });
+      const provider = new SupabaseDataProvider(client);
+
+      await expect(
+        provider.getList('products', {
+          filters: [{ field, operator: 'eq', value: 'x' }],
+        }),
+      ).rejects.toThrow(`Invalid field "${field}"`);
+      await expect(
+        provider.getList('products', { filters: { [field]: 'x' } }),
+      ).rejects.toThrow(`Invalid field "${field}"`);
+      expect(client.from).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['name.desc', 'name,id'])(
+    'getList rejects the sorter field %s before querying',
+    async (field) => {
+      const { client } = fakeClient({ data: [], error: null });
+      const provider = new SupabaseDataProvider(client);
+
+      await expect(
+        provider.getList('products', { sorters: [{ field, order: 'asc' }] }),
+      ).rejects.toThrow(`Invalid field "${field}"`);
+      expect(client.from).not.toHaveBeenCalled();
+    },
+  );
+
+  it('getList sorts on columns named like PostgREST query options', async () => {
+    const { client, builder } = fakeClient({ data: [], count: 0, error: null });
+    const provider = new SupabaseDataProvider(client);
+
+    await provider.getList('products', {
+      sorters: [
+        { field: 'order', order: 'asc' },
+        { field: 'limit', order: 'desc' },
+      ],
+    });
+
+    expect(builder.order).toHaveBeenCalledWith('order', { ascending: true });
+    expect(builder.order).toHaveBeenCalledWith('limit', { ascending: false });
+  });
+
+  it('getList reports a failed count past the last row with a message', async () => {
+    const { client, builder } = fakeClient({ data: null, error: null });
+    const responses = [
+      {
+        data: null,
+        error: { message: 'Range not satisfiable', code: 'PGRST103' },
+        count: null,
+        status: 416,
+      },
+      { data: null, error: { message: '' }, count: null, status: 401 },
+    ];
+    builder.then = (resolve: (value: unknown) => void) =>
+      resolve(responses.shift());
+    const provider = new SupabaseDataProvider(client);
+
+    await expect(
+      provider.getList('products', { pagination: { current: 9 } }),
+    ).rejects.toMatchObject({
+      category: 'unauthenticated',
+      message: 'Could not count the rows of products',
+    });
+  });
+
+  it('getList accepts a column name with spaces or capitals', async () => {
+    const { client, builder } = fakeClient({ data: [], count: 0, error: null });
+    const provider = new SupabaseDataProvider(client);
+
+    await provider.getList('products', {
+      filters: [{ field: 'Unit price', operator: 'gte', value: 1 }],
+      sorters: [{ field: 'Unit price', order: 'desc' }],
+    });
+
+    expect(builder.gte).toHaveBeenCalledWith('Unit price', 1);
+    expect(builder.order).toHaveBeenCalledWith('Unit price', {
+      ascending: false,
+    });
   });
 
   it('getList returns an empty page with the filtered total past the last row', async () => {
@@ -305,6 +459,27 @@ describe('SupabaseDataProvider', () => {
     ).rejects.toMatchObject({
       category: 'not-found',
       code: 'PGRST116',
+    });
+  });
+
+  it('does not report an operator the column type lacks as not-found', async () => {
+    const error = {
+      message: 'operator does not exist: double precision ~* unknown',
+      details: '',
+      hint: '',
+      code: '42883',
+    } as PostgrestError;
+    const { client } = fakeClient({ data: null, error, status: 404 });
+    const provider = new SupabaseDataProvider(client);
+
+    await expect(
+      provider.getList('products', {
+        filters: [{ field: 'price', operator: 'contains', value: '1' }],
+      }),
+    ).rejects.toMatchObject({
+      category: 'unknown',
+      code: '42883',
+      status: 404,
     });
   });
 

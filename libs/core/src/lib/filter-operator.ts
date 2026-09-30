@@ -1,10 +1,3 @@
-export type FilterOperator =
-  | 'eq'
-  | 'ne'
-  | 'lt'
-  | 'lte'
-  | 'gt'
-  | 'gte'
-  | 'in'
-  | 'contains'
-  | 'null';
+import { Filter } from './filter';
+
+export type FilterOperator = Filter['operator'];
