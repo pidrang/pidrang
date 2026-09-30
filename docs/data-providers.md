@@ -47,7 +47,7 @@ Call `normalizeFilters(params.filters)` to get a `Filter[]`: `{ field, operator,
 | `contains` | string | case-insensitive substring. Every character is literal: `%`, `_`, `*` and `.` are never wildcards |
 | `null` | boolean | `true`: the value is null; `false`: the value is not null |
 
-A null value is never passed to `eq`, `ne` or a comparison: `validateListParams` rejects it and asks for the `null` operator instead.
+A null value is never passed to `eq`, `ne` or a comparison: `validateListParams` rejects it and asks for the `null` operator instead. A filter `value` must have the column's type: `'10'` on a numeric column is cast by Postgres but compared as a string by other backends, so the result is backend-defined. Sort order of text (collation) and of null values is backend-defined too; the conformance suite only sorts numbers.
 
 **Legacy equality records.** `filters: { in_stock: true }` is still accepted and normalized to `[{ field: 'in_stock', operator: 'eq', value: true }]`. A key set to `undefined` is ignored. A key set to `null` becomes `{ operator: 'null', value: true }`. With `@pidrang/supabase` before this contract, such a key sent `= NULL` to Postgres and never matched any row.
 
@@ -55,7 +55,7 @@ A null value is never passed to `eq`, `ne` or a comparison: `validateListParams`
 
 ## Errors
 
-Throw a `PidrangError` with a `category` so the UI can react without parsing messages:
+Backend failures are thrown as a `PidrangError` with a `category` so the UI can react without parsing messages. Invalid or unsupported list parameters (from `validateListParams` and `rejectUnsupportedFilters`) are a programming error, not a backend failure: they are thrown as a plain `Error` before any request.
 
 | Situation | `category` |
 | --- | --- |
@@ -97,4 +97,17 @@ describeDataProviderConformance('rest', {
 
 `setup` must return a provider whose `resource` contains exactly `CONFORMANCE_ROWS` (`id`, `name`, `price`, `in_stock`, nullable `note`). Operators listed in `unsupported` are expected to be rejected with `rejectUnsupportedFilters`. The suite lives in its own library, used only by specs, so providers never depend on each other.
 
-`@pidrang/supabase` runs it in `supabase-data-provider.conformance.spec.ts` against a real database when `PIDRANG_CONFORMANCE_SUPABASE_URL` and `PIDRANG_CONFORMANCE_SUPABASE_KEY` point to a project with a `conformance_items` table; without them the spec is skipped.
+`@pidrang/supabase` runs it in `supabase-data-provider.conformance.spec.ts` against a real database when `PIDRANG_CONFORMANCE_SUPABASE_URL` and `PIDRANG_CONFORMANCE_SUPABASE_KEY` point to a project with this table; without them the spec is skipped. It is manual for now: CI will run it once pidrang/supabase ships a test dataset (pidrang/supabase#11).
+
+```sql
+create table public.conformance_items (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  price double precision not null,
+  in_stock boolean not null,
+  note text
+);
+grant all on public.conformance_items to anon, authenticated, service_role;
+```
+
+With a local stack (`supabase start` in the pidrang/supabase repository), create the table, then run `PIDRANG_CONFORMANCE_SUPABASE_URL=http://127.0.0.1:54321 PIDRANG_CONFORMANCE_SUPABASE_KEY=<a key allowed to write the table> pnpm exec nx test supabase`.

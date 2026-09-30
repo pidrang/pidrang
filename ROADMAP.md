@@ -23,7 +23,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 
 ## Phase 2 — `@pidrang/supabase`
 
-- `SupabaseDataProvider implements DataProvider`, mapping `ListParams` to `.eq()`/`.order()`/`.range()`, normalizing `PostgrestError` to a `PidrangError` (`unauthenticated`/`forbidden`/`not-found`/`unknown` category from the HTTP status, plus `code`/`status`/`cause`)
+- `SupabaseDataProvider implements DataProvider`, mapping `ListParams` to PostgREST filters (every `Filter` operator, see `docs/data-providers.md`)/`.order()`/`.range()`, normalizing `PostgrestError` to a `PidrangError` (`unauthenticated`/`forbidden`/`not-found`/`unknown` category from the HTTP status, plus `code`/`status`/`cause`)
 - `provideSupabaseDataProvider({ client })` — returns a plain `DataProvider`, no Angular DI of its own
 
 ## Phase 3 — `apps/demo-material`
