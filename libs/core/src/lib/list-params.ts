@@ -1,3 +1,5 @@
+import { Filter } from './filter';
+
 export interface ListParams {
   pagination?: {
     current?: number;
@@ -7,7 +9,7 @@ export interface ListParams {
     field: string;
     order: 'asc' | 'desc';
   }[];
-  filters?: Record<string, unknown>;
+  filters?: Filter[] | Record<string, unknown>;
 }
 
 export interface ListResult<T> {
