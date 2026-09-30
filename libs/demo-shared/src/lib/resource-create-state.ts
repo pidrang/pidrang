@@ -4,7 +4,6 @@ import {
   computed,
   inject,
   linkedSignal,
-  signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -36,7 +35,11 @@ export function injectResourceCreateState(resource: Signal<string>) {
   const destroyRef = inject(DestroyRef);
   const definition = injectResourceDefinition(resource);
 
-  const saving = signal(false);
+  const pending = linkedSignal<string, object | null>({
+    source: resource,
+    computation: () => null,
+  });
+  const saving = computed(() => pending() !== null);
   const saveFailure = linkedSignal<string, SaveFailure | null>({
     source: resource,
     computation: () => null,
@@ -58,8 +61,8 @@ export function injectResourceCreateState(resource: Signal<string>) {
     ),
   );
 
-  function isCurrent(current: string): boolean {
-    return !destroyRef.destroyed && current === resource();
+  function owns(operation: object): boolean {
+    return !destroyRef.destroyed && pending() === operation;
   }
 
   function destinationAfterCreate(id: unknown): unknown[] {
@@ -77,25 +80,28 @@ export function injectResourceCreateState(resource: Signal<string>) {
       return;
     }
     const current = resource();
-    saving.set(true);
+    const operation = {};
+    pending.set(operation);
     saveFailure.set(null);
     try {
       const created = await dataProvider.create<Record<string, unknown>>(
         current,
         { data },
       );
-      if (isCurrent(current)) {
+      if (owns(operation)) {
         await router.navigate(destinationAfterCreate(created['id']));
       }
     } catch (err) {
-      if (isCurrent(current)) {
+      if (owns(operation)) {
         saveFailure.set({
           message: err instanceof Error ? err.message : String(err),
           authRequired: isAuthRequiredError(err),
         });
       }
     } finally {
-      saving.set(false);
+      if (pending() === operation) {
+        pending.set(null);
+      }
     }
   }
 

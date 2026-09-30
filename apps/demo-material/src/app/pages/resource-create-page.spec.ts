@@ -24,6 +24,7 @@ function setup(create: () => Promise<unknown>) {
         dataProvider,
         resources: [
           { name: 'products', fields: [{ name: 'name', type: 'text' }] },
+          { name: 'orders', fields: [{ name: 'name', type: 'text' }] },
         ],
       }),
     ],
@@ -91,5 +92,44 @@ describe('ResourceCreatePage', () => {
 
     expect(creates).toEqual([{ name: 'Draft' }, { name: 'Draft' }]);
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('lets another resource save while the previous save is in flight', async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    const { fixture, creates } = setup(
+      () => new Promise((resolve) => (finish = resolve)),
+    );
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    fixture.componentRef.setInput('resource', 'orders');
+    await fixture.whenStable();
+
+    expect(saveButton(fixture.nativeElement).disabled).toBe(false);
+    saveButton(fixture.nativeElement).click();
+    expect(creates).toHaveLength(2);
+
+    finish({});
+    await fixture.whenStable();
+  });
+
+  it('does not redirect when a stale create succeeds after leaving and coming back', async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    const { fixture, navigate } = setup(
+      () => new Promise((resolve) => (finish = resolve)),
+    );
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    fixture.componentRef.setInput('resource', 'orders');
+    await fixture.whenStable();
+    fixture.componentRef.setInput('resource', 'products');
+    await fixture.whenStable();
+
+    finish({ id: 'new' });
+    await fixture.whenStable();
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(saveButton(fixture.nativeElement).disabled).toBe(false);
   });
 });
