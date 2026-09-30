@@ -88,12 +88,12 @@ const FILTER_CASES: {
   },
   {
     name: 'contains with a literal %',
-    filters: [{ field: 'name', operator: 'contains', value: '0%' }],
+    filters: [{ field: 'name', operator: 'contains', value: '%' }],
     expected: ids(4),
   },
   {
     name: 'contains with a literal _',
-    filters: [{ field: 'name', operator: 'contains', value: 'e_c' }],
+    filters: [{ field: 'name', operator: 'contains', value: '_' }],
     expected: ids(5),
   },
   {
