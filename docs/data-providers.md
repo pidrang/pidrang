@@ -44,7 +44,7 @@ Call `normalizeFilters(params.filters)` to get a `Filter[]`: `{ field, operator,
 | `eq`, `ne` | string, finite number or boolean | equal / different. `ne` never matches a null value, as in SQL |
 | `lt`, `lte`, `gt`, `gte` | string, finite number or boolean | ordered comparison; a null value never matches |
 | `in` | array of strings, finite numbers or booleans | the value is one of the array items. An empty array matches nothing |
-| `contains` | string | case-insensitive substring. `%` and `_` are literal characters, not wildcards |
+| `contains` | string | case-insensitive substring. Every character is literal: `%`, `_`, `*` and `.` are never wildcards |
 | `null` | boolean | `true`: the value is null; `false`: the value is not null |
 
 A null value is never passed to `eq`, `ne` or a comparison: `validateListParams` rejects it and asks for the `null` operator instead.

@@ -48,7 +48,7 @@ Framework-native (Angular) but UI-agnostic. It depends on `@angular/core` only, 
 
 Implements `DataProvider` and `AuthProvider` against `@supabase/supabase-js`:
 
-- `SupabaseDataProvider` and `provideSupabaseDataProvider({ client })` map `ListParams` to PostgREST filters (`eq`, `neq`, `lt`, `lte`, `gt`, `gte`, `in`, `ilike`, `is`), `.order()` and `.range()` and normalize `PostgrestError` to a `PidrangError` whose `category` comes from the HTTP status, so an app can ask for sign-in on `unauthenticated` only, never on a signed-in user's Row Level Security denial. `getList` always adds `id` ascending as a final sort, unless a sorter already targets `id`, so pages never repeat or skip rows.
+- `SupabaseDataProvider` and `provideSupabaseDataProvider({ client })` map `ListParams` to PostgREST filters (`eq`, `neq`, `lt`, `lte`, `gt`, `gte`, an escaped `in` list, `imatch` with an escaped pattern for `contains`, `is`), `.order()` and `.range()` and normalize `PostgrestError` to a `PidrangError` whose `category` comes from the HTTP status, so an app can ask for sign-in on `unauthenticated` only, never on a signed-in user's Row Level Security denial. `getList` always adds `id` ascending as a final sort, unless a sorter already targets `id`, so pages never repeat or skip rows.
 - `SupabaseAuthProvider` and `provideSupabaseAuthProvider({ client })` wrap Supabase Auth. A missing session (`AuthSessionMissingError`, `session_not_found`) is a `null` identity; network and server failures are thrown as `PidrangError`. Supabase auth events drive `onSessionChange`, and a repeated `SIGNED_IN` for the same user (sent when a tab regains focus) is ignored.
 
 Both factories return plain objects and do not use Angular DI. The app wires them in through `providePidrang`.
