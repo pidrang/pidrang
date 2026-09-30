@@ -67,6 +67,7 @@ The full walkthrough, from a new Angular app to a working list, create and edit 
 - [Getting started](./docs/getting-started.md)
 - [Architecture](./docs/architecture.md)
 - [Design notes](./docs/design-notes.md)
+- [Writing a data provider](./docs/data-providers.md)
 - [Roadmap](./ROADMAP.md)
 - [Changelog](./CHANGELOG.md)
 
