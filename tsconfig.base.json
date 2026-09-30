@@ -22,7 +22,10 @@
       "@pidrang/cli": ["./libs/cli/src/index.ts"],
       "@pidrang/cli-supabase": ["./libs/cli-supabase/src/index.ts"],
       "pidrang": ["./apps/pidrang-cli/src/index.ts"],
-      "@pidrang/demo-shared": ["./libs/demo-shared/src/index.ts"]
+      "@pidrang/demo-shared": ["./libs/demo-shared/src/index.ts"],
+      "@pidrang/provider-conformance": [
+        "./libs/provider-conformance/src/index.ts"
+      ]
     }
   },
   "exclude": ["node_modules", "tmp"]
