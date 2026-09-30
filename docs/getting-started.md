@@ -131,10 +131,15 @@ injectResourceList<Row>(
   () => ({
     pagination: { current: this.page(), pageSize: 20 },
     sorters: [{ field: 'created_at', order: 'desc' }],
-    filters: { in_stock: true },
+    filters: [
+      { field: 'in_stock', operator: 'eq', value: true },
+      { field: 'name', operator: 'contains', value: 'mouse' },
+    ],
   }),
 );
 ```
+
+Filters combine with AND. The operators are `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `in`, `contains` (case-insensitive) and `null`; the shorthand `filters: { in_stock: true }` still works for equality. See [Writing a data provider](./data-providers.md#filters) for the exact semantics.
 
 ## 5. Per-row actions
 

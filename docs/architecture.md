@@ -35,7 +35,7 @@ pidrang/
 
 Framework-native (Angular) but UI-agnostic. It depends on `@angular/core` only, never on a component library, `@angular/common`, `@angular/forms` or `@angular/router`. Subpaths of `@angular/core` are allowed, `rxjs` is not. That boundary is what lets any UI layer or data source be added without touching core.
 
-- `Resource` (optionally described with `Field` and `FieldType` for a typed form or table), `DataProvider`, `ListParams` and `ListResult<T>`, `GetOneParams`, `CreateParams<T>`, `UpdateParams<T>`, `DeleteParams`
+- `Resource` (optionally described with `Field` and `FieldType` for a typed form or table), `DataProvider`, `ListParams` (with typed `Filter`s: `normalizeFilters`, `validateListParams`, `rejectUnsupportedFilters`) and `ListResult<T>`, `GetOneParams`, `CreateParams<T>`, `UpdateParams<T>`, `DeleteParams`
 - `providePidrang({ dataProvider, resources, authProvider? })` for app-wide configuration
 - `injectDataProvider()`, `injectAuthProvider()`, `injectResources()`, `injectResource(name)` for reading that configuration
 - `injectResourceList<T>(resourceName, params?)`, a signal-based list loader built on Angular's native `resource()`
@@ -48,7 +48,7 @@ Framework-native (Angular) but UI-agnostic. It depends on `@angular/core` only, 
 
 Implements `DataProvider` and `AuthProvider` against `@supabase/supabase-js`:
 
-- `SupabaseDataProvider` and `provideSupabaseDataProvider({ client })` map `ListParams` to `.eq()`, `.order()` and `.range()` and normalize `PostgrestError` to a `PidrangError` whose `category` comes from the HTTP status, so an app can ask for sign-in on `unauthenticated` only, never on a signed-in user's Row Level Security denial. `getList` always adds `id` ascending as a final sort, unless a sorter already targets `id`, so pages never repeat or skip rows.
+- `SupabaseDataProvider` and `provideSupabaseDataProvider({ client })` map `ListParams` to PostgREST filters (`eq`, `neq`, `lt`, `lte`, `gt`, `gte`, `in`, `ilike`, `is`), `.order()` and `.range()` and normalize `PostgrestError` to a `PidrangError` whose `category` comes from the HTTP status, so an app can ask for sign-in on `unauthenticated` only, never on a signed-in user's Row Level Security denial. `getList` always adds `id` ascending as a final sort, unless a sorter already targets `id`, so pages never repeat or skip rows.
 - `SupabaseAuthProvider` and `provideSupabaseAuthProvider({ client })` wrap Supabase Auth. A missing session (`AuthSessionMissingError`, `session_not_found`) is a `null` identity; network and server failures are thrown as `PidrangError`. Supabase auth events drive `onSessionChange`, and a repeated `SIGNED_IN` for the same user (sent when a tab regains focus) is ignored.
 
 Both factories return plain objects and do not use Angular DI. The app wires them in through `providePidrang`.
@@ -78,4 +78,4 @@ They depend on `@pidrang/core` and their own styling stack, never on a specific 
 
 New packages such as `@pidrang/rest`, `@pidrang/graphql` or `@pidrang/primeng` depend on `@pidrang/core` only. If adding one requires changing core, treat that as a design smell and re-examine the core contract first.
 
-The reasons behind non-obvious implementation choices are in [Design notes](./design-notes.md).
+The reasons behind non-obvious implementation choices are in [Design notes](./design-notes.md). The data provider contract, with its filter semantics and conformance suite, is in [Writing a data provider](./data-providers.md).
