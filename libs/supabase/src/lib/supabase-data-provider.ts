@@ -2,15 +2,20 @@ import {
   CreateParams,
   DataProvider,
   DeleteParams,
+  Filter,
   GetOneParams,
   ListParams,
   ListResult,
   UpdateParams,
+  normalizeFilters,
   validateListParams,
 } from '@pidrang/core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+import { escapeLikePattern } from './escape-like-pattern';
 import { toError } from './to-error';
+
+const RANGE_NOT_SATISFIABLE = 'PGRST103';
 
 export class SupabaseDataProvider implements DataProvider {
   constructor(private readonly client: SupabaseClient) {}
@@ -20,12 +25,9 @@ export class SupabaseDataProvider implements DataProvider {
     params?: ListParams,
   ): Promise<ListResult<T>> {
     validateListParams(params);
+    const filters = normalizeFilters(params?.filters);
 
-    let query = this.client.from(resource).select('*', { count: 'exact' });
-
-    for (const [column, value] of Object.entries(params?.filters ?? {})) {
-      query = query.eq(column, value);
-    }
+    let query = this.filteredQuery(resource, filters, false);
 
     const sorters = params?.sorters ?? [];
     for (const sorter of sorters) {
@@ -40,10 +42,55 @@ export class SupabaseDataProvider implements DataProvider {
     query = query.range(from, from + pageSize - 1);
 
     const { data, count, error, status } = await query;
+    if (error?.code === RANGE_NOT_SATISFIABLE) {
+      const counted = await this.filteredQuery(resource, filters, true);
+      if (counted.error) {
+        throw toError(counted.error, counted.status);
+      }
+      return { data: [], total: counted.count ?? 0 };
+    }
     if (error) {
       throw toError(error, status);
     }
     return { data: (data ?? []) as T[], total: count ?? 0 };
+  }
+
+  private filteredQuery(resource: string, filters: Filter[], head: boolean) {
+    let query = this.client
+      .from(resource)
+      .select('*', { count: 'exact', head });
+    for (const { field, operator, value } of filters) {
+      switch (operator) {
+        case 'eq':
+          query = query.eq(field, value);
+          break;
+        case 'ne':
+          query = query.neq(field, value);
+          break;
+        case 'lt':
+          query = query.lt(field, value);
+          break;
+        case 'lte':
+          query = query.lte(field, value);
+          break;
+        case 'gt':
+          query = query.gt(field, value);
+          break;
+        case 'gte':
+          query = query.gte(field, value);
+          break;
+        case 'in':
+          query = query.in(field, value as unknown[]);
+          break;
+        case 'contains':
+          query = query.ilike(field, `%${escapeLikePattern(String(value))}%`);
+          break;
+        case 'null':
+          query = value ? query.is(field, null) : query.not(field, 'is', null);
+          break;
+      }
+    }
+    return query;
   }
 
   async getOne<T>(resource: string, params: GetOneParams): Promise<T> {
