@@ -17,8 +17,6 @@ function fakeClient(result: {
     lte: vi.fn(() => builder),
     gt: vi.fn(() => builder),
     gte: vi.fn(() => builder),
-    in: vi.fn(() => builder),
-    ilike: vi.fn(() => builder),
     is: vi.fn(() => builder),
     not: vi.fn(() => builder),
     filter: vi.fn(() => builder),

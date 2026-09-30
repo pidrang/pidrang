@@ -19,6 +19,16 @@ const noComments = {
   },
 };
 
+const moduleBoundaries = {
+  allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
+  depConstraints: [
+    {
+      sourceTag: '*',
+      onlyDependOnLibsWithTags: ['*'],
+    },
+  ],
+};
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -31,34 +41,16 @@ export default [
     rules: {
       '@nx/enforce-module-boundaries': [
         'error',
-        {
-          enforceBuildableLibDependency: true,
-          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
-          depConstraints: [
-            {
-              sourceTag: '*',
-              onlyDependOnLibsWithTags: ['*'],
-            },
-          ],
-        },
+        { ...moduleBoundaries, enforceBuildableLibDependency: true },
       ],
     },
   },
   {
-    files: ['**/*.spec.ts'],
+    files: ['**/*.conformance.spec.ts'],
     rules: {
       '@nx/enforce-module-boundaries': [
         'error',
-        {
-          enforceBuildableLibDependency: false,
-          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
-          depConstraints: [
-            {
-              sourceTag: '*',
-              onlyDependOnLibsWithTags: ['*'],
-            },
-          ],
-        },
+        { ...moduleBoundaries, enforceBuildableLibDependency: false },
       ],
     },
   },
