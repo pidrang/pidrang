@@ -211,4 +211,33 @@ describe('ResourceEditPage', () => {
 
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it('keeps the newer save locked when the previous record save settles first', async () => {
+    const writes: Deferred<unknown>[] = [];
+    const { fixture, updates, navigate } = setup(() => {
+      const write = deferred<unknown>();
+      writes.push(write);
+      return write.promise;
+    });
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    fixture.componentRef.setInput('id', '2');
+    await fixture.whenStable();
+    saveButton(fixture.nativeElement).click();
+
+    writes[0].reject(new Error('denied'));
+    await fixture.whenStable();
+
+    expect(saveButton(fixture.nativeElement).disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+    saveButton(fixture.nativeElement).click();
+    expect(updates.map((call) => call.id)).toEqual(['1', '2']);
+    expect(navigate).not.toHaveBeenCalled();
+
+    writes[1].resolve({});
+    await fixture.whenStable();
+
+    expect(navigate).toHaveBeenCalledWith(['/', 'products', '2']);
+  });
 });

@@ -132,4 +132,30 @@ describe('ResourceCreatePage', () => {
     expect(navigate).not.toHaveBeenCalled();
     expect(saveButton(fixture.nativeElement).disabled).toBe(false);
   });
+
+  it('keeps the newer create locked when the previous resource create settles first', async () => {
+    const finishes: ((value: unknown) => void)[] = [];
+    const { fixture, creates, navigate } = setup(
+      () => new Promise((resolve) => finishes.push(resolve)),
+    );
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    fixture.componentRef.setInput('resource', 'orders');
+    await fixture.whenStable();
+    saveButton(fixture.nativeElement).click();
+
+    finishes[0]({});
+    await fixture.whenStable();
+
+    expect(saveButton(fixture.nativeElement).disabled).toBe(true);
+    saveButton(fixture.nativeElement).click();
+    expect(creates).toHaveLength(2);
+    expect(navigate).not.toHaveBeenCalled();
+
+    finishes[1]({});
+    await fixture.whenStable();
+
+    expect(navigate).toHaveBeenCalledWith(['/', 'orders']);
+  });
 });
