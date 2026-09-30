@@ -53,7 +53,7 @@ const FILTER_CASES: {
   {
     name: 'ne, which never matches a null value',
     filters: [{ field: 'note', operator: 'ne', value: 'sticker' }],
-    expected: ids(1, 3, 6),
+    expected: ids(1, 3, 6, 7),
   },
   {
     name: 'lt and gte combined as AND',
@@ -112,10 +112,10 @@ const FILTER_CASES: {
       {
         field: 'name',
         operator: 'in',
-        value: ['a,"b"\\c', '100% cotton cover'],
+        value: ['Cable, "USB-C"', 'a,"b"\\c'],
       },
     ],
-    expected: ids(4),
+    expected: ids(7),
   },
   {
     name: 'null true',
@@ -125,7 +125,7 @@ const FILTER_CASES: {
   {
     name: 'null false',
     filters: [{ field: 'note', operator: 'null', value: false }],
-    expected: ids(1, 3, 5, 6),
+    expected: ids(1, 3, 5, 6, 7),
   },
   {
     name: 'a legacy equality record',
@@ -184,7 +184,9 @@ export function describeDataProviderConformance(
         sorters: [{ field: 'price', order: 'desc' }],
       });
 
-      expect(result.data.map((row) => row.id)).toEqual(ids(6, 1, 2, 3, 4, 5));
+      expect(result.data.map((row) => row.id)).toEqual(
+        ids(6, 1, 2, 3, 4, 7, 5),
+      );
     });
 
     for (const filterCase of FILTER_CASES) {

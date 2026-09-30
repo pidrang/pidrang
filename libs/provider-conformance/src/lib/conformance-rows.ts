@@ -43,4 +43,11 @@ export const CONFORMANCE_ROWS: readonly ConformanceRow[] = [
     in_stock: true,
     note: 'display',
   },
+  {
+    id: '00000000-0000-4000-8000-000000000007',
+    name: 'Cable, "USB-C"',
+    price: 5,
+    in_stock: true,
+    note: 'cable',
+  },
 ];
