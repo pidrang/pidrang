@@ -1,0 +1,8 @@
+{
+  "name": "provider-conformance",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/provider-conformance/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}
