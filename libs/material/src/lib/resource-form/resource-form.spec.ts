@@ -200,4 +200,51 @@ describe('ResourceForm', () => {
 
     expect(saved).toEqual([{ starts_at: '2024-01-01T10:00:00+02:00' }]);
   });
+
+  it('does not block save over an untouched field with a pre-existing invalid value, and still sends it', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'starts_at', type: 'timestamp' },
+    ]);
+    fixture.componentRef.setInput('value', {
+      name: 'Widget',
+      starts_at: 'not-a-timestamp',
+    });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget', starts_at: 'not-a-timestamp' }]);
+  });
+
+  it('preserves an explicit null value for a field without a server default, left untouched', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'notes', type: 'text', nullable: true },
+    ]);
+    fixture.componentRef.setInput('value', { name: 'Widget', notes: null });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget', notes: null }]);
+  });
 });
