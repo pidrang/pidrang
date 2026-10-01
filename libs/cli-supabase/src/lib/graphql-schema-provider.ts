@@ -112,6 +112,8 @@ function scalarTypeName(type: IntrospectionType): string {
   return type.name ?? type.ofType?.name ?? 'String';
 }
 
+const LOOKS_RENAMED_BY_GRAPHQL = /[A-Z]/;
+
 export function createGraphQlSchemaProvider(
   connection: GraphQlConnection,
 ): SchemaProvider {
@@ -124,6 +126,12 @@ export function createGraphQlSchemaProvider(
     },
 
     async introspectTable(table) {
+      if (LOOKS_RENAMED_BY_GRAPHQL.test(table)) {
+        throw new Error(
+          `"${table}" is the GraphQL collection name, and pg_graphql renamed it from its actual Postgres table name. pidrang cannot recover that table name from GraphQL alone, so it cannot scaffold "${table}" from this strategy; use the direct database connection strategy for this table instead.`,
+        );
+      }
+
       const fields = await runIntrospection(connection);
       const collectionField = fields.find(
         (field) => field.name === `${table}Collection`,

@@ -10,6 +10,8 @@ export interface ServiceRoleConnection {
   serviceRoleKey: string;
 }
 
+export type PostgresSsl = true | { ca: string };
+
 export interface PostgresConnection {
   strategy: 'postgres';
   host: string;
@@ -17,6 +19,7 @@ export interface PostgresConnection {
   database: string;
   user: string;
   password: string;
+  ssl?: PostgresSsl;
 }
 
 export type SupabaseConnection =

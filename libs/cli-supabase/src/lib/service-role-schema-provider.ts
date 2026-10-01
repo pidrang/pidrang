@@ -33,18 +33,32 @@ async function fetchSchema(
   return (await response.json()) as OpenApiSchema;
 }
 
+function hasUsableProperties(
+  definition: OpenApiDefinition | undefined,
+): boolean {
+  return Object.keys(definition?.properties ?? {}).length > 0;
+}
+
 export function createServiceRoleSchemaProvider(
   connection: ServiceRoleConnection,
 ): SchemaProvider {
   return {
     async listTables() {
       const schema = await fetchSchema(connection);
-      return Object.keys(schema.definitions ?? {});
+      return Object.entries(schema.definitions ?? {})
+        .filter(([, definition]) => hasUsableProperties(definition))
+        .map(([table]) => table);
     },
 
     async introspectTable(table) {
       const schema = await fetchSchema(connection);
-      const properties = schema.definitions?.[table]?.properties ?? {};
+      const definition = schema.definitions?.[table];
+      if (!hasUsableProperties(definition)) {
+        throw new Error(
+          `"${table}" has no columns in the Supabase OpenAPI schema. pidrang cannot scaffold a resource with no fields; this is usually an RPC function or a view without a column schema, not a table.`,
+        );
+      }
+      const properties = definition?.properties ?? {};
       return Object.entries(properties).map(
         ([name, property]): Field => ({
           name,

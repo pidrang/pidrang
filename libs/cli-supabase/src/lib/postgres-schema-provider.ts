@@ -1,8 +1,19 @@
 import { Client } from 'pg';
 import { Field } from '@pidrang/core';
 import { SchemaProvider } from '@pidrang/cli';
-import { PostgresConnection } from './supabase-connection';
+import { PostgresConnection, PostgresSsl } from './supabase-connection';
 import { postgresTypeToFieldType } from './postgres-field-type';
+
+function toClientSsl(
+  ssl: PostgresSsl | undefined,
+): { rejectUnauthorized: true; ca?: string } | undefined {
+  if (!ssl) {
+    return undefined;
+  }
+  return ssl === true
+    ? { rejectUnauthorized: true }
+    : { rejectUnauthorized: true, ca: ssl.ca };
+}
 
 async function withClient<T>(
   connection: PostgresConnection,
@@ -14,6 +25,7 @@ async function withClient<T>(
     database: connection.database,
     user: connection.user,
     password: connection.password,
+    ssl: toClientSsl(connection.ssl),
   });
   await client.connect();
   try {
@@ -41,6 +53,28 @@ export function createPostgresSchemaProvider(
 
     async introspectTable(table) {
       return withClient(connection, async (client) => {
+        const primaryKey = await client.query<{ column_name: string }>(
+          `select kcu.column_name
+           from information_schema.table_constraints tc
+           join information_schema.key_column_usage kcu
+             on kcu.constraint_name = tc.constraint_name
+            and kcu.table_schema = tc.table_schema
+           where tc.table_schema = 'public'
+             and tc.table_name = $1
+             and tc.constraint_type = 'PRIMARY KEY'`,
+          [table],
+        );
+        if (primaryKey.rows.length === 0) {
+          throw new Error(
+            `Table "${table}" has no primary key. pidrang needs a single-column primary key to identify records.`,
+          );
+        }
+        if (primaryKey.rows.length > 1) {
+          throw new Error(
+            `Table "${table}" has a composite primary key (${primaryKey.rows.map((row) => row.column_name).join(', ')}). pidrang only supports a single-column primary key.`,
+          );
+        }
+
         const result = await client.query<{
           column_name: string;
           data_type: string;

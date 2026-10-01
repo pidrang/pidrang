@@ -85,6 +85,30 @@ describe('runInitWizard', () => {
     expect(plan.tables[0].hiddenFields).toEqual(['id']);
   });
 
+  it('refuses an empty table selection', async () => {
+    const schemaProvider = fakeSchemaProvider();
+    const definition = fakeDefinition('supabase', schemaProvider);
+
+    vi.mocked(checkbox).mockResolvedValueOnce([]);
+
+    await expect(runInitWizard([definition])).rejects.toThrow(
+      'Select at least one table',
+    );
+    expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
+  });
+
+  it('refuses a table named after a route the generated pages reserve for themselves', async () => {
+    const schemaProvider = fakeSchemaProvider();
+    const definition = fakeDefinition('supabase', schemaProvider);
+
+    vi.mocked(checkbox).mockResolvedValueOnce(['resource-unavailable']);
+
+    await expect(runInitWizard([definition])).rejects.toThrow(
+      'resource-unavailable',
+    );
+    expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
+  });
+
   it('plans every selected table', async () => {
     const schemaProvider = fakeSchemaProvider();
     const definition = fakeDefinition('supabase', schemaProvider);

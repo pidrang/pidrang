@@ -1,4 +1,4 @@
-import { select, input, password } from '@inquirer/prompts';
+import { select, input, password, confirm } from '@inquirer/prompts';
 import { SchemaProviderDefinition } from '@pidrang/cli';
 import { SupabaseConnection } from './supabase-connection';
 import { createSupabaseSchemaProvider } from './supabase-schema-provider';
@@ -26,7 +26,19 @@ async function promptPostgresConnection(): Promise<SupabaseConnection> {
   });
   const user = await input({ message: 'Database user:', default: 'postgres' });
   const dbPassword = await password({ message: 'Database password:' });
-  return { strategy: 'postgres', host, port, database, user, password: dbPassword };
+  const ssl = await confirm({
+    message: 'Connect over TLS? (required for a hosted database)',
+    default: true,
+  });
+  return {
+    strategy: 'postgres',
+    host,
+    port,
+    database,
+    user,
+    password: dbPassword,
+    ...(ssl ? { ssl: true as const } : {}),
+  };
 }
 
 export const supabaseSchemaProviderDefinition: SchemaProviderDefinition<SupabaseConnection> =

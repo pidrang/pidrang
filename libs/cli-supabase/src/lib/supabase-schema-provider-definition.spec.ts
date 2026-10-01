@@ -1,10 +1,11 @@
-import { select, input, password } from '@inquirer/prompts';
+import { select, input, password, confirm } from '@inquirer/prompts';
 import { supabaseSchemaProviderDefinition } from './supabase-schema-provider-definition';
 
 vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),
   input: vi.fn(),
   password: vi.fn(),
+  confirm: vi.fn(),
 }));
 
 describe('supabaseSchemaProviderDefinition', () => {
@@ -12,6 +13,7 @@ describe('supabaseSchemaProviderDefinition', () => {
     vi.mocked(select).mockReset();
     vi.mocked(input).mockReset();
     vi.mocked(password).mockReset();
+    vi.mocked(confirm).mockReset();
   });
 
   it('prompts graphql-specific questions when that strategy is chosen', async () => {
@@ -42,7 +44,7 @@ describe('supabaseSchemaProviderDefinition', () => {
     });
   });
 
-  it('prompts postgres-specific questions when that strategy is chosen', async () => {
+  it('prompts postgres-specific questions when that strategy is chosen, defaulting to TLS', async () => {
     vi.mocked(select).mockResolvedValue('postgres');
     vi.mocked(input)
       .mockResolvedValueOnce('db.example.com')
@@ -50,6 +52,7 @@ describe('supabaseSchemaProviderDefinition', () => {
       .mockResolvedValueOnce('mydb')
       .mockResolvedValueOnce('myuser');
     vi.mocked(password).mockResolvedValueOnce('mypassword');
+    vi.mocked(confirm).mockResolvedValueOnce(true);
 
     const connection = await supabaseSchemaProviderDefinition.promptConnection();
 
@@ -60,6 +63,29 @@ describe('supabaseSchemaProviderDefinition', () => {
       database: 'mydb',
       user: 'myuser',
       password: 'mypassword',
+      ssl: true,
+    });
+  });
+
+  it('omits ssl when the user declines TLS, for a local database', async () => {
+    vi.mocked(select).mockResolvedValue('postgres');
+    vi.mocked(input)
+      .mockResolvedValueOnce('localhost')
+      .mockResolvedValueOnce('5432')
+      .mockResolvedValueOnce('postgres')
+      .mockResolvedValueOnce('postgres');
+    vi.mocked(password).mockResolvedValueOnce('postgres');
+    vi.mocked(confirm).mockResolvedValueOnce(false);
+
+    const connection = await supabaseSchemaProviderDefinition.promptConnection();
+
+    expect(connection).toEqual({
+      strategy: 'postgres',
+      host: 'localhost',
+      port: 5432,
+      database: 'postgres',
+      user: 'postgres',
+      password: 'postgres',
     });
   });
 });

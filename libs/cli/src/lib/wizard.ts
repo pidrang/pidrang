@@ -12,6 +12,8 @@ const CRUD_ACTIONS: { name: string; value: CrudAction }[] = [
   { name: 'Delete', value: 'delete' },
 ];
 
+const ROUTES_OWNED_BY_GENERATED_PAGES = new Set(['resource-unavailable']);
+
 export async function runInitWizard(
   providers: SchemaProviderDefinition[],
 ): Promise<GenerationPlan> {
@@ -24,6 +26,17 @@ export async function runInitWizard(
     message: 'Which tables should pidrang scaffold?',
     choices: availableTables.map((table) => ({ name: table, value: table })),
   });
+  if (selectedTables.length === 0) {
+    throw new Error('Select at least one table to scaffold.');
+  }
+  const routeCollisions = selectedTables.filter((table) =>
+    ROUTES_OWNED_BY_GENERATED_PAGES.has(table),
+  );
+  if (routeCollisions.length > 0) {
+    throw new Error(
+      `Table name${routeCollisions.length > 1 ? 's' : ''} ${routeCollisions.join(', ')} ${routeCollisions.length > 1 ? 'collide' : 'collides'} with a route the generated pages reserve for their own use and cannot be scaffolded as a resource.`,
+    );
+  }
 
   const tables: TablePlan[] = [];
   for (const table of selectedTables) {

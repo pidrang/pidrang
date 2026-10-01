@@ -158,4 +158,52 @@ describe('createGraphQlSchemaProvider', () => {
       /not found/,
     );
   });
+
+  it('lists a table pg_graphql renamed to camelCase', async () => {
+    const provider = createGraphQlSchemaProvider({
+      ...connection,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              __schema: {
+                queryType: {
+                  fields: [collectionField('orderItems', [])],
+                },
+              },
+            },
+          }),
+      }),
+    );
+
+    expect(await provider.listTables()).toEqual(['orderItems']);
+  });
+
+  it('refuses to introspect a table name GraphQL renamed from its real Postgres name', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              __schema: {
+                queryType: {
+                  fields: [collectionField('orderItems', [])],
+                },
+              },
+            },
+          }),
+      }),
+    );
+    const provider = createGraphQlSchemaProvider(connection);
+
+    await expect(provider.introspectTable('orderItems')).rejects.toThrow(
+      'pg_graphql renamed it',
+    );
+  });
 });

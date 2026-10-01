@@ -22,6 +22,9 @@ const openApiSchema = {
         id: { type: 'integer', format: 'int8' },
       },
     },
+    refresh_stats: {
+      properties: {},
+    },
   },
 };
 
@@ -82,5 +85,17 @@ describe('createServiceRoleSchemaProvider', () => {
     );
     const provider = createServiceRoleSchemaProvider(connection);
     await expect(provider.listTables()).rejects.toThrow(/401/);
+  });
+
+  it('excludes definitions with no columns, such as RPC functions or columnless views', async () => {
+    const provider = createServiceRoleSchemaProvider(connection);
+    expect(await provider.listTables()).toEqual(['products', 'orders']);
+  });
+
+  it('refuses to introspect a definition with no columns', async () => {
+    const provider = createServiceRoleSchemaProvider(connection);
+    await expect(provider.introspectTable('refresh_stats')).rejects.toThrow(
+      'no columns',
+    );
   });
 });
