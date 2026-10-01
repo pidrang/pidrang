@@ -12,7 +12,7 @@ const TABLE = 'conformance_items';
 
 if (url && key) {
   const host = new URL(url).hostname;
-  if (host !== '127.0.0.1' && host !== 'localhost') {
+  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
     throw new Error(
       `The conformance suite deletes every row of ${TABLE}: point PIDRANG_CONFORMANCE_SUPABASE_URL to a local stack, not ${host}`,
     );
