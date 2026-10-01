@@ -94,6 +94,17 @@ describe('createPostgresSchemaProvider', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects a single-column primary key not named "id"', async () => {
+    query.mockResolvedValueOnce({ rows: [{ column_name: 'code' }] });
+
+    const provider = createPostgresSchemaProvider(connection);
+
+    await expect(provider.introspectTable('products')).rejects.toThrow(
+      'Table "products" has a primary key named "code", not "id"',
+    );
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('closes the client even if the query fails', async () => {
     query.mockRejectedValueOnce(new Error('connection lost'));
 

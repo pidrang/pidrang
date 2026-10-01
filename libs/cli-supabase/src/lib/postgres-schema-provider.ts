@@ -74,6 +74,11 @@ export function createPostgresSchemaProvider(
             `Table "${table}" has a composite primary key (${primaryKey.rows.map((row) => row.column_name).join(', ')}). pidrang only supports a single-column primary key.`,
           );
         }
+        if (primaryKey.rows[0].column_name !== 'id') {
+          throw new Error(
+            `Table "${table}" has a primary key named "${primaryKey.rows[0].column_name}", not "id". pidrang only supports a primary key column named "id".`,
+          );
+        }
 
         const result = await client.query<{
           column_name: string;

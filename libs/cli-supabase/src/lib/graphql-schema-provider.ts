@@ -128,7 +128,7 @@ export function createGraphQlSchemaProvider(
     async introspectTable(table) {
       if (LOOKS_RENAMED_BY_GRAPHQL.test(table)) {
         throw new Error(
-          `"${table}" is the GraphQL collection name, and pg_graphql renamed it from its actual Postgres table name. pidrang cannot recover that table name from GraphQL alone, so it cannot scaffold "${table}" from this strategy; use the direct database connection strategy for this table instead.`,
+          `"${table}" does not look like a Postgres table name: pg_graphql may have renamed it when building this GraphQL collection name, or the table may genuinely be named "${table}". pidrang cannot tell which from GraphQL alone, so it cannot scaffold "${table}" from this strategy; use the direct database connection strategy for this table instead.`,
         );
       }
 
@@ -137,14 +137,16 @@ export function createGraphQlSchemaProvider(
         (field) => field.name === `${table}Collection`,
       );
       if (!collectionField) {
-        throw new Error(`Table "${table}" not found in Supabase GraphQL schema`);
+        throw new Error(
+          `Table "${table}" not found in Supabase GraphQL schema`,
+        );
       }
 
       const collectionFields = unwrapObjectFields(collectionField.type);
       const edgeFields = findFieldFields(collectionFields, 'edges');
       const nodeFields = findFieldFields(edgeFields, 'node');
 
-      return nodeFields
+      const result = nodeFields
         .filter((field) => field.name !== 'nodeId' && isScalarField(field))
         .map(
           (field): Field => ({
@@ -152,6 +154,12 @@ export function createGraphQlSchemaProvider(
             type: graphqlScalarToFieldType(scalarTypeName(field.type)),
           }),
         );
+      if (!result.some((field) => field.name === 'id')) {
+        throw new Error(
+          `Table "${table}" has no "id" column visible to GraphQL introspection. pidrang only supports a primary key column named "id"; use the direct database connection strategy, which can also confirm there is exactly one primary key column (GraphQL introspection cannot).`,
+        );
+      }
+      return result;
     },
   };
 }

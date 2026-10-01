@@ -53,12 +53,19 @@ function collectionField(
                               type: {
                                 kind: 'NON_NULL',
                                 name: null,
-                                ofType: { kind: 'SCALAR', name: column.typeName },
+                                ofType: {
+                                  kind: 'SCALAR',
+                                  name: column.typeName,
+                                },
                               },
                             })),
                             {
                               name: 'author',
-                              type: { kind: 'OBJECT', name: 'users', ofType: null },
+                              type: {
+                                kind: 'OBJECT',
+                                name: 'users',
+                                ofType: null,
+                              },
                             },
                           ],
                         },
@@ -119,6 +126,34 @@ describe('createGraphQlSchemaProvider', () => {
       { name: 'name', type: 'text' },
       { name: 'in_stock', type: 'boolean' },
     ]);
+  });
+
+  it('refuses a table with no "id" column visible to GraphQL introspection', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              __schema: {
+                queryType: {
+                  fields: [
+                    collectionField('widgets', [
+                      { name: 'name', typeName: 'String' },
+                    ]),
+                  ],
+                },
+              },
+            },
+          }),
+      }),
+    );
+    const provider = createGraphQlSchemaProvider(connection);
+
+    await expect(provider.introspectTable('widgets')).rejects.toThrow(
+      'no "id" column',
+    );
   });
 
   it('throws when the GraphQL response has errors', async () => {
@@ -203,7 +238,7 @@ describe('createGraphQlSchemaProvider', () => {
     const provider = createGraphQlSchemaProvider(connection);
 
     await expect(provider.introspectTable('orderItems')).rejects.toThrow(
-      'pg_graphql renamed it',
+      'does not look like a Postgres table name',
     );
   });
 });
