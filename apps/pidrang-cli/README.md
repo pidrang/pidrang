@@ -9,7 +9,7 @@ Wires `@pidrang/cli`'s wizard to `@pidrang/cli-supabase`'s Supabase provider (th
 - `src/app/resources.ts` — the generated `Resource[]`
 - `src/app/pages/{not-found,resource-list,resource-create,resource-show,resource-edit}-page.ts` and `src/app/pidrang/` (the page state functions, route guard and helpers those pages and the routes snippet import, plus an `index.ts` barrel) — the generic `@pidrang/material` CRUD pages, copied once (skipped if a file already exists — never overwritten)
 
-It never edits the app's own `app.routes.ts`/`app.config.ts`; it prints the routes snippet and `providePidrang({...})` call to paste in manually, since those files already exist and their exact shape varies per app.
+It never edits the app's own `app.routes.ts`/`app.config.ts`; it prints the routes snippet and `providePidrang({...})` call to paste in manually, since those files already exist and their exact shape varies per app. It also prints the optional `provideSignInPath(...)` provider: without it, the pages ask the user to sign in as plain text; with it, that text links to the app's own sign-in route. When it keeps page or helper files from an older version that do not know the sign-in path, it names them and says to delete `src/app/pages` and `src/app/pidrang` together before running it again, since they ignore that provider until they are regenerated. It also lists the kept files that differ from what it generates now.
 
 ## Packaging
 

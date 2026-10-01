@@ -1,7 +1,8 @@
 import { ErrorHandler, Provider } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { DataProvider, providePidrang } from '@pidrang/core';
+import { DataProvider, PidrangError, providePidrang } from '@pidrang/core';
+import { provideSignInPath } from '@pidrang/demo-shared';
 
 import { ResourceCreatePage } from './resource-create-page';
 
@@ -142,6 +143,39 @@ describe('ResourceCreatePage', () => {
       fixture.nativeElement.querySelector('[role="status"]')?.textContent,
     ).toContain('The earlier create finished');
   });
+
+  it.each([
+    ['as plain text without a sign-in path', [], null],
+    [
+      'as a link to the sign-in path the app provides',
+      [provideSignInPath('/auth/sign-in')],
+      '/auth/sign-in',
+    ],
+  ] as const)(
+    'asks to sign in after an earlier create failed for lack of a session, %s',
+    async (_label, providers, href) => {
+      let fail: (reason: unknown) => void = () => undefined;
+      const { fixture } = setup(
+        () => new Promise((_resolve, reject) => (fail = reject)),
+        [...providers],
+      );
+      await settle(fixture);
+
+      saveButton(fixture.nativeElement).click();
+      fixture.componentRef.setInput('resource', 'orders');
+      await settle(fixture);
+      fixture.componentRef.setInput('resource', 'products');
+      await settle(fixture);
+      fail(new PidrangError('JWT expired', { category: 'unauthenticated' }));
+      await settle(fixture);
+
+      const link = [...fixture.nativeElement.querySelectorAll('a')].find(
+        (candidate: Element) => candidate.textContent?.includes('sign in'),
+      );
+      expect(fixture.nativeElement.textContent).toContain('sign in');
+      expect(link?.getAttribute('href') ?? null).toBe(href);
+    },
+  );
 
   it('tells the user that the earlier create failed after coming back', async () => {
     let fail: (reason: unknown) => void = () => undefined;
@@ -324,5 +358,43 @@ describe('ResourceCreatePage', () => {
     expect(saveButton(fixture.nativeElement).disabled).toBe(false);
     saveButton(fixture.nativeElement).click();
     expect(creates).toHaveLength(2);
+  });
+
+  it('shows the sign-in prompt as plain text when the app provides no sign-in path', async () => {
+    const { fixture } = setup(() =>
+      Promise.reject(
+        new PidrangError('JWT expired', { category: 'unauthenticated' }),
+      ),
+    );
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('sign in');
+    expect(
+      [...fixture.nativeElement.querySelectorAll('a')].some((link: Element) =>
+        link.textContent?.includes('sign in'),
+      ),
+    ).toBe(false);
+  });
+
+  it('links the sign-in prompt to the sign-in path the app provides', async () => {
+    const { fixture } = setup(
+      () =>
+        Promise.reject(
+          new PidrangError('JWT expired', { category: 'unauthenticated' }),
+        ),
+      [provideSignInPath('/auth/sign-in')],
+    );
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    await fixture.whenStable();
+
+    const link = [...fixture.nativeElement.querySelectorAll('a')].find(
+      (candidate: Element) => candidate.textContent?.includes('sign in'),
+    );
+    expect(link?.getAttribute('href')).toBe('/auth/sign-in');
   });
 });

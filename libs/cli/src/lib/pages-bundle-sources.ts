@@ -10,6 +10,8 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
     'delete-failure.ts',
     'earlier-save.ts',
     'navigation-failure.ts',
+    'parse-sign-in-path.ts',
+    'provide-sign-in-path.ts',
     'record-label.ts',
     'resource-create-state.ts',
     'resource-definition.ts',
@@ -25,6 +27,8 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
     'save-outcome.ts',
     'save-store.ts',
     'save-timeout-error.ts',
+    'sign-in-path.ts',
+    'sign-in-url.ts',
   ].map((file) => ({
     target: `src/app/pidrang/${file}`,
     source: `${DEMO_SHARED}/${file}`,

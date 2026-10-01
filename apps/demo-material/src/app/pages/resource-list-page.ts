@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { ResourceTable } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { injectResourceListState } from '@pidrang/demo-shared';
+import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
 
 @Component({
   selector: 'app-resource-list-page',
@@ -27,8 +27,13 @@ import { injectResourceListState } from '@pidrang/demo-shared';
         <p>{{ failure.message }}</p>
         @if (failure.category === 'unauthenticated') {
           <p>
-            You may need to <a routerLink="/login">sign in</a> to delete
-            records.
+            You may need to
+            @if (signInUrl; as path) {
+              <a [routerLink]="path">sign in</a>
+            } @else {
+              sign in
+            }
+            to delete records.
           </p>
         } @else if (failure.category === 'forbidden') {
           <p>You are not allowed to delete this record.</p>
@@ -83,6 +88,7 @@ export class ResourceListPage {
   readonly resource = input.required<string>();
 
   private readonly state = injectResourceListState(this.resource);
+  protected readonly signInUrl = injectSignInUrl();
   protected readonly pageSizeOptions = this.state.pageSizeOptions;
   protected readonly pageSize = this.state.pageSize;
   protected readonly page = this.state.page;

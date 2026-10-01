@@ -1,7 +1,7 @@
 import { Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ResourceForm } from '@pidrang/tailwind';
-import { injectResourceEditState } from '@pidrang/demo-shared';
+import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
 
 @Component({
   selector: 'app-resource-edit-page',
@@ -29,9 +29,13 @@ import { injectResourceEditState } from '@pidrang/demo-shared';
       @if (earlierFailure.authRequired) {
         <p class="text-gray-700">
           You may need to
-          <a routerLink="/login" class="text-blue-600 hover:underline"
-            >sign in</a
-          >
+          @if (signInUrl; as path) {
+            <a [routerLink]="path" class="text-blue-600 hover:underline"
+              >sign in</a
+            >
+          } @else {
+            sign in
+          }
           to make changes.
         </p>
       }
@@ -72,9 +76,13 @@ import { injectResourceEditState } from '@pidrang/demo-shared';
         @if (failure.authRequired) {
           <p class="text-gray-700">
             You may need to
-            <a routerLink="/login" class="text-blue-600 hover:underline"
-              >sign in</a
-            >
+            @if (signInUrl; as path) {
+              <a [routerLink]="path" class="text-blue-600 hover:underline"
+                >sign in</a
+              >
+            } @else {
+              sign in
+            }
             to make changes.
           </p>
         }
@@ -87,6 +95,7 @@ export class ResourceEditPage {
   readonly id = input.required<string>();
 
   private readonly state = injectResourceEditState(this.resource, this.id);
+  protected readonly signInUrl = injectSignInUrl();
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
   protected readonly earlierSave = this.state.earlierSave;

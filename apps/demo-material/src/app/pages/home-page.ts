@@ -6,6 +6,7 @@ import {
   injectResources,
   isResourceActionEnabled,
 } from '@pidrang/core';
+import { injectSignInUrl } from '@pidrang/demo-shared';
 import { environment } from '../../environments/environment';
 import { MatButtonModule } from '@angular/material/button';
 
@@ -25,7 +26,9 @@ import { MatButtonModule } from '@angular/material/button';
         </button>
       </p>
     } @else {
-      <p><a mat-flat-button color="primary" routerLink="/login">Sign in</a></p>
+      <p>
+        <a mat-flat-button color="primary" [routerLink]="signInUrl">Sign in</a>
+      </p>
     }
 
     <ul>
@@ -53,6 +56,7 @@ import { MatButtonModule } from '@angular/material/button';
   `,
 })
 export class HomePage {
+  protected readonly signInUrl = injectSignInUrl();
   protected readonly tailwindDemoUrl = environment.tailwindDemoUrl;
   protected readonly resources = injectResources();
   protected readonly isResourceActionEnabled = isResourceActionEnabled;

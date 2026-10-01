@@ -20,6 +20,8 @@ import { DEMO_ACCOUNT } from './demo-account';
 import { DemoEnvironment } from './demo-environment';
 import { DEMO_RESOURCES } from './demo-resources';
 import { isSupabaseConfigured } from './is-supabase-configured';
+import { provideSignInPath } from './provide-sign-in-path';
+import { SIGN_IN_ROUTE } from './sign-in-route';
 
 export function demoAppConfig(
   environment: DemoEnvironment,
@@ -29,6 +31,7 @@ export function demoAppConfig(
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
     { provide: DEMO_ACCOUNT, useValue: environment.demoAccount },
+    provideSignInPath(`/${SIGN_IN_ROUTE}`),
   ];
 
   if (
