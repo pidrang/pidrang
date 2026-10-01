@@ -19,8 +19,6 @@ import { SaveFailure } from './save-failure';
 import { SaveOutcome } from './save-outcome';
 import { SaveTimeoutError } from './save-timeout-error';
 
-const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
-
 function mayHaveChanged(outcome: SaveOutcome | null): boolean {
   return outcome === null || outcome.ok;
 }
@@ -71,7 +69,7 @@ export function injectResourceEditState(
   const fields = computed(
     () =>
       definition()?.fields?.filter(
-        (field) => !NON_EDITABLE_FIELDS.has(field.name) && !field.hidden,
+        (field) => !field.readOnly && !field.hidden,
       ) ?? [],
   );
   const value = computed(() => {

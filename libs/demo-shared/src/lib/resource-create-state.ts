@@ -21,8 +21,6 @@ import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
 import { SaveTimeoutError } from './save-timeout-error';
 
-const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
-
 function defaultValueForField(field: Field): unknown {
   switch (field.type) {
     case 'number':
@@ -68,10 +66,7 @@ export function injectResourceCreateState(resource: Signal<string>) {
   );
   const canShow = computed(() => isResourceActionEnabled(definition(), 'show'));
   const fields = computed(
-    () =>
-      definition()?.fields?.filter(
-        (field) => !NON_EDITABLE_FIELDS.has(field.name),
-      ) ?? [],
+    () => definition()?.fields?.filter((field) => !field.readOnly) ?? [],
   );
   const initialValue = computed(() =>
     Object.fromEntries(

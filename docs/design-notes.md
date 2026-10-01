@@ -22,6 +22,12 @@ A typo in a resource name should fail at the call site, not surface later as a c
 
 It wraps `DataProvider.getList` in Angular's `resource()` so callers get `value`, `status`, `error` and `reload` as signals without depending on any UI layer. The resource name may be a function (for example a route parameter signal) so one component instance reused across resources still reloads. Returning `undefined` from the `params` function skips loading, which is `resource()`'s own convention.
 
+### `Field.readOnly`, `nullable` and `hasDefault` replace name-based exclusion
+
+`libs/core/src/lib/field.ts`, `libs/demo-shared/src/lib/resource-create-state.ts`, `resource-edit-state.ts`
+
+`resource-create-state.ts` and `resource-edit-state.ts` used to hardcode `NON_EDITABLE_FIELDS = new Set(['id', 'created_at'])` to keep server-generated columns out of create/edit forms. That breaks for any table whose generated columns are named differently, and it cannot express "generated but still worth showing" separately from "never show." `readOnly` now carries that decision as schema metadata, so any `Resource` (hand-written, like `demo-resources.ts`, or produced by `pidrang init`) must set it on every column the database generates or defaults, or that column becomes editable. `readOnly` stays independent of `hidden`: `hidden` is a list/edit display choice (added for #6), `readOnly` is a write-eligibility choice; a column can be shown on the show page and never writable, or writable but absent from the list. `nullable` and `hasDefault` are consumed by `ResourceForm` (see the UI layers note below), not by the state layer, which only ever sees the final payload.
+
 ## Supabase
 
 ### `as never` casts in `create` and `update`
@@ -56,6 +62,16 @@ The field name comes from the runtime `Resource.fields` schema, not from the key
 
 The `color="warn"` support of `mat.theme()` only covers Material 2 compatible themes. With a Material 3 theme the warn palette has to be declared again, scoped to `[color='warn']`, for buttons to render red.
 
+### `timestamp`, `time` and `numeric` stay text, never `Date` or `Number`
+
+`libs/core/src/lib/field.ts`, `libs/material/src/lib/resource-form/resource-form.ts`, `libs/tailwind/src/lib/resource-form/resource-form.ts`
+
+A `timestamptz` rendered through `<input type="date">` silently drops its time of day, and a `bigint`/`numeric` column read through `JS` `Number` silently loses precision past 2^53 or past what a `double` can hold exactly. `timestamp`, `time` and `numeric` are therefore bound to a plain `<input type="text">`, never converted to `Date` or `Number`, so an untouched value round-trips byte for byte. Format validation is attached with Signal Forms' `pattern()`, not hand-written parsing: `FORMAT_PATTERN_BY_FIELD_TYPE` holds one regex per type, and `fieldError()` turns a failed match into a plain-English hint next to the field, gating `onSubmit` on `model().invalid()`.
+
+The validators are attached through `applyEach(path, (child) => pattern(child, (ctx) => this.regexForField(ctx.key())))` instead of a loop over `this.fields()` inside the schema callback. `form()`'s schema callback runs once, synchronously, while the component is still being constructed, before Angular has bound its required inputs (`fields`, `value`) — reading `this.fields()` there throws `NG0950`. `applyEach` attaches one schema entry to every key of the dynamic record without needing to know the keys up front, and `pattern()`'s second argument accepts a reactive function instead of a literal `RegExp`, so `this.fields()` is only read later, each time Signal Forms actually validates a field, by which point the inputs are bound.
+
+Payload trimming — omitting a field that has `hasDefault` and was never touched, so the server's own default applies, while sending an explicit `false`/`0`/`null` the user did set — happens in `ResourceForm.buildPayload()`, not in `resource-create-state.ts`. Only the form has access to Signal Forms' per-field `dirty()` signal; the state layer only ever receives the object `(save)` emits.
+
 ## CLI
 
 ### Introspecting Supabase through GraphQL
@@ -65,6 +81,16 @@ The `color="warn"` support of `mat.theme()` only covers Material 2 compatible th
 `pg_graphql` exposes each table as a Relay-style `<table>Collection` field on `Query`, returning `{ edges { node { ...columns, nodeId } } }`. In the introspection result, `edges` is wrapped as `NON_NULL(LIST(NON_NULL(OBJECT)))` and `node` as `NON_NULL(OBJECT)`, and `__Type.fields` is only populated for `OBJECT` and `INTERFACE` kinds (it is `null` on every wrapper). Reaching the columns therefore needs `fields` requested again after each `ofType` unwrap: Query, Collection, edges, Edge, node, Node, columns.
 
 GraphQL has no recursive query syntax, so the query is generated to a fixed depth (8), enough to cover that path with margin. `unwrapObjectFields` walks `ofType` until it finds a level where `fields` is populated.
+
+### The three schema providers split number/numeric and date/timestamp/time the same way
+
+`libs/cli-supabase/src/lib/postgres-field-type.ts`, `service-role-field-type.ts`, `graphql-field-type.ts`
+
+Each strategy used to fold every Postgres date/time type into `FieldType.date` and every integer/float/bigint/decimal type into `FieldType.number`. A `bigint` primary key (`id` included) then passed through `JS` `Number`, and a `timestamptz` column lost its time of day in the form (see the UI layers note on `timestamp`/`time`/`numeric`). The three mappers now agree on the same split: safe-precision integers and floats stay `number`; `bigint`, `decimal` and `numeric` map to `numeric`; `date` stays `date`; every `timestamp`/`timestamptz` variant maps to `timestamp`; every `time`/`timetz` variant maps to `time`. Postgres groups these by type name, PostgREST's OpenAPI schema by `format` string, and `pg_graphql` by scalar name (`BigInt`/`BigFloat`, `Datetime`, `Time`), so each mapper keeps its own lookup tables but the same three-way split.
+
+This is why `postgres-schema-provider.spec.ts`'s fixture for a `bigint` `id` column now expects `FieldType.numeric`, not `number`: PostgREST itself already returns `int8`/`bigint` columns as JSON strings for the same precision reason, so treating them as `numeric` end to end (schema, form, payload) matches what the wire already does.
+
+`generate-resources-file.ts` still only emits `name`, `type` and `hidden` for a generated column: none of the three strategies detects `readOnly`, `nullable` or `hasDefault` yet, so a table generated by `pidrang init` today does not mark its primary key or its generated/default columns `readOnly`, and they appear editable in the generated create/edit forms. Nothing publishes to npm yet, so no running consumer is affected, but this must be closed (coordinated with #52's own remaining scope, which already determines the primary key for all three strategies) before a generated app is relied on for writes.
 
 ### Generated pages copy `apps/demo-material`
 
