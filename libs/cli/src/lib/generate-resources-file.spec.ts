@@ -87,6 +87,34 @@ export const resources: Resource[] = [
     );
   });
 
+  it('emits readOnly, nullable and hasDefault only when the field carries them', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'products',
+          fields: [
+            { name: 'id', type: 'numeric', readOnly: true },
+            { name: 'name', type: 'text' },
+            { name: 'status', type: 'text', nullable: true, hasDefault: true },
+          ],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    const output = generateResourcesFile(plan);
+
+    expect(output).toContain(
+      `{ name: 'id', type: 'numeric', readOnly: true },`,
+    );
+    expect(output).toContain(`{ name: 'name', type: 'text' },`);
+    expect(output).toContain(
+      `{ name: 'status', type: 'text', nullable: true, hasDefault: true },`,
+    );
+  });
+
   it('generates one Resource literal per planned table', () => {
     const plan: GenerationPlan = {
       providerId: 'supabase',

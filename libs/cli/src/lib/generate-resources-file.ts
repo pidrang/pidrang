@@ -2,13 +2,7 @@ import { CrudAction } from './crud-action';
 import { GenerationPlan, TablePlan } from './generation-plan';
 import { quote } from './quote';
 
-const CRUD_ACTIONS: CrudAction[] = [
-  'list',
-  'create',
-  'show',
-  'edit',
-  'delete',
-];
+const CRUD_ACTIONS: CrudAction[] = ['list', 'create', 'show', 'edit', 'delete'];
 
 export function generateResourcesFile(plan: GenerationPlan): string {
   const resources = plan.tables.map(generateResourceLiteral).join('\n');
@@ -27,7 +21,13 @@ function generateResourceLiteral(table: TablePlan): string {
   const fields = table.fields
     .map((field) => {
       const hidden = table.hiddenFields.includes(field.name);
-      return `      { name: ${quote(field.name)}, type: ${quote(field.type)}${hidden ? ', hidden: true' : ''} },`;
+      const flags = [
+        hidden ? ', hidden: true' : '',
+        field.readOnly ? ', readOnly: true' : '',
+        field.nullable ? ', nullable: true' : '',
+        field.hasDefault ? ', hasDefault: true' : '',
+      ].join('');
+      return `      { name: ${quote(field.name)}, type: ${quote(field.type)}${flags} },`;
     })
     .join('\n');
 

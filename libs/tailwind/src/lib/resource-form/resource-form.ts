@@ -97,7 +97,7 @@ export class ResourceForm<T extends Record<string, unknown>> {
 
   protected fieldError(field: Field): string | null {
     const state = this.fieldTree(field.name)();
-    if (!state.touched() || state.errors().length === 0) {
+    if (!state.dirty() || state.errors().length === 0) {
       return null;
     }
     return FORMAT_HINT_BY_FIELD_TYPE[field.type] ?? 'This value is not valid.';
@@ -105,10 +105,22 @@ export class ResourceForm<T extends Record<string, unknown>> {
 
   protected onSubmit(event: Event): void {
     event.preventDefault();
-    if (this.pending() || this.model().invalid()) {
+    if (this.pending() || this.hasBlockingError()) {
       return;
     }
     this.save.emit(this.buildPayload());
+  }
+
+  private hasBlockingError(): boolean {
+    return this.fields().some(
+      (field) => this.isDirty(field.name) && this.isInvalid(field.name),
+    );
+  }
+
+  private isInvalid(name: string): boolean {
+    return (this.model as Record<string, SignalField<unknown>>)
+      [name]()
+      .invalid();
   }
 
   private isDirty(name: string): boolean {
