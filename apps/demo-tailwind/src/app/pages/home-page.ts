@@ -30,10 +30,10 @@ import { environment } from '../../environments/environment';
           Sign out
         </button>
       </p>
-    } @else {
+    } @else if (signInUrl; as path) {
       <p class="mt-2">
         <a
-          [routerLink]="signInUrl"
+          [routerLink]="path"
           class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
           >Sign in</a
         >

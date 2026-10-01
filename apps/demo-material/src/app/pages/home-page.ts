@@ -25,9 +25,9 @@ import { MatButtonModule } from '@angular/material/button';
           Sign out
         </button>
       </p>
-    } @else {
+    } @else if (signInUrl; as path) {
       <p>
-        <a mat-flat-button color="primary" [routerLink]="signInUrl">Sign in</a>
+        <a mat-flat-button color="primary" [routerLink]="path">Sign in</a>
       </p>
     }
 
