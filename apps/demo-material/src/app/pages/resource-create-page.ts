@@ -26,10 +26,13 @@ import { injectResourceCreateState } from '@pidrang/demo-shared';
     @if (earlierSave.finished()) {
       <p role="status">The earlier create finished.</p>
     }
+    @if (stopped(); as message) {
+      <p role="alert">{{ message }}</p>
+    }
     @if (savingElsewhere()) {
       <p role="status">
-        A create on this resource is still running from an earlier visit. The
-        form comes back when it finishes.
+        A create on this resource is still running. The form comes back when it
+        finishes.
       </p>
     } @else if (!created()) {
       <lib-resource-form
@@ -38,6 +41,8 @@ import { injectResourceCreateState } from '@pidrang/demo-shared';
         [pending]="saving()"
         (save)="submit($event)"
       />
+    } @else if (!saveFailure()) {
+      <p role="status">Created.</p>
     }
 
     @if (saveFailure(); as failure) {
@@ -56,6 +61,7 @@ export class ResourceCreatePage {
   private readonly state = injectResourceCreateState(this.resource);
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
+  protected readonly stopped = this.state.stopped;
   protected readonly earlierSave = this.state.earlierSave;
   protected readonly created = this.state.created;
   protected readonly saveFailure = this.state.saveFailure;

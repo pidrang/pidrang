@@ -19,6 +19,7 @@ import { navigationFailure } from './navigation-failure';
 import { injectResourceDefinition } from './resource-definition';
 import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
+import { SaveTimeoutError } from './save-timeout-error';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
 
@@ -47,12 +48,16 @@ export function injectResourceCreateState(resource: Signal<string>) {
     source: target,
     computation: () => null,
   });
-  const savingElsewhere = computed(() => saving() && owned() === null);
+  const savingElsewhere = computed(
+    () => saving() && owned() === null && lock.timeout() === null,
+  );
+  const stopped = computed(() => lock.timeout()?.message ?? null);
+  const waiting = computed(() => savingElsewhere() || stopped() !== null);
   const created = linkedSignal<string, boolean>({
     source: target,
     computation: () => false,
   });
-  const earlierSave = injectEarlierSave(target, savingElsewhere, lock.outcome);
+  const earlierSave = injectEarlierSave(target, waiting, lock.outcome);
   const saveFailure = linkedSignal<string, SaveFailure | null>({
     source: resource,
     computation: () => null,
@@ -96,9 +101,9 @@ export function injectResourceCreateState(resource: Signal<string>) {
     try {
       opened = await router.navigate(destination);
     } catch (err) {
-      errorHandler.handleError(err);
+      setTimeout(() => errorHandler.handleError(err));
     }
-    if (!opened && owns(operation)) {
+    if (!opened && owns(operation) && router.currentNavigation() === null) {
       saveFailure.set(navigationFailure());
     }
     return opened;
@@ -114,20 +119,19 @@ export function injectResourceCreateState(resource: Signal<string>) {
     saveFailure.set(null);
     earlierSave.clear();
     try {
-      await lock.hold(async () => {
-        const row = await dataProvider.create<Record<string, unknown>>(
-          current,
-          { data },
-        );
-        if (
-          owns(operation) &&
-          !(await openNext(operation, destinationAfterCreate(row?.['id'])))
-        ) {
-          created.set(true);
-        }
-      });
+      await lock.hold(
+        () => dataProvider.create<Record<string, unknown>>(current, { data }),
+        async (row) => {
+          if (
+            owns(operation) &&
+            !(await openNext(operation, destinationAfterCreate(row?.['id'])))
+          ) {
+            created.set(true);
+          }
+        },
+      );
     } catch (err) {
-      if (owns(operation)) {
+      if (owns(operation) && !(err instanceof SaveTimeoutError)) {
         saveFailure.set({
           message: err instanceof Error ? err.message : String(err),
           authRequired: isAuthRequiredError(err),
@@ -139,6 +143,7 @@ export function injectResourceCreateState(resource: Signal<string>) {
   return {
     saving,
     savingElsewhere,
+    stopped,
     earlierSave,
     created,
     saveFailure,

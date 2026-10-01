@@ -42,6 +42,9 @@ import { injectResourceEditState } from '@pidrang/demo-shared';
     @if (record.isLoading()) {
       <p role="status" class="mt-4 text-gray-600">Loading…</p>
     }
+    @if (stopped(); as message) {
+      <p role="alert" class="mt-4 text-red-600">{{ message }}</p>
+    }
     @if (record.error(); as loadError) {
       <p role="alert" class="mt-4 text-red-600">{{ loadError.message }}</p>
       <button
@@ -53,8 +56,7 @@ import { injectResourceEditState } from '@pidrang/demo-shared';
       </button>
     } @else if (savingElsewhere()) {
       <p role="status" class="mt-4 text-gray-600">
-        This record is being saved from an earlier visit. The form comes back
-        when that save finishes.
+        This record is being saved. The form comes back when that save finishes.
       </p>
     } @else if (value(); as value) {
       <div class="mt-4">
@@ -88,6 +90,7 @@ export class ResourceEditPage {
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
   protected readonly earlierSave = this.state.earlierSave;
+  protected readonly stopped = this.state.stopped;
   protected readonly saveFailure = this.state.saveFailure;
   protected readonly record = this.state.record;
   protected readonly label = this.state.label;

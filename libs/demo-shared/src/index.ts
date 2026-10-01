@@ -21,4 +21,6 @@ export * from './lib/resource-show-state';
 export * from './lib/resource-unavailable-path';
 export * from './lib/save-failure';
 export * from './lib/save-lock';
+export * from './lib/running-save';
 export * from './lib/save-outcome';
+export * from './lib/save-timeout-error';
