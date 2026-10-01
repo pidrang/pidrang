@@ -36,6 +36,12 @@ Without a typed Supabase `Database` schema, `postgrest-js` cannot unify its expe
 
 `getOne`, `update` and `delete` filter on `id`. Composite or differently named keys are not supported. This is an intentional scope limit, not an oversight.
 
+### `contains` uses `imatch`, not `ilike`
+
+`libs/supabase/src/lib/supabase-data-provider.ts`, `escape-regex.ts`
+
+`contains` must match every character literally. With `ilike`, `%` and `_` are wildcards, and PostgREST also turns `*` into `%`, so a search for a literal `*` cannot be written at all. `imatch` (Postgres `~*`, case-insensitive regex) with every regex metacharacter escaped matches the text as typed; the conformance cases for `%`, `_`, `*` and `.` hold it to that. The cost: like `ilike '%…%'`, a regex search cannot use a btree index, so it scans the table. On a large table, add a trigram index, which serves `~*`: `create extension if not exists pg_trgm; create index on <table> using gin (<column> gin_trgm_ops);`.
+
 ## UI layers
 
 ### `ResourceForm` looks up fields by runtime name
