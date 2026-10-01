@@ -8,6 +8,7 @@ import {
 } from '@pidrang/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { conformanceId } from './conformance-id';
 import { ConformanceRow } from './conformance-row';
 import { CONFORMANCE_ROWS } from './conformance-rows';
 
@@ -35,7 +36,7 @@ const VALID_FILTERS: {
 };
 
 function ids(...numbers: number[]): string[] {
-  return numbers.map((n) => `00000000-0000-4000-8000-00000000000${n}`);
+  return numbers.map(conformanceId);
 }
 
 const FILTER_CASES: {
