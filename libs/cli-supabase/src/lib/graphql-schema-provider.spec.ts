@@ -122,7 +122,7 @@ describe('createGraphQlSchemaProvider', () => {
   it('introspects a table into typed fields, excluding nodeId and relations', async () => {
     const provider = createGraphQlSchemaProvider(connection);
     expect(await provider.introspectTable('products')).toEqual([
-      { name: 'id', type: 'number' },
+      { name: 'id', type: 'numeric' },
       { name: 'name', type: 'text' },
       { name: 'in_stock', type: 'boolean' },
     ]);

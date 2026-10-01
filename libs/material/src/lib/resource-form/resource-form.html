@@ -15,6 +15,9 @@
       [type]="inputType(field)"
       [formField]="fieldTree(field.name)"
     />
+    @if (fieldError(field); as error) {
+    <mat-error>{{ error }}</mat-error>
+    }
   </mat-form-field>
   } }
 

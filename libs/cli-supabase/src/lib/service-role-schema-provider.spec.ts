@@ -98,10 +98,10 @@ describe('createServiceRoleSchemaProvider', () => {
   it('introspects a table into typed fields', async () => {
     const provider = createServiceRoleSchemaProvider(connection);
     expect(await provider.introspectTable('products')).toEqual([
-      { name: 'id', type: 'number' },
+      { name: 'id', type: 'numeric' },
       { name: 'name', type: 'text' },
       { name: 'in_stock', type: 'boolean' },
-      { name: 'created_at', type: 'date' },
+      { name: 'created_at', type: 'timestamp' },
     ]);
   });
 

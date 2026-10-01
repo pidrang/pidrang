@@ -197,3 +197,38 @@ describe('injectResourceCreateState across timeouts and sessions', () => {
     expect(state.saveFailure()).toBeNull();
   });
 });
+
+describe('injectResourceCreateState field visibility', () => {
+  it('excludes readOnly fields from the editable fields and initial value', () => {
+    const dataProvider: DataProvider = {
+      getList: () => Promise.reject(new Error('unused')),
+      getOne: () => Promise.reject(new Error('unused')),
+      create: () => Promise.reject(new Error('unused')),
+      update: () => Promise.reject(new Error('unused')),
+      delete: () => Promise.reject(new Error('unused')),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        providePidrang({
+          dataProvider,
+          resources: [
+            {
+              name: 'products',
+              fields: [
+                { name: 'id', type: 'numeric', readOnly: true },
+                { name: 'name', type: 'text' },
+              ],
+            },
+          ],
+        }),
+      ],
+    });
+    const state = TestBed.runInInjectionContext(() =>
+      injectResourceCreateState(signal('products')),
+    );
+
+    expect(state.fields().map((field) => field.name)).toEqual(['name']);
+    expect(state.initialValue()).toEqual({ name: '' });
+  });
+});

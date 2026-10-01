@@ -59,10 +59,10 @@ describe('createPostgresSchemaProvider', () => {
     const fields = await provider.introspectTable('products');
 
     expect(fields).toEqual([
-      { name: 'id', type: 'number' },
+      { name: 'id', type: 'numeric' },
       { name: 'name', type: 'text' },
       { name: 'in_stock', type: 'boolean' },
-      { name: 'created_at', type: 'date' },
+      { name: 'created_at', type: 'timestamp' },
     ]);
     expect(query.mock.calls[0][0]).toContain('table_constraints');
     expect(query.mock.calls[0][1]).toEqual(['products']);

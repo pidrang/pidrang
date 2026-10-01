@@ -21,6 +21,9 @@
       [formField]="fieldTree(field.name)"
       class="rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
     />
+    @if (fieldError(field); as error) {
+    <span class="text-sm text-red-600" role="alert">{{ error }}</span>
+    }
   </label>
   } }
 

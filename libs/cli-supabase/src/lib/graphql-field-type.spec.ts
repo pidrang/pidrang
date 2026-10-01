@@ -5,16 +5,20 @@ describe('graphqlScalarToFieldType', () => {
     expect(graphqlScalarToFieldType('Boolean')).toBe('boolean');
   });
 
-  it('maps numeric scalars to number', () => {
+  it('maps safe numeric scalars to number', () => {
     expect(graphqlScalarToFieldType('Int')).toBe('number');
-    expect(graphqlScalarToFieldType('BigInt')).toBe('number');
     expect(graphqlScalarToFieldType('Float')).toBe('number');
-    expect(graphqlScalarToFieldType('BigFloat')).toBe('number');
   });
 
-  it('maps date scalars to date', () => {
+  it('maps precision-sensitive numeric scalars to numeric, never number', () => {
+    expect(graphqlScalarToFieldType('BigInt')).toBe('numeric');
+    expect(graphqlScalarToFieldType('BigFloat')).toBe('numeric');
+  });
+
+  it('maps Date to date, Datetime to timestamp, Time to time', () => {
     expect(graphqlScalarToFieldType('Date')).toBe('date');
-    expect(graphqlScalarToFieldType('Datetime')).toBe('date');
+    expect(graphqlScalarToFieldType('Datetime')).toBe('timestamp');
+    expect(graphqlScalarToFieldType('Time')).toBe('time');
   });
 
   it('falls back to text for unknown scalars', () => {

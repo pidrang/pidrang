@@ -411,3 +411,38 @@ describe('injectResourceEditState across timeouts and sessions', () => {
     expect(owner.saveFailure()).toBeNull();
   });
 });
+
+describe('injectResourceEditState field visibility', () => {
+  it('excludes readOnly and hidden fields from the editable fields', () => {
+    const dataProvider: DataProvider = {
+      getList: () => Promise.reject(new Error('unused')),
+      getOne: <T>() => new Promise<T>(() => undefined),
+      create: () => Promise.reject(new Error('unused')),
+      update: () => Promise.reject(new Error('unused')),
+      delete: () => Promise.reject(new Error('unused')),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        providePidrang({
+          dataProvider,
+          resources: [
+            {
+              name: 'products',
+              fields: [
+                { name: 'id', type: 'numeric', readOnly: true },
+                { name: 'name', type: 'text' },
+                { name: 'internal', type: 'text', hidden: true },
+              ],
+            },
+          ],
+        }),
+      ],
+    });
+    const state = TestBed.runInInjectionContext(() =>
+      injectResourceEditState(signal('products'), signal('1')),
+    );
+
+    expect(state.fields().map((field) => field.name)).toEqual(['name']);
+  });
+});
