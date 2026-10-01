@@ -19,9 +19,12 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
     'resource-row.ts',
     'resource-show-state.ts',
     'resource-unavailable-path.ts',
+    'running-save.ts',
     'save-failure.ts',
     'save-lock.ts',
     'save-outcome.ts',
+    'save-store.ts',
+    'save-timeout-error.ts',
   ].map((file) => ({
     target: `src/app/pidrang/${file}`,
     source: `${DEMO_SHARED}/${file}`,

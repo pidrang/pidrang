@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { DataProvider, providePidrang } from '@pidrang/core';
+import { AuthProvider, DataProvider, providePidrang } from '@pidrang/core';
 
 import { injectResourceCreateState } from './resource-create-state';
 
@@ -74,5 +74,126 @@ describe('injectResourceCreateState', () => {
     expect(writes).toEqual([{ name: 'First' }]);
     opened(true);
     await first;
+  });
+});
+
+function setupCreate() {
+  const creates: ((row: unknown) => void)[] = [];
+  let sessionChanged: () => void = () => undefined;
+  const dataProvider: DataProvider = {
+    getList: () => Promise.reject(new Error('unused')),
+    getOne: () => Promise.reject(new Error('unused')),
+    create: <T>() =>
+      new Promise<T>((resolve) => creates.push((row) => resolve(row as T))),
+    update: () => Promise.reject(new Error('unused')),
+    delete: () => Promise.reject(new Error('unused')),
+  };
+  const authProvider: AuthProvider = {
+    login: () => Promise.resolve(),
+    logout: () => Promise.resolve(),
+    getIdentity: () => Promise.resolve(null),
+    onSessionChange: (listener) => {
+      sessionChanged = listener;
+      return () => undefined;
+    },
+  };
+  TestBed.configureTestingModule({
+    providers: [
+      provideRouter([]),
+      providePidrang({
+        dataProvider,
+        resources: [{ name: 'products' }],
+        authProvider,
+      }),
+    ],
+  });
+  const navigate = vi
+    .spyOn(TestBed.inject(Router), 'navigate')
+    .mockResolvedValue(true);
+  const state = TestBed.runInInjectionContext(() =>
+    injectResourceCreateState(signal('products')),
+  );
+  return { creates, navigate, state, changeSession: () => sessionChanged() };
+}
+
+describe('injectResourceCreateState across timeouts and sessions', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('replaces the draft with a timeout message when the create never answers', async () => {
+    const { creates, navigate, state } = setupCreate();
+
+    const running = state.submit({ name: 'Webcam' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await running;
+
+    expect(state.stopped()).toContain('No answer from the server');
+    expect(state.saveFailure()).toBeNull();
+    await state.submit({ name: 'Webcam' });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(creates).toHaveLength(1);
+  });
+
+  it('opens the next page after a successful create even if the session changed meanwhile', async () => {
+    const { creates, navigate, state, changeSession } = setupCreate();
+
+    const running = state.submit({ name: 'Webcam' });
+    changeSession();
+    creates[0]({ id: '9' });
+    await running;
+
+    expect(navigate).toHaveBeenCalledWith(['/', 'products']);
+  });
+
+  it('tells a page that waited on a create that it timed out', async () => {
+    const { state } = setupCreate();
+    const waiting = TestBed.runInInjectionContext(() =>
+      injectResourceCreateState(signal('products')),
+    );
+    waiting.savingElsewhere();
+    waiting.earlierSave.failure();
+
+    void state.submit({ name: 'Webcam' });
+    waiting.savingElsewhere();
+    waiting.earlierSave.failure();
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(waiting.savingElsewhere()).toBe(false);
+    expect(waiting.stopped()).toContain('No answer from the server');
+  });
+
+  it('says a timed-out create finished when it answers late', async () => {
+    const { creates, state } = setupCreate();
+    const running = state.submit({ name: 'Webcam' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await running;
+    state.stopped();
+    state.earlierSave.finished();
+
+    creates[0]({ id: '9' });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(state.stopped()).toBeNull();
+    expect(state.earlierSave.finished()).toBe(true);
+  });
+
+  it('hides the draft without an error when another navigation replaced the next page', async () => {
+    const { creates, navigate, state } = setupCreate();
+    navigate.mockResolvedValue(false);
+    vi.spyOn(TestBed.inject(Router), 'currentNavigation').mockReturnValue(
+      {} as ReturnType<Router['currentNavigation']>,
+    );
+
+    const running = state.submit({ name: 'Webcam' });
+    creates[0]({ id: '9' });
+    await running;
+
+    expect(state.created()).toBe(true);
+    expect(state.saveFailure()).toBeNull();
   });
 });

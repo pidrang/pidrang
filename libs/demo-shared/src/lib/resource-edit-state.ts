@@ -16,8 +16,14 @@ import { injectResourceDefinition } from './resource-definition';
 import { injectResourceRecord } from './resource-record';
 import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
+import { SaveOutcome } from './save-outcome';
+import { SaveTimeoutError } from './save-timeout-error';
 
 const NON_EDITABLE_FIELDS = new Set(['id', 'created_at']);
+
+function mayHaveChanged(outcome: SaveOutcome | null): boolean {
+  return outcome === null || outcome.ok;
+}
 
 export function injectResourceEditState(
   resource: Signal<string>,
@@ -35,12 +41,19 @@ export function injectResourceEditState(
     source: target,
     computation: () => null,
   });
-  const savingElsewhere = computed(() => saving() && owned() === null);
-  const earlierSave = injectEarlierSave(target, savingElsewhere, lock.outcome);
-  const revision = linkedSignal<{ waiting: boolean; saved: number }, number>({
-    source: () => ({ waiting: savingElsewhere(), saved: lock.saved() }),
+  const savingElsewhere = computed(
+    () => saving() && owned() === null && lock.timeout() === null,
+  );
+  const stopped = computed(() => lock.timeout()?.message ?? null);
+  const waiting = computed(() => savingElsewhere() || stopped() !== null);
+  const earlierSave = injectEarlierSave(target, waiting, lock.outcome);
+  const revision = linkedSignal<
+    { waiting: boolean; outcome: SaveOutcome | null },
+    number
+  >({
+    source: () => ({ waiting: waiting(), outcome: lock.outcome() }),
     computation: (now, previous) =>
-      previous?.source.waiting && now.saved !== previous.source.saved
+      previous?.source.waiting && !now.waiting && mayHaveChanged(now.outcome)
         ? previous.value + 1
         : (previous?.value ?? 0),
   });
@@ -93,9 +106,9 @@ export function injectResourceEditState(
     try {
       opened = await router.navigate(destination);
     } catch (err) {
-      errorHandler.handleError(err);
+      setTimeout(() => errorHandler.handleError(err));
     }
-    if (!opened && owns(operation)) {
+    if (!opened && owns(operation) && router.currentNavigation() === null) {
       saveFailure.set(navigationFailure());
     }
     return opened;
@@ -112,14 +125,16 @@ export function injectResourceEditState(
     saveFailure.set(null);
     earlierSave.clear();
     try {
-      await lock.hold(async () => {
-        await dataProvider.update(currentResource, { id: currentId, data });
-        if (owns(operation)) {
-          await openNext(operation, destinationAfterSave());
-        }
-      });
+      await lock.hold(
+        () => dataProvider.update(currentResource, { id: currentId, data }),
+        async () => {
+          if (owns(operation)) {
+            await openNext(operation, destinationAfterSave());
+          }
+        },
+      );
     } catch (err) {
-      if (owns(operation)) {
+      if (owns(operation) && !(err instanceof SaveTimeoutError)) {
         saveFailure.set({
           message: err instanceof Error ? err.message : String(err),
           authRequired: isAuthRequiredError(err),
@@ -132,6 +147,7 @@ export function injectResourceEditState(
     saving,
     savingElsewhere,
     earlierSave,
+    stopped,
     saveFailure,
     record,
     label,

@@ -82,6 +82,24 @@ Angular matches routes in order and `:resource` matches any single segment. More
 
 ## Demo apps
 
+### The save lock keeps only running saves, with a 30-second timeout
+
+`libs/demo-shared/src/lib/save-lock.ts`, `save-store.ts`
+
+The create and edit pages lock a record while it is saved, across visits, so the user cannot send a second write that could land before the first. The lock lives in a root store, `SAVE_STORE`, that holds only the saves still running: a save removes its record when it settles. A page waiting on someone else's save keeps a reference to that save's entry, so it can still read the outcome after the entry left the store; the entry is collected with the page.
+
+A request that never answers would leave every page of its record waiting with no explanation, so the provider call races a 30-second timer. On timeout the record stays locked, since the write may still land, but every page of that record, including one the user opens later, shows a message saying the save may still be applied above a form that stays disabled, so what the user typed is kept. When the request finally answers, its entry leaves the store, the form comes back and the page says whether that earlier save finished or failed; an edit page reads the record again after a success and keeps what was loaded after a failure. The late answer never opens the next page. The store therefore holds only requests in flight. A request that never settles (a `fetch` has no default timeout, a custom provider may retry forever) keeps its record locked until the page is reloaded, which the message says. The 30 seconds are a constant in the copied `save-lock.ts`: an app whose writes legitimately take longer edits it there. The timeout covers the request only. The navigation that follows keeps the lock until it ends, and a pending navigation ends as soon as another one starts.
+
+The save is recorded as done as soon as the request succeeds, before the next page opens, so a failure in that step is never reported as a failed save to the pages waiting on it. A next page that does not open is reported only when no other navigation replaced it: the router resolves a replaced navigation with `false` too. A create page then shows "Created." instead of its draft, in case that other navigation is cancelled and the user stays.
+
+The store counts session changes reported by the optional `AuthProvider.onSessionChange`. A save started in an earlier session is not reported to a page that was waiting on it, so the next user in the same tab never sees the previous user's error. The lock itself is kept until the save settles, and the page that started the save always shows its own result: hiding it could hide an expired-session error or let a create be sent twice. Supabase reports `USER_UPDATED` for the same user as a session change too, and delivers the event in a `setTimeout`, so a save settling in that same tick still shows its outcome; both are accepted. Without an auth provider nothing is hidden. The store is created in the root injector, so it only sees an `authProvider` passed to `providePidrang` at the root, as the demos and generated apps do; one provided in a lazy route is not seen.
+
+A page learns that an earlier save ended by seeing its "waiting" state go from true to false. The `linkedSignal`s behind it only notice that change when they are read, so a template must read `earlierSave.failure()` and `earlierSave.finished()` on every render, as the shipped pages do, not only under a condition.
+
+`hold` refuses a record that is already being saved, and a settling save only removes its own entry, so code calling `injectSaveLock` directly cannot unlock a newer save.
+
+When the save succeeds but the next page fails to open, the error goes to Angular's `ErrorHandler` in a `setTimeout`, outside the save: an app whose `ErrorHandler` rethrows would otherwise turn a saved record into a reported save failure.
+
 ### Local Supabase key
 
 `apps/demo-material/src/environments/environment.local.ts`, `apps/demo-tailwind/src/environments/environment.local.ts`

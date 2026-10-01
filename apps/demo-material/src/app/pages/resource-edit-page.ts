@@ -29,6 +29,9 @@ import { injectResourceEditState } from '@pidrang/demo-shared';
     @if (record.isLoading()) {
       <p role="status">Loading…</p>
     }
+    @if (stopped(); as message) {
+      <p role="alert">{{ message }}</p>
+    }
     @if (record.error(); as loadError) {
       <p role="alert">{{ loadError.message }}</p>
       <button mat-stroked-button type="button" (click)="record.reload()">
@@ -36,8 +39,7 @@ import { injectResourceEditState } from '@pidrang/demo-shared';
       </button>
     } @else if (savingElsewhere()) {
       <p role="status">
-        This record is being saved from an earlier visit. The form comes back
-        when that save finishes.
+        This record is being saved. The form comes back when that save finishes.
       </p>
     } @else if (value(); as value) {
       <lib-resource-form
@@ -65,6 +67,7 @@ export class ResourceEditPage {
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
   protected readonly earlierSave = this.state.earlierSave;
+  protected readonly stopped = this.state.stopped;
   protected readonly saveFailure = this.state.saveFailure;
   protected readonly record = this.state.record;
   protected readonly label = this.state.label;

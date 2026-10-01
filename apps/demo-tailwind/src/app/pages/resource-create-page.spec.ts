@@ -249,6 +249,7 @@ describe('ResourceCreatePage', () => {
 
     saveButton(fixture.nativeElement).click();
     await settle(fixture);
+    await vi.waitFor(() => expect(handleError).toHaveBeenCalled());
 
     expect(
       fixture.nativeElement.querySelector('[role="alert"]')?.textContent,
@@ -272,6 +273,24 @@ describe('ResourceCreatePage', () => {
     ).toContain('Saved, but the next page could not open');
     expect(fixture.nativeElement.querySelector('form')).toBeNull();
     expect(creates).toHaveLength(1);
+  });
+
+  it('says the row was created when another navigation replaced the next page', async () => {
+    const { fixture, navigate } = setup(() => Promise.resolve({ id: '9' }));
+    navigate.mockResolvedValue(false);
+    vi.spyOn(TestBed.inject(Router), 'currentNavigation').mockReturnValue(
+      {} as ReturnType<Router['currentNavigation']>,
+    );
+    await settle(fixture);
+
+    saveButton(fixture.nativeElement).click();
+    await settle(fixture);
+
+    expect(
+      fixture.nativeElement.querySelector('[role="status"]')?.textContent,
+    ).toContain('Created.');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('form')).toBeNull();
   });
 
   it('treats a create that resolves with no row as saved', async () => {

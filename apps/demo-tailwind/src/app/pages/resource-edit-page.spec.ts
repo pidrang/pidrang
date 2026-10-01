@@ -379,11 +379,75 @@ describe('ResourceEditPage', () => {
 
     saveButton(fixture.nativeElement).click();
     await settle(fixture);
+    await vi.waitFor(() => expect(handleError).toHaveBeenCalled());
 
     expect(
       fixture.nativeElement.querySelector('[role="alert"]')?.textContent,
     ).toContain('Saved, but the next page could not open');
     expect(handleError).toHaveBeenCalledWith(failure);
+  });
+
+  it('says the server did not answer after 30 seconds and keeps the form disabled until it does', async () => {
+    const { fixture, updates, navigate } = setup(
+      () => new Promise(() => undefined),
+    );
+    await settle(fixture);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    saveButton(fixture.nativeElement).click();
+    await vi.advanceTimersByTimeAsync(30_000);
+    vi.useRealTimers();
+    await settle(fixture);
+
+    expect(
+      fixture.nativeElement.querySelector('[role="alert"]')?.textContent,
+    ).toContain('No answer from the server after 30 seconds');
+    expect(saveButton(fixture.nativeElement).disabled).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(1);
+  });
+
+  it('keeps the form disabled after a timeout when the user leaves and comes back', async () => {
+    const { fixture } = setup(() => new Promise(() => undefined));
+    await settle(fixture);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    saveButton(fixture.nativeElement).click();
+    await vi.advanceTimersByTimeAsync(30_000);
+    vi.useRealTimers();
+    fixture.componentRef.setInput('id', '2');
+    await settle(fixture);
+    fixture.componentRef.setInput('id', '1');
+    await settle(fixture);
+
+    expect(
+      fixture.nativeElement.querySelector('[role="alert"]')?.textContent,
+    ).toContain('No answer from the server after 30 seconds');
+    expect(saveButton(fixture.nativeElement).disabled).toBe(true);
+  });
+
+  it('keeps what the user typed when a timed-out save fails late', async () => {
+    const late = deferred<unknown>();
+    const { fixture } = setup(() => late.promise);
+    await settle(fixture);
+    const input = nameInput(fixture.nativeElement);
+    input.value = 'Draft';
+    input.dispatchEvent(new Event('input'));
+    await settle(fixture);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    saveButton(fixture.nativeElement).click();
+    await vi.advanceTimersByTimeAsync(30_000);
+    vi.useRealTimers();
+    await settle(fixture);
+    late.reject(new Error('denied late'));
+    await settle(fixture);
+
+    expect(nameInput(fixture.nativeElement).value).toBe('Draft');
+    expect(
+      fixture.nativeElement.querySelector('[role="alert"]')?.textContent,
+    ).toContain('The earlier save failed: denied late');
+    expect(saveButton(fixture.nativeElement).disabled).toBe(false);
   });
 
   it('says the record was saved when a guard cancels the next page', async () => {
