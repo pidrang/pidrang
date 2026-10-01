@@ -1,6 +1,9 @@
+import { Provider } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { DataProvider, PidrangError, providePidrang } from '@pidrang/core';
+import { provideSignInPath } from '@pidrang/demo-shared';
 
 import { ResourceListPage } from './resource-list-page';
 
@@ -25,7 +28,10 @@ const ROWS = [
   { id: '2', name: 'Mouse' },
 ];
 
-async function setup(remove: (id: string) => Promise<unknown>) {
+async function setup(
+  remove: (id: string) => Promise<unknown>,
+  providers: Provider[] = [],
+) {
   const deletes: string[] = [];
   let lists = 0;
   const dataProvider: DataProvider = {
@@ -45,6 +51,7 @@ async function setup(remove: (id: string) => Promise<unknown>) {
     imports: [ResourceListPage],
     providers: [
       provideRouter([]),
+      ...providers,
       providePidrang({
         dataProvider,
         resources: [
@@ -289,6 +296,40 @@ describe('ResourceListPage delete', () => {
     await settle(fixture);
     expect(pageSizeDisabled(fixture.nativeElement)).toBe(false);
   });
+  it('shows the sign-in prompt as plain text when the app provides no sign-in path', async () => {
+    const { fixture } = await setup(() =>
+      Promise.reject(
+        new PidrangError('JWT expired', { category: 'unauthenticated' }),
+      ),
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    await settle(fixture);
+
+    expect(alertText(fixture.nativeElement)).toContain('sign in');
+    expect(fixture.nativeElement.querySelector('[role="alert"] a')).toBeNull();
+  });
+
+  it('links the sign-in prompt to the sign-in path the app provides', async () => {
+    const { fixture } = await setup(
+      () =>
+        Promise.reject(
+          new PidrangError('JWT expired', { category: 'unauthenticated' }),
+        ),
+      [provideSignInPath('/auth/sign-in')],
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    await settle(fixture);
+
+    expect(
+      fixture.nativeElement
+        .querySelector('[role="alert"] a')
+        ?.getAttribute('href'),
+    ).toBe('/auth/sign-in');
+  });
 });
 
 describe('ResourceListPage delete consistency', () => {
@@ -375,3 +416,51 @@ async function flush(
   }
   fixture.detectChanges();
 }
+
+describe('ResourceListPage sign-in link inside a route', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('resolves a relative sign-in path from the app root, not from the current page', async () => {
+    const dataProvider: DataProvider = {
+      getList: <T>() =>
+        Promise.resolve({ data: ROWS as T[], total: ROWS.length }),
+      getOne: () => Promise.reject(new Error('unused')),
+      create: () => Promise.reject(new Error('unused')),
+      update: () => Promise.reject(new Error('unused')),
+      delete: () =>
+        Promise.reject(
+          new PidrangError('JWT expired', { category: 'unauthenticated' }),
+        ),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(
+          [{ path: ':resource', component: ResourceListPage }],
+          withComponentInputBinding(),
+        ),
+        providePidrang({
+          dataProvider,
+          resources: [
+            { name: 'products', fields: [{ name: 'name', type: 'text' }] },
+          ],
+        }),
+        provideSignInPath('auth/sign-in'),
+      ],
+    });
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/products', ResourceListPage);
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const page = harness.routeNativeElement as HTMLElement;
+    deleteButtons(page)[0].click();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(page.querySelector('[role="alert"] a')?.getAttribute('href')).toBe(
+      '/auth/sign-in',
+    );
+  });
+});

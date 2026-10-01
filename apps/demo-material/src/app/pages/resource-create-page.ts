@@ -2,7 +2,10 @@ import { Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ResourceForm } from '@pidrang/material';
 import { MatButtonModule } from '@angular/material/button';
-import { injectResourceCreateState } from '@pidrang/demo-shared';
+import {
+  injectSignInUrl,
+  injectResourceCreateState,
+} from '@pidrang/demo-shared';
 
 @Component({
   selector: 'app-resource-create-page',
@@ -19,7 +22,13 @@ import { injectResourceCreateState } from '@pidrang/demo-shared';
       </p>
       @if (earlierFailure.authRequired) {
         <p>
-          You may need to <a routerLink="/login">sign in</a> to make changes.
+          You may need to
+          @if (signInUrl; as path) {
+            <a [routerLink]="path">sign in</a>
+          } @else {
+            sign in
+          }
+          to make changes.
         </p>
       }
     }
@@ -49,7 +58,13 @@ import { injectResourceCreateState } from '@pidrang/demo-shared';
       <p role="alert">{{ failure.message }}</p>
       @if (failure.authRequired) {
         <p>
-          You may need to <a routerLink="/login">sign in</a> to make changes.
+          You may need to
+          @if (signInUrl; as path) {
+            <a [routerLink]="path">sign in</a>
+          } @else {
+            sign in
+          }
+          to make changes.
         </p>
       }
     }
@@ -59,6 +74,7 @@ export class ResourceCreatePage {
   readonly resource = input.required<string>();
 
   private readonly state = injectResourceCreateState(this.resource);
+  protected readonly signInUrl = injectSignInUrl();
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
   protected readonly stopped = this.state.stopped;

@@ -1,7 +1,13 @@
 import { ErrorHandler, Provider } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import {
+  Router,
+  provideRouter,
+  withComponentInputBinding,
+} from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { DataProvider, PidrangError, providePidrang } from '@pidrang/core';
+import { provideSignInPath } from '@pidrang/demo-shared';
 
 import { ResourceEditPage } from './resource-edit-page';
 
@@ -194,6 +200,38 @@ describe('ResourceEditPage', () => {
     write.resolve({});
     await settle(fixture);
   });
+
+  it.each([
+    ['as plain text without a sign-in path', [], null],
+    [
+      'as a link to the sign-in path the app provides',
+      [provideSignInPath('/auth/sign-in')],
+      '/auth/sign-in',
+    ],
+  ] as const)(
+    'asks to sign in after an earlier save failed for lack of a session, %s',
+    async (_label, providers, href) => {
+      const write = deferred<unknown>();
+      const { fixture } = setup(() => write.promise, [...providers]);
+      await settle(fixture);
+
+      saveButton(fixture.nativeElement).click();
+      fixture.componentRef.setInput('id', '2');
+      await settle(fixture);
+      fixture.componentRef.setInput('id', '1');
+      await settle(fixture);
+      write.reject(
+        new PidrangError('JWT expired', { category: 'unauthenticated' }),
+      );
+      await settle(fixture);
+
+      const link = [...fixture.nativeElement.querySelectorAll('a')].find(
+        (candidate: Element) => candidate.textContent?.includes('sign in'),
+      );
+      expect(fixture.nativeElement.textContent).toContain('sign in');
+      expect(link?.getAttribute('href') ?? null).toBe(href);
+    },
+  );
 
   it('tells the user that the earlier save failed after coming back', async () => {
     const write = deferred<unknown>();
@@ -482,7 +520,7 @@ describe('ResourceEditPage', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'The earlier save failed: JWT expired',
     );
-    expect(fixture.nativeElement.textContent).toContain(
+    expect(fixture.nativeElement.textContent.replace(/\s+/g, ' ')).toContain(
       'You may need to sign in',
     );
   });
@@ -537,5 +575,89 @@ describe('ResourceEditPage', () => {
     expect(saveButton(fixture.nativeElement).disabled).toBe(false);
     saveButton(fixture.nativeElement).click();
     expect(updates).toHaveLength(2);
+  });
+
+  it('shows the sign-in prompt as plain text when the app provides no sign-in path', async () => {
+    const { fixture } = setup(() =>
+      Promise.reject(
+        new PidrangError('JWT expired', { category: 'unauthenticated' }),
+      ),
+    );
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('sign in');
+    expect(
+      [...fixture.nativeElement.querySelectorAll('a')].some((link: Element) =>
+        link.textContent?.includes('sign in'),
+      ),
+    ).toBe(false);
+  });
+
+  it('links the sign-in prompt to the sign-in path the app provides', async () => {
+    const { fixture } = setup(
+      () =>
+        Promise.reject(
+          new PidrangError('JWT expired', { category: 'unauthenticated' }),
+        ),
+      [provideSignInPath('/auth/sign-in')],
+    );
+    await fixture.whenStable();
+
+    saveButton(fixture.nativeElement).click();
+    await fixture.whenStable();
+
+    const link = [...fixture.nativeElement.querySelectorAll('a')].find(
+      (candidate: Element) => candidate.textContent?.includes('sign in'),
+    );
+    expect(link?.getAttribute('href')).toBe('/auth/sign-in');
+  });
+});
+
+describe('ResourceEditPage sign-in link inside a route', () => {
+  it('resolves a relative sign-in path from the app root, not from the current page', async () => {
+    const dataProvider: DataProvider = {
+      getList: () => Promise.reject(new Error('unused')),
+      getOne: <T>(_resource: string, params: { id: string | number }) =>
+        Promise.resolve({ id: params.id, name: 'Keyboard' } as T),
+      create: () => Promise.reject(new Error('unused')),
+      update: () =>
+        Promise.reject(
+          new PidrangError('JWT expired', { category: 'unauthenticated' }),
+        ),
+      delete: () => Promise.reject(new Error('unused')),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(
+          [{ path: ':resource/:id/edit', component: ResourceEditPage }],
+          withComponentInputBinding(),
+        ),
+        providePidrang({
+          dataProvider,
+          resources: [
+            { name: 'products', fields: [{ name: 'name', type: 'text' }] },
+          ],
+        }),
+        provideSignInPath('auth/sign-in'),
+      ],
+    });
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/products/1/edit', ResourceEditPage);
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    const page = harness.routeNativeElement as HTMLElement;
+    saveButton(page).click();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    const link = [...page.querySelectorAll('a')].find((candidate) =>
+      candidate.textContent?.includes('sign in'),
+    );
+    expect(link?.getAttribute('href')).toBe('/auth/sign-in');
   });
 });

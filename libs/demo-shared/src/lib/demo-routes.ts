@@ -3,11 +3,12 @@ import { Route } from '@angular/router';
 import { canMatchResourceAction } from './can-match-resource-action';
 import { DemoPages } from './demo-pages';
 import { RESOURCE_UNAVAILABLE_PATH } from './resource-unavailable-path';
+import { SIGN_IN_ROUTE } from './sign-in-route';
 
 export function demoRoutes(pages: DemoPages): Route[] {
   return [
     { path: '', component: pages.home },
-    { path: 'login', component: pages.signIn },
+    { path: SIGN_IN_ROUTE, component: pages.signIn },
     { path: RESOURCE_UNAVAILABLE_PATH, component: pages.notFound },
     {
       path: ':resource/create',

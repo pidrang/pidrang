@@ -6,6 +6,7 @@ import { buildPagesBundle } from './build-pages-bundle';
 import {
   generatePagesBundle,
   RESOURCE_ROUTES_SNIPPET,
+  SIGN_IN_PATH_SNIPPET,
 } from './generate-pages-bundle';
 
 const WORKSPACE_ROOT = join(__dirname, '../../../..');
@@ -224,6 +225,14 @@ describe('generatePagesBundle', () => {
     );
   });
 
+  it('never hard-codes a link to /login, a route the app may not have', () => {
+    const hardCoded = generatePagesBundle().filter((file) =>
+      /\/login\b/.test(file.content),
+    );
+
+    expect(hardCoded.map((file) => file.path)).toEqual([]);
+  });
+
   it('exports each page component name once', () => {
     const files = generatePagesBundle();
     const names = [
@@ -245,6 +254,7 @@ describe('generatePagesBundle', () => {
     const contents = [
       ...generatePagesBundle().map((file) => file.content),
       RESOURCE_ROUTES_SNIPPET,
+      SIGN_IN_PATH_SNIPPET,
     ];
 
     for (const content of contents) {
@@ -306,5 +316,23 @@ describe('RESOURCE_ROUTES_SNIPPET', () => {
     expect(createIndex).toBeLessThan(editIndex);
     expect(editIndex).toBeLessThan(showIndex);
     expect(showIndex).toBeLessThan(listIndex);
+  });
+});
+
+describe('SIGN_IN_PATH_SNIPPET', () => {
+  it('imports provideSignInPath from the generated file that defines it', () => {
+    const providerFile = generatePagesBundle().find(
+      (file) => file.path === 'src/app/pidrang/provide-sign-in-path.ts',
+    );
+
+    expect(providerFile?.content).toContain(
+      'export function provideSignInPath',
+    );
+    expect(SIGN_IN_PATH_SNIPPET).toContain(
+      "import { provideSignInPath } from './pidrang/provide-sign-in-path';",
+    );
+    expect(SIGN_IN_PATH_SNIPPET).toContain(
+      "provideSignInPath('/your-sign-in-route')",
+    );
   });
 });

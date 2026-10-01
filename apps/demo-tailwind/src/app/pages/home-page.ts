@@ -6,6 +6,7 @@ import {
   injectResources,
   isResourceActionEnabled,
 } from '@pidrang/core';
+import { injectSignInUrl } from '@pidrang/demo-shared';
 import { environment } from '../../environments/environment';
 
 @Component({
@@ -32,7 +33,7 @@ import { environment } from '../../environments/environment';
     } @else {
       <p class="mt-2">
         <a
-          routerLink="/login"
+          [routerLink]="signInUrl"
           class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
           >Sign in</a
         >
@@ -70,6 +71,7 @@ import { environment } from '../../environments/environment';
   `,
 })
 export class HomePage {
+  protected readonly signInUrl = injectSignInUrl();
   protected readonly materialDemoUrl = environment.materialDemoUrl;
   protected readonly resources = injectResources();
   protected readonly isResourceActionEnabled = isResourceActionEnabled;

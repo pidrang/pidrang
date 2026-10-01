@@ -35,6 +35,11 @@ export const resourceRoutes: Route[] = [
 ];
 `;
 
+export const SIGN_IN_PATH_SNIPPET = `import { provideSignInPath } from './pidrang/provide-sign-in-path';
+
+provideSignInPath('/your-sign-in-route')
+`;
+
 export function generatePagesBundle(): GeneratedFile[] {
   return GENERATED_PAGE_FILES.map((file) => ({ ...file }));
 }
