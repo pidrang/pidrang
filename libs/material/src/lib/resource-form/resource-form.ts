@@ -163,11 +163,8 @@ export class ResourceForm<T extends Record<string, unknown>> {
   }
 
   private buildPayload(): Partial<T> {
-    return buildResourcePayload(
-      this.mode(),
-      this.fields(),
-      this.draft(),
-      (name) => this.fieldTree(name)().dirty(),
+    return buildResourcePayload(this.fields(), this.draft(), (name) =>
+      this.fieldTree(name)().dirty(),
     ) as Partial<T>;
   }
 }
