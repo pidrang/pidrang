@@ -13,7 +13,9 @@
     />
     {{ fieldLabel(field) }}
   </label>
-  } @else {
+  @if (fieldHint(field); as hint) {
+  <span class="text-xs text-gray-500">{{ hint }}</span>
+  } } @else {
   <label class="flex flex-col gap-1 text-sm text-gray-700">
     {{ fieldLabel(field) }}
     <input
@@ -23,6 +25,8 @@
     />
     @if (fieldError(field); as error) {
     <span class="text-sm text-red-600" role="alert">{{ error }}</span>
+    } @else if (fieldHint(field); as hint) {
+    <span class="text-xs text-gray-500">{{ hint }}</span>
     }
   </label>
   } }

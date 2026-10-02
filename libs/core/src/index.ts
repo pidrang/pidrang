@@ -2,6 +2,8 @@ export * from './lib/resource';
 export * from './lib/resource-action';
 export * from './lib/is-resource-action-enabled';
 export * from './lib/field';
+export * from './lib/field-presentation';
+export * from './lib/resource-form-payload';
 export * from './lib/filter-operator';
 export * from './lib/filter';
 export * from './lib/filter-value';

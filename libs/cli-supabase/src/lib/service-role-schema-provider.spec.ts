@@ -12,6 +12,7 @@ const PRIMARY_KEY_DESCRIPTION = 'Note:\nThis is a Primary Key.<pk/>';
 const openApiSchema = {
   definitions: {
     products: {
+      required: ['id', 'name'],
       properties: {
         id: {
           type: 'integer',
@@ -98,11 +99,22 @@ describe('createServiceRoleSchemaProvider', () => {
   it('introspects a table into typed fields', async () => {
     const provider = createServiceRoleSchemaProvider(connection);
     expect(await provider.introspectTable('products')).toEqual([
-      { name: 'id', type: 'numeric' },
+      { name: 'id', type: 'numeric', readOnly: true },
       { name: 'name', type: 'text' },
-      { name: 'in_stock', type: 'boolean' },
-      { name: 'created_at', type: 'timestamp' },
+      { name: 'in_stock', type: 'boolean', hasDefault: true },
+      { name: 'created_at', type: 'timestamp', hasDefault: true },
     ]);
+  });
+
+  it('marks a column with a server default (not in "required") as hasDefault', async () => {
+    const provider = createServiceRoleSchemaProvider(connection);
+    const fields = await provider.introspectTable('products');
+    expect(fields.find((field) => field.name === 'in_stock')).toEqual(
+      expect.objectContaining({ hasDefault: true }),
+    );
+    expect(
+      fields.find((field) => field.name === 'name')?.hasDefault,
+    ).toBeUndefined();
   });
 
   it('calls the OpenAPI endpoint with the service role key', async () => {

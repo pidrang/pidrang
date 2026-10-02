@@ -108,6 +108,10 @@ function isScalarField(field: IntrospectionField): boolean {
   return kind === 'SCALAR' || kind === 'ENUM';
 }
 
+function isNullableField(field: IntrospectionField): boolean {
+  return field.type.kind !== 'NON_NULL';
+}
+
 function scalarTypeName(type: IntrospectionType): string {
   return type.name ?? type.ofType?.name ?? 'String';
 }
@@ -152,6 +156,8 @@ export function createGraphQlSchemaProvider(
           (field): Field => ({
             name: field.name,
             type: graphqlScalarToFieldType(scalarTypeName(field.type)),
+            readOnly: field.name === 'id' || undefined,
+            nullable: isNullableField(field) || undefined,
           }),
         );
       if (!result.some((field) => field.name === 'id')) {

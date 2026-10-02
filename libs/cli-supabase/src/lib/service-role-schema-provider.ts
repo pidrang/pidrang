@@ -11,6 +11,7 @@ interface OpenApiProperty {
 
 interface OpenApiDefinition {
   properties?: Record<string, OpenApiProperty>;
+  required?: string[];
 }
 
 interface OpenApiSchema {
@@ -88,10 +89,13 @@ export function createServiceRoleSchemaProvider(
         );
       }
       const properties = definition?.properties ?? {};
+      const required = definition?.required ?? [];
       return Object.entries(properties).map(
         ([name, property]): Field => ({
           name,
           type: openApiPropertyToFieldType(property.type, property.format),
+          readOnly: primaryKey.includes(name) || undefined,
+          hasDefault: required.includes(name) ? undefined : true,
         }),
       );
     },

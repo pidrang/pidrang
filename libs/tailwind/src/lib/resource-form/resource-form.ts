@@ -9,8 +9,18 @@ import {
   applyEach,
   form,
   pattern,
+  required,
 } from '@angular/forms/signals';
-import { Field, FieldType } from '@pidrang/core';
+import {
+  Field,
+  ResourceFormMode,
+  buildResourcePayload,
+  fieldRequiresValueWhenEmpty,
+  formatHintForField,
+  formatPatternForField,
+  inputTypeForField,
+  shouldBlockSubmit,
+} from '@pidrang/core';
 
 type RecordPath = SchemaPath<
   Record<string, unknown>,
@@ -22,31 +32,7 @@ type ChildStringPath = SchemaPath<
   SchemaPathRules.Supported,
   PathKind.Child
 >;
-
-const INPUT_TYPE_BY_FIELD_TYPE: Record<
-  Exclude<FieldType, 'boolean'>,
-  string
-> = {
-  text: 'text',
-  number: 'number',
-  numeric: 'text',
-  date: 'date',
-  timestamp: 'text',
-  time: 'text',
-};
-
-const FORMAT_PATTERN_BY_FIELD_TYPE: Partial<Record<FieldType, RegExp>> = {
-  timestamp:
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/,
-  time: /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/,
-  numeric: /^-?\d+(\.\d+)?$/,
-};
-
-const FORMAT_HINT_BY_FIELD_TYPE: Partial<Record<FieldType, string>> = {
-  timestamp: 'Enter a timestamp like 2024-01-01T10:30:00 or with a Z suffix.',
-  time: 'Enter a time like 10:30 or 10:30:00.',
-  numeric: 'Enter a whole or decimal number, such as 42 or 19.99.',
-};
+type ChildPath = SchemaPath<unknown, SchemaPathRules.Supported, PathKind.Child>;
 
 @Component({
   selector: 'lib-resource-form',
@@ -54,6 +40,7 @@ const FORMAT_HINT_BY_FIELD_TYPE: Partial<Record<FieldType, string>> = {
   templateUrl: './resource-form.html',
 })
 export class ResourceForm<T extends Record<string, unknown>> {
+  readonly mode = input.required<ResourceFormMode>();
   readonly fields = input.required<Field[]>();
   readonly value = input.required<T>();
   readonly pending = input(false);
@@ -65,12 +52,24 @@ export class ResourceForm<T extends Record<string, unknown>> {
       pattern(child as unknown as ChildStringPath, (ctx) =>
         this.regexForField(ctx.key()),
       );
+      required(child as unknown as ChildPath, {
+        when: (ctx) => this.isRequiredWhenEmpty(ctx.key()),
+      });
     });
   });
 
+  private fieldByName(name: string): Field | undefined {
+    return this.fields().find((candidate) => candidate.name === name);
+  }
+
   private regexForField(name: string): RegExp | undefined {
-    const field = this.fields().find((candidate) => candidate.name === name);
-    return field ? FORMAT_PATTERN_BY_FIELD_TYPE[field.type] : undefined;
+    const field = this.fieldByName(name);
+    return field ? formatPatternForField(field) : undefined;
+  }
+
+  private isRequiredWhenEmpty(name: string): boolean {
+    const field = this.fieldByName(name);
+    return field ? fieldRequiresValueWhenEmpty(field) : false;
   }
 
   protected fieldTree(
@@ -90,9 +89,7 @@ export class ResourceForm<T extends Record<string, unknown>> {
   }
 
   protected inputType(field: Field): string {
-    return INPUT_TYPE_BY_FIELD_TYPE[
-      field.type as Exclude<FieldType, 'boolean'>
-    ];
+    return inputTypeForField(field);
   }
 
   protected fieldError(field: Field): string | null {
@@ -100,7 +97,14 @@ export class ResourceForm<T extends Record<string, unknown>> {
     if (!state.dirty() || state.errors().length === 0) {
       return null;
     }
-    return FORMAT_HINT_BY_FIELD_TYPE[field.type] ?? 'This value is not valid.';
+    return formatHintForField(field);
+  }
+
+  protected fieldHint(field: Field): string | null {
+    if (!field.hasDefault || this.isDirty(field.name)) {
+      return null;
+    }
+    return 'Leave unchanged to use the database default.';
   }
 
   protected onSubmit(event: Event): void {
@@ -112,8 +116,12 @@ export class ResourceForm<T extends Record<string, unknown>> {
   }
 
   private hasBlockingError(): boolean {
-    return this.fields().some(
-      (field) => this.isDirty(field.name) && this.isInvalid(field.name),
+    return this.fields().some((field) =>
+      shouldBlockSubmit(
+        this.mode(),
+        this.isDirty(field.name),
+        this.isInvalid(field.name),
+      ),
     );
   }
 
@@ -128,10 +136,11 @@ export class ResourceForm<T extends Record<string, unknown>> {
   }
 
   private buildPayload(): T {
-    const draft = this.draft();
-    const entries = this.fields()
-      .filter((field) => !field.hasDefault || this.isDirty(field.name))
-      .map((field) => [field.name, draft[field.name]] as const);
-    return Object.fromEntries(entries) as T;
+    return buildResourcePayload(
+      this.mode(),
+      this.fields(),
+      this.draft(),
+      (name) => this.isDirty(name),
+    ) as T;
   }
 }
