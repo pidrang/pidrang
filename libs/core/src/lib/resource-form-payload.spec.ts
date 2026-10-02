@@ -1,6 +1,7 @@
 import { Field } from './field';
 import {
   buildResourcePayload,
+  normalizeResourceValue,
   shouldBlockSubmit,
 } from './resource-form-payload';
 
@@ -34,20 +35,6 @@ describe('buildResourcePayload', () => {
       () => true,
     );
     expect(payload).toEqual({ active: false });
-  });
-
-  it('sends every field on create regardless of dirty, except a defaulted one', () => {
-    const fields = [
-      field({ name: 'name' }),
-      field({ name: 'status', hasDefault: true }),
-    ];
-    const payload = buildResourcePayload(
-      'create',
-      fields,
-      { name: 'Widget', status: '' },
-      () => false,
-    );
-    expect(payload).toEqual({ name: 'Widget' });
   });
 
   it('on edit, sends only touched fields regardless of hasDefault', () => {
@@ -131,6 +118,34 @@ describe('buildResourcePayload', () => {
     );
     expect(payload).toEqual({ notes: null });
   });
+
+  it('never sends a readOnly field, even if the caller left it in fields and it is dirty', () => {
+    const fields = [
+      field({ name: 'id', readOnly: true }),
+      field({ name: 'name' }),
+    ];
+    const payload = buildResourcePayload(
+      'edit',
+      fields,
+      { id: 'tampered', name: 'Widget' },
+      () => true,
+    );
+    expect(payload).toEqual({ name: 'Widget' });
+  });
+
+  it('never sends a readOnly field on create either', () => {
+    const fields = [
+      field({ name: 'id', readOnly: true }),
+      field({ name: 'name' }),
+    ];
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { id: 'tampered', name: 'Widget' },
+      () => false,
+    );
+    expect(payload).toEqual({ name: 'Widget' });
+  });
 });
 
 describe('shouldBlockSubmit', () => {
@@ -145,5 +160,50 @@ describe('shouldBlockSubmit', () => {
   it('on edit, blocks only when the invalid field was also touched', () => {
     expect(shouldBlockSubmit('edit', true, true)).toBe(true);
     expect(shouldBlockSubmit('edit', false, true)).toBe(false);
+  });
+});
+
+describe('normalizeResourceValue', () => {
+  it('stringifies a numeric field that arrived as a JS number', () => {
+    const fields = [field({ name: 'amount', type: 'numeric' })];
+    expect(normalizeResourceValue(fields, { amount: 1 })).toEqual({
+      amount: '1',
+    });
+  });
+
+  it('turns a null text-bound field into an empty string', () => {
+    const fields = [field({ name: 'starts_at', type: 'timestamp' })];
+    expect(normalizeResourceValue(fields, { starts_at: null })).toEqual({
+      starts_at: '',
+    });
+  });
+
+  it('turns a Date instance into a plain string for a date field', () => {
+    const fields = [field({ name: 'available_on', type: 'date' })];
+    const result = normalizeResourceValue(fields, {
+      available_on: new Date('2024-06-01T00:00:00.000Z'),
+    });
+    expect(typeof result.available_on).toBe('string');
+  });
+
+  it('leaves an already-string text-bound value unchanged', () => {
+    const fields = [field({ name: 'amount', type: 'numeric' })];
+    expect(
+      normalizeResourceValue(fields, { amount: '12345678901234.5678' }),
+    ).toEqual({ amount: '12345678901234.5678' });
+  });
+
+  it('leaves a plain number field alone', () => {
+    const fields = [field({ name: 'quantity', type: 'number' })];
+    expect(normalizeResourceValue(fields, { quantity: 5 })).toEqual({
+      quantity: 5,
+    });
+  });
+
+  it('leaves a field with no matching schema entry unchanged', () => {
+    const fields: Field[] = [];
+    expect(normalizeResourceValue(fields, { mystery: 42 })).toEqual({
+      mystery: 42,
+    });
   });
 });

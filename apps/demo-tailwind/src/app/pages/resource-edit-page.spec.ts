@@ -90,6 +90,12 @@ function nameInput(element: HTMLElement): HTMLInputElement {
   return input;
 }
 
+function dirtyName(element: HTMLElement, value = 'Edited'): void {
+  const input = nameInput(element);
+  input.value = value;
+  input.dispatchEvent(new Event('input'));
+}
+
 async function settle(fixture: ComponentFixture<unknown>): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve));
   await fixture.whenStable();
@@ -111,6 +117,7 @@ describe('ResourceEditPage', () => {
     const { fixture, updates } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     saveButton(fixture.nativeElement).click();
     write.resolve({});
@@ -158,6 +165,7 @@ describe('ResourceEditPage', () => {
     const { fixture, updates, navigate } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     write.resolve({});
@@ -172,6 +180,7 @@ describe('ResourceEditPage', () => {
     const { fixture } = setup(() => Promise.reject(new Error('denied')));
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await settle(fixture);
     expect(
@@ -189,11 +198,13 @@ describe('ResourceEditPage', () => {
     const { fixture, updates } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
 
     expect(saveButton(fixture.nativeElement).disabled).toBe(false);
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     expect(updates.map((call) => call.id)).toEqual(['1', '2']);
 
@@ -215,6 +226,7 @@ describe('ResourceEditPage', () => {
       const { fixture } = setup(() => write.promise, [...providers]);
       await settle(fixture);
 
+      dirtyName(fixture.nativeElement);
       saveButton(fixture.nativeElement).click();
       fixture.componentRef.setInput('id', '2');
       await settle(fixture);
@@ -238,6 +250,7 @@ describe('ResourceEditPage', () => {
     const { fixture } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
@@ -258,6 +271,7 @@ describe('ResourceEditPage', () => {
     const { fixture, navigate } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
@@ -282,9 +296,11 @@ describe('ResourceEditPage', () => {
     });
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
 
     writes[0].reject(new Error('denied'));
@@ -307,6 +323,7 @@ describe('ResourceEditPage', () => {
     const { fixture, updates, reads } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
@@ -338,6 +355,7 @@ describe('ResourceEditPage', () => {
     );
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
@@ -358,6 +376,7 @@ describe('ResourceEditPage', () => {
     await settle(fixture);
     const readsBeforeSaving = reads.length;
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await settle(fixture);
 
@@ -370,6 +389,7 @@ describe('ResourceEditPage', () => {
     const { fixture, reads } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
@@ -389,6 +409,7 @@ describe('ResourceEditPage', () => {
     const { fixture, updates } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.destroy();
     const next = TestBed.createComponent(ResourceEditPage);
@@ -415,6 +436,7 @@ describe('ResourceEditPage', () => {
     navigate.mockRejectedValue(failure);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await settle(fixture);
     await vi.waitFor(() => expect(handleError).toHaveBeenCalled());
@@ -432,6 +454,7 @@ describe('ResourceEditPage', () => {
     await settle(fixture);
 
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await vi.advanceTimersByTimeAsync(30_000);
     vi.useRealTimers();
@@ -450,6 +473,7 @@ describe('ResourceEditPage', () => {
     await settle(fixture);
 
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await vi.advanceTimersByTimeAsync(30_000);
     vi.useRealTimers();
@@ -493,6 +517,7 @@ describe('ResourceEditPage', () => {
     navigate.mockResolvedValue(false);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await settle(fixture);
 
@@ -506,6 +531,7 @@ describe('ResourceEditPage', () => {
     const { fixture } = setup(() => write.promise);
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
@@ -534,6 +560,7 @@ describe('ResourceEditPage', () => {
     });
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     fixture.componentRef.setInput('id', '2');
     await settle(fixture);
@@ -545,6 +572,7 @@ describe('ResourceEditPage', () => {
       'The earlier save finished',
     );
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     writes[1].reject(new Error('denied'));
     await settle(fixture);
@@ -566,6 +594,7 @@ describe('ResourceEditPage', () => {
     });
     await settle(fixture);
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await settle(fixture);
 
@@ -585,6 +614,7 @@ describe('ResourceEditPage', () => {
     );
     await fixture.whenStable();
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await fixture.whenStable();
 
@@ -606,6 +636,7 @@ describe('ResourceEditPage', () => {
     );
     await fixture.whenStable();
 
+    dirtyName(fixture.nativeElement);
     saveButton(fixture.nativeElement).click();
     await fixture.whenStable();
 
@@ -651,6 +682,7 @@ describe('ResourceEditPage sign-in link inside a route', () => {
     harness.detectChanges();
 
     const page = harness.routeNativeElement as HTMLElement;
+    dirtyName(page);
     saveButton(page).click();
     await harness.fixture.whenStable();
     harness.detectChanges();

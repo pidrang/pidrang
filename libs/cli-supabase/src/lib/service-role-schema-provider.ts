@@ -7,6 +7,7 @@ interface OpenApiProperty {
   type: string;
   format?: string;
   description?: string;
+  default?: unknown;
 }
 
 interface OpenApiDefinition {
@@ -95,7 +96,8 @@ export function createServiceRoleSchemaProvider(
           name,
           type: openApiPropertyToFieldType(property.type, property.format),
           readOnly: primaryKey.includes(name) || undefined,
-          hasDefault: required.includes(name) ? undefined : true,
+          hasDefault: 'default' in property ? true : undefined,
+          nullable: required.includes(name) ? undefined : true,
         }),
       );
     },

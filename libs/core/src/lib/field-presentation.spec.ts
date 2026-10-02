@@ -11,15 +11,15 @@ function field(overrides: Partial<Field>): Field {
 }
 
 describe('inputTypeForField', () => {
-  it('binds timestamp, time and numeric to a plain text input', () => {
+  it('binds timestamp, time, numeric and date to a plain text input', () => {
     expect(inputTypeForField(field({ type: 'timestamp' }))).toBe('text');
     expect(inputTypeForField(field({ type: 'time' }))).toBe('text');
     expect(inputTypeForField(field({ type: 'numeric' }))).toBe('text');
+    expect(inputTypeForField(field({ type: 'date' }))).toBe('text');
   });
 
-  it('keeps number and date on their native input types', () => {
+  it('keeps number on its native input type', () => {
     expect(inputTypeForField(field({ type: 'number' }))).toBe('number');
-    expect(inputTypeForField(field({ type: 'date' }))).toBe('date');
   });
 });
 
@@ -28,11 +28,28 @@ describe('formatPatternForField', () => {
     expect(formatPatternForField(field({ type: 'text' }))).toBeUndefined();
   });
 
-  it('matches a zoned timestamp and rejects a bare one', () => {
+  it('matches a zoned timestamp and rejects a bare one with an invalid time', () => {
     const pattern = formatPatternForField(field({ type: 'timestamp' }));
     expect(pattern?.test('2024-01-01T10:30:00+02:00')).toBe(true);
     expect(pattern?.test('2024-01-01T10:30:00')).toBe(true);
     expect(pattern?.test('not-a-timestamp')).toBe(false);
+    expect(pattern?.test('2024-99-99T10:30:00')).toBe(false);
+    expect(pattern?.test('2024-01-01T99:99:00')).toBe(false);
+  });
+
+  it('matches a time of day and rejects an impossible one', () => {
+    const pattern = formatPatternForField(field({ type: 'time' }));
+    expect(pattern?.test('10:30')).toBe(true);
+    expect(pattern?.test('23:59:59')).toBe(true);
+    expect(pattern?.test('99:99')).toBe(false);
+    expect(pattern?.test('24:00')).toBe(false);
+  });
+
+  it('matches a plain date and rejects an impossible one', () => {
+    const pattern = formatPatternForField(field({ type: 'date' }));
+    expect(pattern?.test('2024-01-31')).toBe(true);
+    expect(pattern?.test('2024-99-99')).toBe(false);
+    expect(pattern?.test('2024-13-01')).toBe(false);
   });
 
   it('matches a whole or decimal number', () => {

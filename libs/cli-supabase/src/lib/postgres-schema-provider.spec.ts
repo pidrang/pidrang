@@ -54,6 +54,7 @@ describe('createPostgresSchemaProvider', () => {
           column_default: null,
           is_nullable: 'NO',
           is_identity: 'YES',
+          identity_generation: 'BY DEFAULT',
           is_generated: 'NEVER',
         },
         {
@@ -62,6 +63,7 @@ describe('createPostgresSchemaProvider', () => {
           column_default: null,
           is_nullable: 'NO',
           is_identity: 'NO',
+          identity_generation: null,
           is_generated: 'NEVER',
         },
         {
@@ -70,6 +72,7 @@ describe('createPostgresSchemaProvider', () => {
           column_default: null,
           is_nullable: 'YES',
           is_identity: 'NO',
+          identity_generation: null,
           is_generated: 'NEVER',
         },
         {
@@ -78,6 +81,7 @@ describe('createPostgresSchemaProvider', () => {
           column_default: 'now()',
           is_nullable: 'NO',
           is_identity: 'NO',
+          identity_generation: null,
           is_generated: 'NEVER',
         },
         {
@@ -86,7 +90,17 @@ describe('createPostgresSchemaProvider', () => {
           column_default: null,
           is_nullable: 'NO',
           is_identity: 'NO',
+          identity_generation: null,
           is_generated: 'ALWAYS',
+        },
+        {
+          column_name: 'sequence_no',
+          data_type: 'integer',
+          column_default: null,
+          is_nullable: 'NO',
+          is_identity: 'YES',
+          identity_generation: 'ALWAYS',
+          is_generated: 'NEVER',
         },
       ],
     });
@@ -100,6 +114,12 @@ describe('createPostgresSchemaProvider', () => {
       { name: 'notes', type: 'text', nullable: true },
       { name: 'created_at', type: 'timestamp', hasDefault: true },
       { name: 'search_text', type: 'text', readOnly: true },
+      {
+        name: 'sequence_no',
+        type: 'number',
+        readOnly: true,
+        hasDefault: true,
+      },
     ]);
     expect(query.mock.calls[0][0]).toContain('table_constraints');
     expect(query.mock.calls[0][1]).toEqual(['products']);
