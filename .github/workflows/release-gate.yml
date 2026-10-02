@@ -1,0 +1,67 @@
+name: Release gate
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to pack and test (for example 0.1.0). Defaults to 0.0.0-gate.<commit>.
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        required: false
+        type: string
+    secrets:
+      SUPABASE_FIXTURES_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: fixtures
+        run: echo "ref=$(cat tools/release-gate/supabase-fixtures.ref)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          repository: pidrang/supabase
+          ref: ${{ steps.fixtures.outputs.ref }}
+          token: ${{ secrets.SUPABASE_FIXTURES_TOKEN }}
+          path: .supabase-fixtures
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - working-directory: .supabase-fixtures
+        run: npx -y "supabase@$(cat supabase/.cli-version)" start -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,supavisor,realtime,storage-api
+
+      - env:
+          PIDRANG_SUPABASE_DIR: ${{ github.workspace }}/.supabase-fixtures
+          VERSION: ${{ inputs.version }}
+        run: node tools/release-gate/run.mjs --mode full ${VERSION:+--version "$VERSION"}
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-gate-${{ github.sha }}
+          path: tmp/release-gate
+          if-no-files-found: warn
+          retention-days: 30

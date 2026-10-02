@@ -104,7 +104,7 @@ describeDataProviderConformance('rest', {
 
 `setup` must return a provider whose `resource` contains exactly `CONFORMANCE_ROWS` (`id`, `name`, `price`, `in_stock`, nullable `note`). Operators listed in `unsupported` are expected to be rejected with `rejectUnsupportedFilters`. The suite lives in its own library, used only by specs, so providers never depend on each other. `supabase-data-provider.conformance.spec.ts` refuses to run against any host but `127.0.0.1`, `localhost` or `[::1]`.
 
-`@pidrang/supabase` runs it in `supabase-data-provider.conformance.spec.ts` against a local Supabase stack when `PIDRANG_CONFORMANCE_SUPABASE_URL` and `PIDRANG_CONFORMANCE_SUPABASE_KEY` are set; without them the spec is skipped. It is manual for now: CI will run it once pidrang/supabase ships a test dataset (pidrang/supabase#11).
+`@pidrang/supabase` runs it in `supabase-data-provider.conformance.spec.ts` against a local Supabase stack when `PIDRANG_CONFORMANCE_SUPABASE_URL` and `PIDRANG_CONFORMANCE_SUPABASE_KEY` are set; without them the spec is skipped. The [release gate](./releasing.md#the-release-gate) sets both, loads the table below with `scripts/load-fixtures.sh --conformance` from pidrang/supabase, and fails unless every conformance test ran and passed.
 
 ```sql
 create table public.conformance_items (

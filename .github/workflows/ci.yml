@@ -22,4 +22,14 @@ jobs:
 
       - run: pnpm exec nx run-many -t lint test build
 
-      - run: pnpm run verify:artifacts
+      - run: pnpm exec eslint tools/release-gate tools/versioned-packages.mjs tools/verify-artifacts.mjs
+
+      - run: node tools/release-gate/run.mjs --mode build
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-gate-build-${{ github.sha }}
+          path: tmp/release-gate
+          if-no-files-found: ignore
+          retention-days: 14

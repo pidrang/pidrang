@@ -23,7 +23,7 @@ Exit status: `0` when done or when nothing is left to write, `1` on invalid inpu
 
 ## Packaging
 
-`pidrang`, `@pidrang/cli` and `@pidrang/cli-supabase` are prepared for npm but not published yet (tracked in #25 and #57). `pnpm run verify:artifacts` packs them, installs the tarballs in an empty directory and runs the installed `pidrang` binary, so the published package is tested without workspace links. See `docs/releasing.md`.
+`pidrang`, `@pidrang/cli` and `@pidrang/cli-supabase` are prepared for npm but not published yet (tracked in #25 and #57). `pnpm run verify:artifacts` packs them, installs the tarballs in an empty directory and runs the installed `pidrang` binary, so the published package is tested without workspace links. The release gate also generates the CRUD pages of an Angular app with the installed CLI, builds it and tests it in a browser. See `docs/releasing.md`.
 
 ## Running unit tests
 

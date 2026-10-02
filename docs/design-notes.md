@@ -229,6 +229,18 @@ When the save succeeds but the next page fails to open, the error goes to Angula
 
 The sign-in form submits natively, so Enter in either field signs in. While a sign-in runs, a root state, `SIGN_IN_STATE`, disables the form and the demo-account button on every visit of the page and shows "Signing in…". Supabase saves the session of each successful sign-in as it answers, so two sign-ins in flight could end on the older account; one at a time prevents that. Both demos call the same `injectSignIn()`. The lock is released when the request settles, not when the page is left. A success goes home only if a sign-in page is still open, the one that started it or a later visit, so a user who came back to the page while it ran is not left on it signed in, and one who went elsewhere is not pulled away. A failure is kept in the same root state, so a visit that came back while the sign-in ran shows it; it is kept only when a sign-in page is open to show it, and cleared by the next attempt, by a success, and when the last open sign-in page is left, so a later visit never shows an old error. A session change (another tab signing in, a sign-out) clears it too, and a failure from before that change is dropped. After 30 seconds without an answer, the page says to reload it and keeps the form disabled: a late answer would still change the session, so the lock is never released early, but reloading is a safe way out, since the session is saved by the page's own script and a reload drops the request before its answer is saved. The demos' sign-in page is not part of what `pidrang init` generates.
 
+### The release gate owns its servers and its database
+
+`tools/release-gate`
+
+The gate starts every server it tests on its own port (4310, 4311, 4320, 4321) and refuses to reuse one already running. A `nx serve` left running on 4200 points at the hosted project, and Playwright's `reuseExistingServer` would test that instead. For the same reason, every page blocks requests to non-loopback hosts. The fixtures are reloaded before each test, so the tests share one database and must run one at a time: the config sets one worker and one browser.
+
+The gate keeps the tarballs it tested next to their sha256 in `identities.json`, rather than only checking them and deleting them like `verify:artifacts`. Publishing can then prove it ships the bytes that were tested.
+
+The installed apps are copied outside the repository before `npm install`. Inside it, Node would resolve any package missing from the app in the repository's own `node_modules`, and a missing peer dependency would go unnoticed.
+
+The old `apps/demo-material-e2e` and `apps/demo-tailwind-e2e` projects were removed. Their only test looked for a "Welcome" heading that no longer exists, and they served the demos against the hosted project. The demo smoke tests now live in the gate, against the local fixtures.
+
 ### Local Supabase key
 
 `apps/demo-material/src/environments/environment.local.ts`, `apps/demo-tailwind/src/environments/environment.local.ts`

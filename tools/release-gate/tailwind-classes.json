@@ -1,0 +1,12 @@
+[
+  ".bg-blue-600",
+  ".px-3",
+  ".py-2",
+  ".border-gray-200",
+  ".text-gray-700",
+  ".font-medium",
+  ".rounded",
+  ".max-w-xl",
+  "focus\\:border-blue-500",
+  "disabled\\:opacity-60"
+]
