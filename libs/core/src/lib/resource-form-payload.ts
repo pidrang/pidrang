@@ -11,18 +11,12 @@ function valueForField(field: Field, value: unknown): unknown {
 }
 
 export function buildResourcePayload<T extends Record<string, unknown>>(
-  mode: ResourceFormMode,
   fields: Field[],
   draft: T,
   isDirty: (name: string) => boolean,
 ): Record<string, unknown> {
   const entries = fields
-    .filter((field) => !field.readOnly)
-    .filter((field) =>
-      mode === 'create'
-        ? !field.hasDefault || isDirty(field.name)
-        : isDirty(field.name),
-    )
+    .filter((field) => !field.readOnly && isDirty(field.name))
     .map(
       (field) => [field.name, valueForField(field, draft[field.name])] as const,
     );

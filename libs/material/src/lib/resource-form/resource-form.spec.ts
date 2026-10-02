@@ -50,7 +50,7 @@ describe('ResourceForm', () => {
     expect(initial).toEqual({ name: 'USB-C dock', price: 129 });
   });
 
-  it('sends every field on create, even an untouched one without a server default', async () => {
+  it('omits every untouched field on create, same as on edit, and keeps only a touched one', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
@@ -67,10 +67,43 @@ describe('ResourceForm', () => {
       saved.push(value),
     );
 
+    const nameInput = fixture.nativeElement.querySelectorAll('input')[0];
+    nameInput.value = 'USB-C dock v2';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
     fixture.nativeElement.querySelector('button').click();
     await fixture.whenStable();
 
-    expect(saved).toEqual([{ name: 'USB-C dock', price: 129 }]);
+    expect(saved).toEqual([{ name: 'USB-C dock v2' }]);
+  });
+
+  it('omits an untouched, nullable field on create instead of sending an empty string', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'note', type: 'text', nullable: true },
+    ]);
+    fixture.componentRef.setInput('value', { name: 'Widget', note: '' });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const nameInput = fixture.nativeElement.querySelectorAll('input')[0];
+    nameInput.value = 'Widget v2';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget v2' }]);
   });
 
   it('renders a checkbox for a boolean field', async () => {
@@ -104,6 +137,12 @@ describe('ResourceForm', () => {
       saved.push(value),
     );
 
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = 'USB-C dock v2';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
     const button: HTMLButtonElement =
       fixture.nativeElement.querySelector('button');
     const formElement: HTMLFormElement =
@@ -122,30 +161,7 @@ describe('ResourceForm', () => {
     await fixture.whenStable();
 
     expect(button.disabled).toBe(false);
-    expect(saved).toEqual([{ name: 'USB-C dock' }]);
-  });
-
-  it('omits an untouched field that has a server default on create, but keeps other fields', async () => {
-    TestBed.configureTestingModule({ imports: [ResourceForm] });
-
-    const fixture = TestBed.createComponent(ResourceForm);
-    fixture.componentRef.setInput('mode', 'create');
-    fixture.componentRef.setInput('fields', [
-      { name: 'name', type: 'text' },
-      { name: 'status', type: 'text', hasDefault: true },
-    ]);
-    fixture.componentRef.setInput('value', { name: 'Widget', status: '' });
-    await fixture.whenStable();
-
-    const saved: unknown[] = [];
-    fixture.componentInstance.save.subscribe((value: unknown) =>
-      saved.push(value),
-    );
-
-    fixture.nativeElement.querySelector('button').click();
-    await fixture.whenStable();
-
-    expect(saved).toEqual([{ name: 'Widget' }]);
+    expect(saved).toEqual([{ name: 'USB-C dock v2' }]);
   });
 
   it('shows a hint on an untouched field with a server default, on create', async () => {
@@ -366,7 +382,7 @@ describe('ResourceForm', () => {
     expect(saved).toEqual([]);
   });
 
-  it('round-trips a valid zoned timestamp unchanged on create', async () => {
+  it('omits an untouched timestamp field on create even though its loaded value is valid', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
@@ -387,7 +403,37 @@ describe('ResourceForm', () => {
     fixture.nativeElement.querySelector('button').click();
     await fixture.whenStable();
 
-    expect(saved).toEqual([{ starts_at: '2024-01-01T10:00:00+02:00' }]);
+    expect(saved).toEqual([{}]);
+  });
+
+  it('sends a touched timestamp unchanged on create when it round-trips a valid zoned value', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'starts_at', type: 'timestamp' },
+    ]);
+    fixture.componentRef.setInput('value', {
+      starts_at: '2024-01-01T10:00:00+02:00',
+    });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '2024-02-02T11:00:00+02:00';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ starts_at: '2024-02-02T11:00:00+02:00' }]);
   });
 
   it('does not block an edit save over an untouched field with a pre-existing invalid value, and still sends it unchanged if dirtied', async () => {
@@ -421,7 +467,7 @@ describe('ResourceForm', () => {
     expect(saved).toEqual([{ name: 'Widget v2' }]);
   });
 
-  it('preserves an explicit null value for a field without a server default, left untouched on create', async () => {
+  it('omits an untouched nullable field left at null on create, same as one left at an empty string', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
@@ -438,10 +484,43 @@ describe('ResourceForm', () => {
       saved.push(value),
     );
 
+    const nameInput = fixture.nativeElement.querySelectorAll('input')[0];
+    nameInput.value = 'Widget v2';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
     fixture.nativeElement.querySelector('button').click();
     await fixture.whenStable();
 
-    expect(saved).toEqual([{ name: 'Widget', notes: null }]);
+    expect(saved).toEqual([{ name: 'Widget v2' }]);
+  });
+
+  it('preserves an explicit null for a touched, nullable field on create', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'notes', type: 'timestamp', nullable: true },
+    ]);
+    fixture.componentRef.setInput('value', { notes: '2024-01-01T10:00:00' });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ notes: null }]);
   });
 
   it('sends an explicit 0 for a touched number field', async () => {
