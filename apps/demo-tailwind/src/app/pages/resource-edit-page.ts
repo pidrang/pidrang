@@ -64,12 +64,15 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
       </p>
     } @else if (value(); as value) {
       <div class="mt-4">
-        <lib-resource-form
-          [fields]="fields()"
-          [value]="value"
-          [pending]="saving()"
-          (save)="submit($event)"
-        />
+        @for (r of [resource() + ':' + id()]; track r) {
+          <lib-resource-form
+            mode="edit"
+            [fields]="fields()"
+            [value]="value"
+            [pending]="saving()"
+            (save)="submit($event)"
+          />
+        }
       </div>
       @if (saveFailure(); as failure) {
         <p role="alert" class="mt-4 text-red-600">{{ failure.message }}</p>

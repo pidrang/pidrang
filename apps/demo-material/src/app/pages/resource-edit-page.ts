@@ -48,12 +48,15 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
         This record is being saved. The form comes back when that save finishes.
       </p>
     } @else if (value(); as value) {
-      <lib-resource-form
-        [fields]="fields()"
-        [value]="value"
-        [pending]="saving()"
-        (save)="submit($event)"
-      />
+      @for (r of [resource() + ':' + id()]; track r) {
+        <lib-resource-form
+          mode="edit"
+          [fields]="fields()"
+          [value]="value"
+          [pending]="saving()"
+          (save)="submit($event)"
+        />
+      }
       @if (saveFailure(); as failure) {
         <p role="alert">{{ failure.message }}</p>
         @if (failure.authRequired) {

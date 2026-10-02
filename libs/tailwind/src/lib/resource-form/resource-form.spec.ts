@@ -7,6 +7,7 @@ describe('ResourceForm', () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
     fixture.componentRef.setInput('fields', [
       { name: 'name', type: 'text' },
       { name: 'price', type: 'number' },
@@ -19,11 +20,12 @@ describe('ResourceForm', () => {
     expect((inputs[1] as HTMLInputElement).value).toBe('129');
   });
 
-  it('emits the edited value on save, without mutating the value input', async () => {
+  it('emits only the edited field on save in edit mode, without mutating the value input', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
     const initial = { name: 'USB-C dock', price: 129 };
+    fixture.componentRef.setInput('mode', 'edit');
     fixture.componentRef.setInput('fields', [
       { name: 'name', type: 'text' },
       { name: 'price', type: 'number' },
@@ -44,14 +46,38 @@ describe('ResourceForm', () => {
     fixture.nativeElement.querySelector('button').click();
     await fixture.whenStable();
 
-    expect(saved).toEqual([{ name: 'USB-C dock', price: 99 }]);
+    expect(saved).toEqual([{ price: 99 }]);
     expect(initial).toEqual({ name: 'USB-C dock', price: 129 });
+  });
+
+  it('sends every field on create, even an untouched one without a server default', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'price', type: 'number' },
+    ]);
+    fixture.componentRef.setInput('value', { name: 'USB-C dock', price: 129 });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'USB-C dock', price: 129 }]);
   });
 
   it('renders a checkbox for a boolean field', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
     fixture.componentRef.setInput('fields', [
       { name: 'active', type: 'boolean' },
     ]);
@@ -67,6 +93,7 @@ describe('ResourceForm', () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
     fixture.componentRef.setInput('fields', [{ name: 'name', type: 'text' }]);
     fixture.componentRef.setInput('value', { name: 'USB-C dock' });
     fixture.componentRef.setInput('pending', true);
@@ -98,10 +125,11 @@ describe('ResourceForm', () => {
     expect(saved).toEqual([{ name: 'USB-C dock' }]);
   });
 
-  it('omits an untouched field that has a server default, but keeps other fields', async () => {
+  it('omits an untouched field that has a server default on create, but keeps other fields', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
     fixture.componentRef.setInput('fields', [
       { name: 'name', type: 'text' },
       { name: 'status', type: 'text', hasDefault: true },
@@ -120,10 +148,27 @@ describe('ResourceForm', () => {
     expect(saved).toEqual([{ name: 'Widget' }]);
   });
 
+  it('shows a hint on an untouched field with a server default, on create', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'status', type: 'text', hasDefault: true },
+    ]);
+    fixture.componentRef.setInput('value', { status: '' });
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Leave unchanged to use the database default.',
+    );
+  });
+
   it('sends an explicit falsy value for a touched field that has a server default', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
     fixture.componentRef.setInput('fields', [
       { name: 'active', type: 'boolean', hasDefault: true },
     ]);
@@ -151,6 +196,7 @@ describe('ResourceForm', () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
     fixture.componentRef.setInput('fields', [
       { name: 'starts_at', type: 'timestamp' },
     ]);
@@ -178,10 +224,153 @@ describe('ResourceForm', () => {
     expect(fixture.nativeElement.textContent).toContain('Enter a timestamp');
   });
 
-  it('round-trips a valid zoned timestamp unchanged when left untouched', async () => {
+  it('omits every untouched field on edit, even one without a server default, preserving full numeric precision', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'amount', type: 'numeric' },
+    ]);
+    fixture.componentRef.setInput('value', {
+      name: 'Widget',
+      amount: '12345678901234.5678',
+    });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const nameInput = fixture.nativeElement.querySelectorAll('input')[0];
+    nameInput.value = 'Widget v2';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget v2' }]);
+  });
+
+  it('sends a touched numeric value unchanged on edit, preserving full precision', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'amount', type: 'numeric' },
+    ]);
+    fixture.componentRef.setInput('value', { amount: '1.00' });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '12345678901234.5678';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ amount: '12345678901234.5678' }]);
+  });
+
+  it('converts an emptied, nullable timestamp to null instead of sending an empty string', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'starts_at', type: 'timestamp', nullable: true },
+    ]);
+    fixture.componentRef.setInput('value', {
+      starts_at: '2024-01-01T10:00:00',
+    });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ starts_at: null }]);
+  });
+
+  it('blocks save when a non-nullable timestamp is cleared', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'starts_at', type: 'timestamp' },
+    ]);
+    fixture.componentRef.setInput('value', {
+      starts_at: '2024-01-01T10:00:00',
+    });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new Event('blur'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([]);
+  });
+
+  it('blocks create when a required typed field is left at its blank default, even untouched', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'starts_at', type: 'timestamp' },
+    ]);
+    fixture.componentRef.setInput('value', { starts_at: '' });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([]);
+  });
+
+  it('round-trips a valid zoned timestamp unchanged on create', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
     fixture.componentRef.setInput('fields', [
       { name: 'starts_at', type: 'timestamp' },
     ]);
@@ -201,10 +390,11 @@ describe('ResourceForm', () => {
     expect(saved).toEqual([{ starts_at: '2024-01-01T10:00:00+02:00' }]);
   });
 
-  it('does not block save over an untouched field with a pre-existing invalid value, and still sends it', async () => {
+  it('does not block an edit save over an untouched field with a pre-existing invalid value, and still sends it unchanged if dirtied', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
     fixture.componentRef.setInput('fields', [
       { name: 'name', type: 'text' },
       { name: 'starts_at', type: 'timestamp' },
@@ -220,16 +410,22 @@ describe('ResourceForm', () => {
       saved.push(value),
     );
 
+    const nameInput = fixture.nativeElement.querySelectorAll('input')[0];
+    nameInput.value = 'Widget v2';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
     fixture.nativeElement.querySelector('button').click();
     await fixture.whenStable();
 
-    expect(saved).toEqual([{ name: 'Widget', starts_at: 'not-a-timestamp' }]);
+    expect(saved).toEqual([{ name: 'Widget v2' }]);
   });
 
-  it('preserves an explicit null value for a field without a server default, left untouched', async () => {
+  it('preserves an explicit null value for a field without a server default, left untouched on create', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
     const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
     fixture.componentRef.setInput('fields', [
       { name: 'name', type: 'text' },
       { name: 'notes', type: 'text', nullable: true },
@@ -246,5 +442,33 @@ describe('ResourceForm', () => {
     await fixture.whenStable();
 
     expect(saved).toEqual([{ name: 'Widget', notes: null }]);
+  });
+
+  it('sends an explicit 0 for a touched number field', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'quantity', type: 'number' },
+    ]);
+    fixture.componentRef.setInput('value', { quantity: 5 });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '0';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ quantity: 0 }]);
   });
 });

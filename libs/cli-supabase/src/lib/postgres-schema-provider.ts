@@ -80,22 +80,37 @@ export function createPostgresSchemaProvider(
           );
         }
 
+        const primaryKeyColumn = primaryKey.rows[0].column_name;
+
         const result = await client.query<{
           column_name: string;
           data_type: string;
+          column_default: string | null;
+          is_nullable: 'YES' | 'NO';
+          is_identity: 'YES' | 'NO';
+          is_generated: 'ALWAYS' | 'NEVER';
         }>(
-          `select column_name, data_type
+          `select column_name, data_type, column_default, is_nullable,
+                  is_identity, is_generated
            from information_schema.columns
            where table_schema = 'public' and table_name = $1
            order by ordinal_position`,
           [table],
         );
-        return result.rows.map(
-          (row): Field => ({
+        return result.rows.map((row): Field => {
+          const isPrimaryKey = row.column_name === primaryKeyColumn;
+          const isGenerated = row.is_generated === 'ALWAYS';
+          return {
             name: row.column_name,
             type: postgresTypeToFieldType(row.data_type),
-          }),
-        );
+            readOnly: isPrimaryKey || isGenerated || undefined,
+            hasDefault:
+              row.column_default !== null || row.is_identity === 'YES'
+                ? true
+                : undefined,
+            nullable: row.is_nullable === 'YES' ? true : undefined,
+          };
+        });
       });
     },
   };

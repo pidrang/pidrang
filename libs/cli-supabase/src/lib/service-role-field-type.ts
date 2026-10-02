@@ -27,7 +27,12 @@ const TIMESTAMP_FORMATS = new Set([
   'timestamp with time zone',
 ]);
 
-const TIME_FORMATS = new Set(['time', 'timetz']);
+const TIME_FORMATS = new Set([
+  'time',
+  'timetz',
+  'time without time zone',
+  'time with time zone',
+]);
 
 export function openApiPropertyToFieldType(
   type: string,

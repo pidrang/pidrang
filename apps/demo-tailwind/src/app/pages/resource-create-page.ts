@@ -52,12 +52,15 @@ import {
       </p>
     } @else if (!created()) {
       <div class="mt-4">
-        <lib-resource-form
-          [fields]="fields()"
-          [value]="initialValue()"
-          [pending]="saving()"
-          (save)="submit($event)"
-        />
+        @for (r of [resource()]; track r) {
+          <lib-resource-form
+            mode="create"
+            [fields]="fields()"
+            [value]="initialValue()"
+            [pending]="saving()"
+            (save)="submit($event)"
+          />
+        }
       </div>
     } @else if (!saveFailure()) {
       <p role="status" class="mt-4 text-gray-600">Created.</p>

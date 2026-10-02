@@ -9,3 +9,9 @@ form {
 button {
   align-self: flex-start;
 }
+
+.field-hint {
+  margin: -8px 0 0;
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant, rgba(0, 0, 0, 0.6));
+}

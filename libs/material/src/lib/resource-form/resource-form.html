@@ -7,7 +7,9 @@
   <mat-checkbox [formField]="fieldTree(field.name)"
     >{{ fieldLabel(field) }}</mat-checkbox
   >
-  } @else {
+  @if (fieldHint(field); as hint) {
+  <p class="field-hint">{{ hint }}</p>
+  } } @else {
   <mat-form-field>
     <mat-label>{{ fieldLabel(field) }}</mat-label>
     <input
@@ -17,6 +19,8 @@
     />
     @if (fieldError(field); as error) {
     <mat-error>{{ error }}</mat-error>
+    } @else if (fieldHint(field); as hint) {
+    <mat-hint>{{ hint }}</mat-hint>
     }
   </mat-form-field>
   } }

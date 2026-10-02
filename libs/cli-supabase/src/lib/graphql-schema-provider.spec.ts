@@ -9,7 +9,7 @@ const connection: GraphQlConnection = {
 
 function collectionField(
   name: string,
-  columns: { name: string; typeName: string }[],
+  columns: { name: string; typeName: string; nullable?: boolean }[],
 ) {
   return {
     name: `${name}Collection`,
@@ -50,14 +50,16 @@ function collectionField(
                             },
                             ...columns.map((column) => ({
                               name: column.name,
-                              type: {
-                                kind: 'NON_NULL',
-                                name: null,
-                                ofType: {
-                                  kind: 'SCALAR',
-                                  name: column.typeName,
-                                },
-                              },
+                              type: column.nullable
+                                ? { kind: 'SCALAR', name: column.typeName }
+                                : {
+                                    kind: 'NON_NULL',
+                                    name: null,
+                                    ofType: {
+                                      kind: 'SCALAR',
+                                      name: column.typeName,
+                                    },
+                                  },
                             })),
                             {
                               name: 'author',
@@ -91,6 +93,7 @@ const introspectionResponse = {
             { name: 'id', typeName: 'BigInt' },
             { name: 'name', typeName: 'String' },
             { name: 'in_stock', typeName: 'Boolean' },
+            { name: 'notes', typeName: 'String', nullable: true },
           ]),
           { name: 'someOtherField', type: { fields: null } },
         ],
@@ -122,9 +125,10 @@ describe('createGraphQlSchemaProvider', () => {
   it('introspects a table into typed fields, excluding nodeId and relations', async () => {
     const provider = createGraphQlSchemaProvider(connection);
     expect(await provider.introspectTable('products')).toEqual([
-      { name: 'id', type: 'numeric' },
+      { name: 'id', type: 'numeric', readOnly: true },
       { name: 'name', type: 'text' },
       { name: 'in_stock', type: 'boolean' },
+      { name: 'notes', type: 'text', nullable: true },
     ]);
   });
 

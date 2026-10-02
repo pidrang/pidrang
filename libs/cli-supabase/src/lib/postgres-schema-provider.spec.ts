@@ -48,10 +48,46 @@ describe('createPostgresSchemaProvider', () => {
     query.mockResolvedValueOnce({ rows: [{ column_name: 'id' }] });
     query.mockResolvedValueOnce({
       rows: [
-        { column_name: 'id', data_type: 'bigint' },
-        { column_name: 'name', data_type: 'text' },
-        { column_name: 'in_stock', data_type: 'boolean' },
-        { column_name: 'created_at', data_type: 'timestamp with time zone' },
+        {
+          column_name: 'id',
+          data_type: 'bigint',
+          column_default: null,
+          is_nullable: 'NO',
+          is_identity: 'YES',
+          is_generated: 'NEVER',
+        },
+        {
+          column_name: 'name',
+          data_type: 'text',
+          column_default: null,
+          is_nullable: 'NO',
+          is_identity: 'NO',
+          is_generated: 'NEVER',
+        },
+        {
+          column_name: 'notes',
+          data_type: 'text',
+          column_default: null,
+          is_nullable: 'YES',
+          is_identity: 'NO',
+          is_generated: 'NEVER',
+        },
+        {
+          column_name: 'created_at',
+          data_type: 'timestamp with time zone',
+          column_default: 'now()',
+          is_nullable: 'NO',
+          is_identity: 'NO',
+          is_generated: 'NEVER',
+        },
+        {
+          column_name: 'search_text',
+          data_type: 'text',
+          column_default: null,
+          is_nullable: 'NO',
+          is_identity: 'NO',
+          is_generated: 'ALWAYS',
+        },
       ],
     });
 
@@ -59,10 +95,11 @@ describe('createPostgresSchemaProvider', () => {
     const fields = await provider.introspectTable('products');
 
     expect(fields).toEqual([
-      { name: 'id', type: 'numeric' },
+      { name: 'id', type: 'numeric', readOnly: true, hasDefault: true },
       { name: 'name', type: 'text' },
-      { name: 'in_stock', type: 'boolean' },
-      { name: 'created_at', type: 'timestamp' },
+      { name: 'notes', type: 'text', nullable: true },
+      { name: 'created_at', type: 'timestamp', hasDefault: true },
+      { name: 'search_text', type: 'text', readOnly: true },
     ]);
     expect(query.mock.calls[0][0]).toContain('table_constraints');
     expect(query.mock.calls[0][1]).toEqual(['products']);

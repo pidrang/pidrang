@@ -44,12 +44,15 @@ import {
         finishes.
       </p>
     } @else if (!created()) {
-      <lib-resource-form
-        [fields]="fields()"
-        [value]="initialValue()"
-        [pending]="saving()"
-        (save)="submit($event)"
-      />
+      @for (r of [resource()]; track r) {
+        <lib-resource-form
+          mode="create"
+          [fields]="fields()"
+          [value]="initialValue()"
+          [pending]="saving()"
+          (save)="submit($event)"
+        />
+      }
     } @else if (!saveFailure()) {
       <p role="status">Created.</p>
     }

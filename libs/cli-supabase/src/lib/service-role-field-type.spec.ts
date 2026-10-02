@@ -28,6 +28,15 @@ describe('openApiPropertyToFieldType', () => {
     expect(openApiPropertyToFieldType('string', 'time')).toBe('time');
   });
 
+  it('maps the long-form time format too, not just the short one', () => {
+    expect(openApiPropertyToFieldType('string', 'time without time zone')).toBe(
+      'time',
+    );
+    expect(openApiPropertyToFieldType('string', 'time with time zone')).toBe(
+      'time',
+    );
+  });
+
   it('falls back to text for unknown formats', () => {
     expect(openApiPropertyToFieldType('string', 'text')).toBe('text');
     expect(openApiPropertyToFieldType('string', 'uuid')).toBe('text');

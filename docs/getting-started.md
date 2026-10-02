@@ -28,17 +28,23 @@ export const resources: Resource[] = [
   {
     name: 'products',
     fields: [
-      { name: 'id', type: 'text' },
+      { name: 'id', type: 'text', readOnly: true },
       { name: 'name', type: 'text' },
       { name: 'price', type: 'number' },
       { name: 'in_stock', label: 'In stock', type: 'boolean' },
-      { name: 'created_at', label: 'Created at', type: 'date' },
+      {
+        name: 'created_at',
+        label: 'Created at',
+        type: 'timestamp',
+        readOnly: true,
+        hasDefault: true,
+      },
     ],
   },
 ];
 ```
 
-`name` must match the Supabase table name. Field types are `'text'`, `'number'`, `'boolean'` and `'date'`. `label` overrides the column header and form label; `hidden: true` marks a field a generic list or edit page should skip. `list`, `create`, `show`, `edit` and `delete` are optional flags, enabled when omitted; set one to `false` to hide that action and refuse its route in the generic pages.
+`name` must match the Supabase table name. Field types are `'text'`, `'number'`, `'boolean'`, `'date'`, `'timestamp'`, `'time'` and `'numeric'`. `timestamp`, `time` and `numeric` are kept as plain strings end to end, never converted through `Date` or `Number`, so a zoned time or a `bigint`/high-precision `numeric` value round-trips without losing anything. `label` overrides the column header and form label; `hidden: true` marks a field a generic list or edit page should skip. `readOnly: true` keeps a field out of create/edit forms entirely — use it for a primary key or any column the database generates; `hasDefault: true` lets an untouched field on create be omitted from the payload so the server's own default applies, instead of overwriting it; `nullable: true` lets a `timestamp`/`time`/`numeric`/`date` field be cleared (sent as `null`) rather than blocked as invalid when empty. `list`, `create`, `show`, `edit` and `delete` are optional flags, enabled when omitted; set one to `false` to hide that action and refuse its route in the generic pages.
 
 Instead of writing this by hand, the `pidrang init` CLI can introspect your Supabase schema and generate `resources.ts` for you. See [Generating resources](#generating-resources).
 
@@ -184,7 +190,7 @@ The list pages of `apps/demo-material` and `apps/demo-tailwind`, and the pages `
 
 ## 6. Create and edit forms
 
-`ResourceForm` renders one input per field, built on Angular Signal Forms. It never mutates the `value` you pass in; it emits the edited copy through `save`.
+`ResourceForm` renders one input per field, built on Angular Signal Forms. It never mutates the `value` you pass in; it emits a payload through `save`. The required `[mode]` input is `'create'` or `'edit'`: on create it sends every field except an untouched one with `hasDefault`, so the server's own default applies; on edit it sends only a field you actually changed, so an untouched value (a precise `numeric`, a zoned `timestamp`) round-trips unchanged instead of being re-serialized.
 
 ```ts
 import { Component, computed, inject, input } from '@angular/core';
@@ -197,7 +203,7 @@ import { ResourceForm } from '@pidrang/material';
   imports: [ResourceForm],
   template: `
     <h1>Create {{ resource() }}</h1>
-    <lib-resource-form [fields]="fields()" [value]="initialValue()" (save)="submit($event)" />
+    <lib-resource-form mode="create" [fields]="fields()" [value]="initialValue()" (save)="submit($event)" />
   `,
 })
 export class ResourceCreatePage {
@@ -207,7 +213,7 @@ export class ResourceCreatePage {
   private readonly router = inject(Router);
   private readonly resources = injectResources();
 
-  protected readonly fields = computed(() => this.resources.find((resource) => resource.name === this.resource())?.fields?.filter((field) => field.name !== 'id' && field.name !== 'created_at') ?? []);
+  protected readonly fields = computed(() => this.resources.find((resource) => resource.name === this.resource())?.fields?.filter((field) => !field.readOnly) ?? []);
 
   protected readonly initialValue = computed(() => Object.fromEntries(this.fields().map((field) => [field.name, field.type === 'number' ? 0 : field.type === 'boolean' ? false : ''])));
 
@@ -218,7 +224,7 @@ export class ResourceCreatePage {
 }
 ```
 
-Bind `[pending]` to a signal that is `true` while the save runs: the form then disables its submit button and ignores further submits, so a double click cannot create two rows. An edit page is the same component fed with `dataProvider.getOne(resource, { id })` as the initial value and `dataProvider.update(resource, { id, data })` on save. The complete List, Create, Show and Edit pages live in [`apps/demo-material`](../apps/demo-material/src/app/pages). They go further: the flag is held per record (per resource for a create) across visits, a page that comes back while a save runs waits for it and then says whether it finished or failed, a request with no answer after 30 seconds shows a message above a disabled form, on every page of that record, until the server answers and the page says how that save ended, and a save whose next page does not open says it was saved. See [the save lock](./design-notes.md#the-save-lock-keeps-only-running-saves-with-a-30-second-timeout) for how it works and its limits.
+`readOnly: true` (on `id`, or on any column the database generates or defaults, like `created_at` above) keeps that field out of the form entirely, on both create and edit. Bind `[pending]` to a signal that is `true` while the save runs: the form then disables its submit button and ignores further submits, so a double click cannot create two rows. An edit page is the same component with `mode="edit"`, fed with `dataProvider.getOne(resource, { id })` as the initial value and `dataProvider.update(resource, { id, data })` on save. The complete List, Create, Show and Edit pages live in [`apps/demo-material`](../apps/demo-material/src/app/pages). They go further: the flag is held per record (per resource for a create) across visits, a page that comes back while a save runs waits for it and then says whether it finished or failed, a request with no answer after 30 seconds shows a message above a disabled form, on every page of that record, until the server answers and the page says how that save ended, and a save whose next page does not open says it was saved. See [the save lock](./design-notes.md#the-save-lock-keeps-only-running-saves-with-a-30-second-timeout) for how it works and its limits.
 
 ## 7. Sign in
 
@@ -266,7 +272,7 @@ When a write fails because the user is not signed in, the generated pages say "Y
 ```ts
 import { provideSignInPath } from './pidrang/provide-sign-in-path';
 
-provideSignInPath('/your-sign-in-route')
+provideSignInPath('/your-sign-in-route');
 ```
 
 Pages generated by an older `pidrang init` keep their hard-coded `/login` link and ignore this provider. When the CLI keeps such pages or helpers, it names them; delete `src/app/pages` and `src/app/pidrang` together (the current pages need the current helpers) and run it again. It also lists every kept file that differs from what it generates now.

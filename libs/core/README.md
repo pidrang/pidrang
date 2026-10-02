@@ -14,7 +14,9 @@ See the [getting started guide](https://github.com/pidrang/pidrang/blob/main/doc
 
 ## Exports
 
-- `Resource`, `Field` (`name`, `label?`, `type`, `hidden?`), `FieldType`
+- `Resource`, `Field` (`name`, `label?`, `type`, `hidden?`, `readOnly?`, `nullable?`, `hasDefault?`), `FieldType` (`'text' | 'number' | 'boolean' | 'date' | 'timestamp' | 'time' | 'numeric'`)
+- `inputTypeForField()`, `formatPatternForField()`, `formatHintForField()`, `fieldRequiresValueWhenEmpty()` — pure, UI-agnostic helpers a `ResourceForm` implementation renders and validates a `Field` with
+- `buildResourcePayload(mode, fields, draft, isDirty)`, `shouldBlockSubmit(mode, dirty, invalid)`, `ResourceFormMode` (`'create' | 'edit'`) — the save payload and submit-blocking rule shared by every UI layer
 - `DataProvider`, `ListParams`, `ListResult<T>`, `Filter`, `FilterOperator`, `FilterValue`, `normalizeFilters()`, `validateListParams()`, `rejectUnsupportedFilters()`, `GetOneParams`, `CreateParams<T>`, `UpdateParams<T>`, `DeleteParams`
 - `AuthProvider`, `AuthIdentity`, `LoginParams`
 - `providePidrang({ dataProvider, resources, authProvider? })`
