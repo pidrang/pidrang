@@ -4,7 +4,8 @@
   [attr.aria-busy]="pending()"
   class="flex max-w-xl flex-col items-stretch gap-4"
 >
-  @for (field of fields(); track field.name) { @if (field.type === 'boolean') {
+  @for (field of editableFields(); track field.name) { @if (field.type ===
+  'boolean') {
   <label class="flex items-center gap-2 text-sm text-gray-700">
     <input
       type="checkbox"

@@ -17,6 +17,7 @@ export function buildResourcePayload<T extends Record<string, unknown>>(
   isDirty: (name: string) => boolean,
 ): Record<string, unknown> {
   const entries = fields
+    .filter((field) => !field.readOnly)
     .filter((field) =>
       mode === 'create'
         ? !field.hasDefault || isDirty(field.name)
@@ -34,4 +35,22 @@ export function shouldBlockSubmit(
   invalid: boolean,
 ): boolean {
   return mode === 'create' ? invalid : dirty && invalid;
+}
+
+function normalizedValue(field: Field, value: unknown): unknown {
+  if (!isTextInputBoundField(field) || typeof value === 'string') {
+    return value;
+  }
+  return value === null || value === undefined ? '' : String(value);
+}
+
+export function normalizeResourceValue<T extends Record<string, unknown>>(
+  fields: Field[],
+  value: T,
+): T {
+  const entries = Object.entries(value).map(([name, v]) => {
+    const field = fields.find((candidate) => candidate.name === name);
+    return [name, field ? normalizedValue(field, v) : v] as const;
+  });
+  return Object.fromEntries(entries) as T;
 }

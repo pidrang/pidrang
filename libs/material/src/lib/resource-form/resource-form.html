@@ -3,7 +3,8 @@
   (submit)="onSubmit($event)"
   [attr.aria-busy]="pending()"
 >
-  @for (field of fields(); track field.name) { @if (field.type === 'boolean') {
+  @for (field of editableFields(); track field.name) { @if (field.type ===
+  'boolean') {
   <mat-checkbox [formField]="fieldTree(field.name)"
     >{{ fieldLabel(field) }}</mat-checkbox
   >

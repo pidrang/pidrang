@@ -88,10 +88,11 @@ export function createPostgresSchemaProvider(
           column_default: string | null;
           is_nullable: 'YES' | 'NO';
           is_identity: 'YES' | 'NO';
+          identity_generation: 'ALWAYS' | 'BY DEFAULT' | null;
           is_generated: 'ALWAYS' | 'NEVER';
         }>(
           `select column_name, data_type, column_default, is_nullable,
-                  is_identity, is_generated
+                  is_identity, identity_generation, is_generated
            from information_schema.columns
            where table_schema = 'public' and table_name = $1
            order by ordinal_position`,
@@ -100,10 +101,12 @@ export function createPostgresSchemaProvider(
         return result.rows.map((row): Field => {
           const isPrimaryKey = row.column_name === primaryKeyColumn;
           const isGenerated = row.is_generated === 'ALWAYS';
+          const isAlwaysIdentity = row.identity_generation === 'ALWAYS';
           return {
             name: row.column_name,
             type: postgresTypeToFieldType(row.data_type),
-            readOnly: isPrimaryKey || isGenerated || undefined,
+            readOnly:
+              isPrimaryKey || isGenerated || isAlwaysIdentity || undefined,
             hasDefault:
               row.column_default !== null || row.is_identity === 'YES'
                 ? true

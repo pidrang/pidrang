@@ -12,16 +12,22 @@ const PRIMARY_KEY_DESCRIPTION = 'Note:\nThis is a Primary Key.<pk/>';
 const openApiSchema = {
   definitions: {
     products: {
-      required: ['id', 'name'],
+      required: ['id', 'name', 'in_stock', 'created_at'],
       properties: {
         id: {
           type: 'integer',
           format: 'int8',
           description: PRIMARY_KEY_DESCRIPTION,
+          default: 'gen_random_uuid()',
         },
         name: { type: 'string', format: 'text' },
-        in_stock: { type: 'boolean', format: 'bool' },
-        created_at: { type: 'string', format: 'timestamptz' },
+        in_stock: { type: 'boolean', format: 'bool', default: true },
+        created_at: {
+          type: 'string',
+          format: 'timestamptz',
+          default: 'now()',
+        },
+        notes: { type: 'string', format: 'text' },
       },
     },
     orders: {
@@ -99,21 +105,33 @@ describe('createServiceRoleSchemaProvider', () => {
   it('introspects a table into typed fields', async () => {
     const provider = createServiceRoleSchemaProvider(connection);
     expect(await provider.introspectTable('products')).toEqual([
-      { name: 'id', type: 'numeric', readOnly: true },
+      { name: 'id', type: 'numeric', readOnly: true, hasDefault: true },
       { name: 'name', type: 'text' },
       { name: 'in_stock', type: 'boolean', hasDefault: true },
       { name: 'created_at', type: 'timestamp', hasDefault: true },
+      { name: 'notes', type: 'text', nullable: true },
     ]);
   });
 
-  it('marks a column with a server default (not in "required") as hasDefault', async () => {
+  it('marks a column that carries a "default" key as hasDefault, even though it is NOT NULL and so still listed in "required"', async () => {
     const provider = createServiceRoleSchemaProvider(connection);
     const fields = await provider.introspectTable('products');
-    expect(fields.find((field) => field.name === 'in_stock')).toEqual(
+    expect(fields.find((field) => field.name === 'created_at')).toEqual(
       expect.objectContaining({ hasDefault: true }),
     );
     expect(
       fields.find((field) => field.name === 'name')?.hasDefault,
+    ).toBeUndefined();
+  });
+
+  it('marks a column absent from "required" as nullable', async () => {
+    const provider = createServiceRoleSchemaProvider(connection);
+    const fields = await provider.introspectTable('products');
+    expect(fields.find((field) => field.name === 'notes')).toEqual(
+      expect.objectContaining({ nullable: true }),
+    );
+    expect(
+      fields.find((field) => field.name === 'name')?.nullable,
     ).toBeUndefined();
   });
 

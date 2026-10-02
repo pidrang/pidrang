@@ -471,4 +471,184 @@ describe('ResourceForm', () => {
 
     expect(saved).toEqual([{ quantity: 0 }]);
   });
+
+  it('does not block create over an untouched, non-nullable, typed field that has a server default', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'created_at', type: 'timestamp', hasDefault: true },
+    ]);
+    fixture.componentRef.setInput('value', { created_at: '' });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{}]);
+  });
+
+  it('blocks create over a hasDefault field once the user clears it themselves', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'created_at', type: 'timestamp', hasDefault: true },
+    ]);
+    fixture.componentRef.setInput('value', {
+      created_at: '2024-01-01T10:00:00',
+    });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([]);
+  });
+
+  it('preserves full precision of a dirty numeric field even when it loaded as a JS number', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'amount', type: 'numeric' },
+    ]);
+    fixture.componentRef.setInput('value', { amount: 1 });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '9007199254740993';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ amount: '9007199254740993' }]);
+  });
+
+  it('saves a date field typed into after loading as null as a plain date string, not a Date', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'available_on', type: 'date', nullable: true },
+    ]);
+    fixture.componentRef.setInput('value', { available_on: null });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = '2024-06-01';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ available_on: '2024-06-01' }]);
+  });
+
+  it('does not emit save on edit when nothing was actually changed', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [{ name: 'name', type: 'text' }]);
+    fixture.componentRef.setInput('value', { name: 'Widget' });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([]);
+  });
+
+  it('never renders or sends a readOnly field, even if the caller forgot to filter it out', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'id', type: 'text', readOnly: true },
+      { name: 'name', type: 'text' },
+    ]);
+    fixture.componentRef.setInput('value', { id: 'abc-123', name: 'Widget' });
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelectorAll('input').length).toBe(1);
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    input.value = 'Widget v2';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget v2' }]);
+  });
+
+  it('shows the inline hint for a blank required field after a blocked submit attempt, even though it was never touched', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'starts_at', type: 'timestamp' },
+    ]);
+    fixture.componentRef.setInput('value', { starts_at: '' });
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Enter a timestamp',
+    );
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('Enter a timestamp');
+  });
 });
