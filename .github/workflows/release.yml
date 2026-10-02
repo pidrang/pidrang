@@ -27,7 +27,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/release-gate.yml
+    secrets:
+      SUPABASE_FIXTURES_TOKEN: ${{ secrets.SUPABASE_FIXTURES_TOKEN }}
+
   release:
+    needs: gate
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

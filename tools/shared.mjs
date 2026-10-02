@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-export const tarballDirectory = resolve(root, 'tmp/tarballs');
+export const tarballDirectory = resolve(
+  root,
+  process.env['PIDRANG_TARBALLS'] ?? 'tmp/tarballs',
+);
 
 export const packages = [
   {

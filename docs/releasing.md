@@ -58,6 +58,55 @@ The script restores `nx.json`, the package manifests and `pnpm-lock.yaml` when i
 
 Only the four libraries are in the `nx.json` release group. The three CLI packages are prepared and verified but not released until #57; the verification temporarily includes them so their tarballs are checked too.
 
+## The release gate
+
+`tools/release-gate/run.mjs` tests the tarballs as an application installs them. It never uses the source tree, tsconfig paths or pnpm workspace links.
+
+- `--mode build` (every pull request):
+  1. packs the seven packages at one version (`0.0.0-gate.<commit>` by default, `--version` to choose) into `tmp/release-gate/tarballs`, and runs the tarball and install checks above on them;
+  2. writes `tmp/release-gate/identities.json`: name, version, size and sha256 of each tarball, the source commit and the Node, npm and pnpm versions;
+  3. copies `tools/release-gate/consumers/material` and `tools/release-gate/consumers/tailwind` (two small Angular 22 apps with strict templates) to an empty directory outside the repository, and installs the tarballs there with npm, along with the Angular, Material, Supabase and Tailwind versions of the root `package.json`;
+  4. in the Material app, generates `resources.ts`, the CRUD pages and the resource routes with the installed `@pidrang/cli` from `tools/release-gate/generation-plan.json`;
+  5. runs `ng build` on both apps. The Tailwind build must contain the utility classes listed in `tools/release-gate/tailwind-classes.json`, which only exist when the `@source` line reaches the installed `@pidrang/tailwind`;
+  6. records each app's installed versions in `identities.json` and keeps its `package-lock.json`.
+- `--mode full` (the `Release gate` workflow, on every push to `main` and before every release) does the same against a local Supabase stack, then:
+  1. runs Playwright on both apps and both demos (`tools/release-gate/e2e`), each served by the gate on its own port. A test fails if the page sends a request to any host but `127.0.0.1`, `localhost` or `[::1]`. The fixtures are reloaded before each test, and the tests run one at a time;
+  2. runs the Supabase provider conformance suite and fails unless every conformance test ran and passed;
+  3. records the pidrang/supabase commit and `gate: { mode: 'full', passed: true }` in `identities.json`, then checks the tarballs against it again. Each run deletes `tmp/release-gate` before its first check, so a run that stops at any step leaves no manifest, or one with `passed: false`.
+
+The browser tests cover:
+
+- the list up to row eleven on page two;
+- create, show, edit and delete as the fixture writer;
+- delete confirmation;
+- a failed delete retried;
+- a refused delete;
+- a write that row-level security refuses;
+- the anonymous sign-in prompt and its link;
+- the action flags;
+- unknown resources next to an app route declared after the resource routes;
+- route input binding;
+- the Material theme and the Tailwind styles.
+
+Both workflows (`CI` in build mode, `Release gate` in full mode) upload `tmp/release-gate` (tarballs, manifest, build logs, Playwright report and traces of failed tests) as an artifact, even when it fails.
+
+### Running it locally
+
+1. Clone [pidrang/supabase](https://github.com/pidrang/supabase) at the commit in `tools/release-gate/supabase-fixtures.ref`.
+2. Start its stack with the CLI version the repository pins: `npx -y "supabase@$(cat supabase/.cli-version)" start`. If that clone is linked to the hosted project, `supabase/.temp` pins the hosted service versions, and some of those images are not published; add `-x storage-api,imgproxy`, the gate does not need them.
+3. In this repository:
+   ```bash
+   PIDRANG_SUPABASE_DIR=../supabase node tools/release-gate/run.mjs --mode full
+   ```
+
+The gate stops early when the pidrang/supabase clone is not at the pinned commit or has local changes, and when the demos' `environment.local.ts` does not hold the running stack's publishable key, so a stack started by another CLI version fails too. The gate runs every `supabase` command, including the ones in the fixture scripts, through the CLI version pinned in `supabase/.cli-version`, whatever is installed globally. It takes about six minutes and needs ports 4310, 4311, 4320 and 4321 free.
+
+### Publishing what the gate tested
+
+`node tools/release-gate/verify-identities.mjs <directory>` fails unless `<directory>/identities.json` records a passed full gate, then re-hashes the tarballs in `<directory>/tarballs` and fails when any of them differs from the manifest in name, version, size or content, or when one was not tested. Publishing (#25, #57) must run the gate at the release version, download its artifact and publish those tarballs after this check, rather than letting `nx release` pack them again. Until then, the `Release` workflow only runs the gate first and stops when it fails.
+
+The workflow checks out pidrang/supabase with the `SUPABASE_FIXTURES_TOKEN` secret: a fine-grained token with read-only access to the contents of that repository.
+
 ## One-time setup
 
 - The `@pidrang` organization exists on npm. Make sure the publishing account is a member with publish rights. An organization does not reserve the unscoped `pidrang` package name used by the CLI: check that `npm view pidrang` returns 404 before the CLI release.
