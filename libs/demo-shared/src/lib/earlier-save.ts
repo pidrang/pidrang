@@ -43,5 +43,5 @@ export function injectEarlierSave(
     earlier.set(null);
   }
 
-  return { finished, failure, clear };
+  return { outcome: earlier.asReadonly(), finished, failure, clear };
 }

@@ -1,6 +1,7 @@
 export * from './lib/auth-required-error';
 export * from './lib/can-match-resource-action';
 export * from './lib/delete-failure';
+export * from './lib/delete-failure-of';
 export * from './lib/demo-account';
 export * from './lib/demo-app-config';
 export * from './lib/demo-environment';

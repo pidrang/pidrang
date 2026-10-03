@@ -2,7 +2,12 @@ import { Provider } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { DataProvider, PidrangError, providePidrang } from '@pidrang/core';
+import {
+  AuthProvider,
+  DataProvider,
+  PidrangError,
+  providePidrang,
+} from '@pidrang/core';
 import { provideSignInPath } from '@pidrang/demo-shared';
 
 import { ResourceListPage } from './resource-list-page';
@@ -34,6 +39,16 @@ async function setup(
 ) {
   const deletes: string[] = [];
   let lists = 0;
+  let sessionChanged: () => void = () => undefined;
+  const authProvider: AuthProvider = {
+    login: () => Promise.resolve(),
+    logout: () => Promise.resolve(),
+    getIdentity: () => Promise.resolve(null),
+    onSessionChange: (listener) => {
+      sessionChanged = listener;
+      return () => undefined;
+    },
+  };
   const dataProvider: DataProvider = {
     getList: <T>() => {
       lists += 1;
@@ -54,6 +69,7 @@ async function setup(
       ...providers,
       providePidrang({
         dataProvider,
+        authProvider,
         resources: [
           { name: 'products', fields: [{ name: 'name', type: 'text' }] },
           { name: 'orders', fields: [{ name: 'name', type: 'text' }] },
@@ -64,12 +80,20 @@ async function setup(
   const fixture = TestBed.createComponent(ResourceListPage);
   fixture.componentRef.setInput('resource', 'products');
   await settle(fixture);
-  return { fixture, deletes, listCalls: () => lists };
+  return {
+    fixture,
+    deletes,
+    listCalls: () => lists,
+    changeSession: () => sessionChanged(),
+  };
 }
 
 async function settle(
   fixture: ReturnType<typeof TestBed.createComponent<ResourceListPage>>,
 ): Promise<void> {
+  fixture.detectChanges();
+  await fixture.whenStable();
+  await new Promise((resolve) => setTimeout(resolve));
   fixture.detectChanges();
   await fixture.whenStable();
   fixture.detectChanges();
@@ -94,6 +118,30 @@ function pageSizeDisabled(element: HTMLElement): boolean {
 
 function alertText(element: HTMLElement): string {
   return element.querySelector('[role="alert"]')?.textContent ?? '';
+}
+
+function statusText(element: HTMLElement): string {
+  return Array.from(element.querySelectorAll('[role="status"]'))
+    .map((node) => node.textContent ?? '')
+    .join(' ');
+}
+
+async function roundTrip(
+  fixture: ReturnType<typeof TestBed.createComponent<ResourceListPage>>,
+): Promise<void> {
+  fixture.componentRef.setInput('resource', 'orders');
+  await settle(fixture);
+  fixture.componentRef.setInput('resource', 'products');
+  await settle(fixture);
+}
+
+async function reopen(): Promise<
+  ReturnType<typeof TestBed.createComponent<ResourceListPage>>
+> {
+  const next = TestBed.createComponent(ResourceListPage);
+  next.componentRef.setInput('resource', 'products');
+  await settle(next);
+  return next;
 }
 
 describe('ResourceListPage delete', () => {
@@ -225,7 +273,242 @@ describe('ResourceListPage delete', () => {
     await settle(fixture);
   });
 
-  it('keeps a newer delete locked when a stale one settles after a round trip', async () => {
+  it('refuses a second delete after A -> B -> A while the first one runs', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, deletes } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    await roundTrip(fixture);
+
+    expect(
+      deleteButtons(fixture.nativeElement).every((button) => button.disabled),
+    ).toBe(true);
+    expect(statusText(fixture.nativeElement)).toContain(
+      'A delete on this resource is still running',
+    );
+    await fixture.componentInstance['remove'](ROWS[0]);
+    await fixture.componentInstance['remove'](ROWS[1]);
+    expect(deletes).toEqual(['1']);
+
+    pending.resolve({});
+    await settle(fixture);
+    await settle(fixture);
+    expect(
+      deleteButtons(fixture.nativeElement).every((button) => !button.disabled),
+    ).toBe(true);
+  });
+
+  it('refuses a second delete from a new page while the first one runs', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, deletes } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.destroy();
+    const next = await reopen();
+
+    expect(
+      deleteButtons(next.nativeElement).every((button) => button.disabled),
+    ).toBe(true);
+    await next.componentInstance['remove'](ROWS[0]);
+    expect(deletes).toEqual(['1']);
+
+    pending.resolve({});
+    await settle(next);
+  });
+
+  it('says the earlier delete finished and reads the list again on return', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, listCalls } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    await roundTrip(fixture);
+    const before = listCalls();
+
+    pending.resolve({});
+    await settle(fixture);
+    await settle(fixture);
+
+    expect(statusText(fixture.nativeElement)).toContain(
+      'The earlier delete finished.',
+    );
+    expect(listCalls()).toBe(before + 1);
+  });
+
+  it('says the earlier delete failed on return, with its category', async () => {
+    const pending = deferred<unknown>();
+    const { fixture } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    await roundTrip(fixture);
+
+    pending.reject(
+      new PidrangError('permission denied for table products', {
+        category: 'forbidden',
+      }),
+    );
+    await settle(fixture);
+    await settle(fixture);
+
+    expect(alertText(fixture.nativeElement)).toContain(
+      'The earlier delete failed: permission denied for table products',
+    );
+    expect(alertText(fixture.nativeElement)).toContain(
+      'You are not allowed to delete this record.',
+    );
+    expect(
+      deleteButtons(fixture.nativeElement).every((button) => !button.disabled),
+    ).toBe(true);
+  });
+
+  it('offers sign-in when the earlier delete failed for lack of a session', async () => {
+    const pending = deferred<unknown>();
+    const { fixture } = await setup(
+      () => pending.promise,
+      [provideSignInPath('/auth/sign-in')],
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    const next = await (async () => {
+      fixture.destroy();
+      return reopen();
+    })();
+
+    pending.reject(
+      new PidrangError('JWT expired', { category: 'unauthenticated' }),
+    );
+    await settle(next);
+    await settle(next);
+
+    expect(alertText(next.nativeElement)).toContain(
+      'The earlier delete failed: JWT expired',
+    );
+    expect(
+      next.nativeElement
+        .querySelector('[role="alert"] a')
+        ?.getAttribute('href'),
+    ).toBe('/auth/sign-in');
+  });
+
+  it('reads the list again when a waited-on delete succeeds after a session change', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, listCalls, changeSession } = await setup(
+      () => pending.promise,
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    await roundTrip(fixture);
+    changeSession();
+    await settle(fixture);
+    const before = listCalls();
+
+    pending.resolve({});
+    await settle(fixture);
+    await settle(fixture);
+
+    expect(listCalls()).toBe(before + 1);
+    expect(statusText(fixture.nativeElement)).not.toContain(
+      'The earlier delete finished.',
+    );
+  });
+
+  it('does not show its own failure once the session changed', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, changeSession } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.detectChanges();
+    changeSession();
+    pending.reject(new Error('row 1 of products is referenced by orders'));
+    await settle(fixture);
+    await settle(fixture);
+
+    expect(alertText(fixture.nativeElement)).toBe('');
+  });
+
+  it('hides a delete failure already shown once the session changes', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, changeSession } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    pending.reject(new Error('row 1 of products is referenced by orders'));
+    await settle(fixture);
+    expect(alertText(fixture.nativeElement)).toContain('referenced by orders');
+
+    changeSession();
+    await settle(fixture);
+    expect(alertText(fixture.nativeElement)).toBe('');
+  });
+
+  it('hides an earlier delete failure already shown once the session changes', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, changeSession } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    await roundTrip(fixture);
+    pending.reject(new Error('row 1 of products is referenced by orders'));
+    await settle(fixture);
+    await settle(fixture);
+    expect(alertText(fixture.nativeElement)).toContain(
+      'The earlier delete failed',
+    );
+
+    changeSession();
+    await settle(fixture);
+    expect(alertText(fixture.nativeElement)).toBe('');
+  });
+
+  it('reads the list again when its own delete succeeds after a session change', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, listCalls, changeSession } = await setup(
+      () => pending.promise,
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    fixture.detectChanges();
+    changeSession();
+    await settle(fixture);
+    const before = listCalls();
+
+    pending.resolve({});
+    await settle(fixture);
+    await settle(fixture);
+
+    expect(listCalls()).toBe(before + 1);
+  });
+
+  it('leaves a destroyed page alone and lets the next page report the outcome', async () => {
+    const pending = deferred<unknown>();
+    const { fixture } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    deleteButtons(fixture.nativeElement)[0].click();
+    const state = fixture.componentInstance as unknown as {
+      deleteFailure: () => unknown;
+    };
+    fixture.destroy();
+    const next = await reopen();
+
+    pending.reject(new Error('Failed to fetch'));
+    await settle(next);
+    await settle(next);
+
+    expect(state.deleteFailure()).toBeNull();
+    expect(alertText(next.nativeElement)).toContain(
+      'The earlier delete failed: Failed to fetch',
+    );
+  });
+
+  it('runs deletes on two resources independently', async () => {
     const calls: Deferred<unknown>[] = [];
     const { fixture, deletes } = await setup(() => {
       const call = deferred<unknown>();
@@ -237,48 +520,46 @@ describe('ResourceListPage delete', () => {
     deleteButtons(fixture.nativeElement)[0].click();
     fixture.componentRef.setInput('resource', 'orders');
     await settle(fixture);
-    fixture.componentRef.setInput('resource', 'products');
-    await settle(fixture);
-    deleteButtons(fixture.nativeElement)[0].click();
+    deleteButtons(fixture.nativeElement)[1].click();
     fixture.detectChanges();
 
+    expect(deletes).toEqual(['1', '2']);
+    calls[1].resolve({});
     calls[0].resolve({});
     await settle(fixture);
+  });
 
+  it('says a delete has no answer after 30 seconds and keeps delete disabled until it settles', async () => {
+    const pending = deferred<unknown>();
+    const { fixture, deletes, listCalls } = await setup(() => pending.promise);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    deleteButtons(fixture.nativeElement)[0].click();
+    await vi.advanceTimersByTimeAsync(30_000);
+    vi.useRealTimers();
+    await settle(fixture);
+
+    const alert = alertText(fixture.nativeElement);
+    expect(alert).toContain(
+      'No answer from the server after 30 seconds. The delete may still be applied',
+    );
+    expect(alert).not.toContain('form');
+    expect(alert).not.toContain('reload');
     expect(
       deleteButtons(fixture.nativeElement).every((button) => button.disabled),
     ).toBe(true);
     await fixture.componentInstance['remove'](ROWS[1]);
-    expect(deletes).toEqual(['1', '1']);
+    expect(deletes).toEqual(['1']);
 
-    calls[1].resolve({});
+    const before = listCalls();
+    pending.resolve({});
     await settle(fixture);
     await settle(fixture);
-
+    expect(listCalls()).toBe(before + 1);
     expect(
       deleteButtons(fixture.nativeElement).every((button) => !button.disabled),
     ).toBe(true);
-  });
-
-  it('does not show a stale failure after leaving and coming back to the resource', async () => {
-    const pending = deferred<unknown>();
-    const { fixture } = await setup(() => pending.promise);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-    deleteButtons(fixture.nativeElement)[0].click();
-    fixture.componentRef.setInput('resource', 'orders');
-    await settle(fixture);
-    fixture.componentRef.setInput('resource', 'products');
-    await settle(fixture);
-
-    pending.reject(
-      new PidrangError('permission denied for table products', {
-        category: 'forbidden',
-      }),
-    );
-    await settle(fixture);
-
-    expect(alertText(fixture.nativeElement)).toBe('');
   });
 
   it('locks pagination while a delete is in flight', async () => {
@@ -335,7 +616,7 @@ describe('ResourceListPage delete', () => {
 describe('ResourceListPage delete consistency', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('shows the database state after two deletes whose refreshes overlap', async () => {
+  it('shows the database state after two deletes whose list reads overlap', async () => {
     let rows = [...ROWS];
     let holdLists = false;
     const listGates: Deferred<void>[] = [];
@@ -386,13 +667,15 @@ describe('ResourceListPage delete consistency', () => {
     await settle(fixture);
     fixture.componentRef.setInput('resource', 'products');
     await settle(fixture);
-    deleteButtons(fixture.nativeElement)[1].click();
-    fixture.detectChanges();
 
     holdLists = true;
     deleteCalls.get('1')?.resolve();
     await flush(fixture);
+    const second = fixture.componentInstance['remove'](ROWS[1]);
+    await flush(fixture);
+    expect(deleteCalls.has('2')).toBe(true);
     deleteCalls.get('2')?.resolve();
+    await second;
     await flush(fixture);
     holdLists = false;
     for (const gate of listGates) {
