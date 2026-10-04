@@ -120,6 +120,12 @@ The list pages use the same lock for delete, keyed on the resource: one delete r
 
 When the save succeeds but the next page fails to open, the error goes to Angular's `ErrorHandler` in a `setTimeout`, outside the save: an app whose `ErrorHandler` rethrows would otherwise turn a saved record into a reported save failure.
 
+### The demos' sign-in runs one at a time
+
+`libs/demo-shared/src/lib/sign-in.ts`, `sign-in-state.ts`
+
+The sign-in form submits natively, so Enter in either field signs in. While a sign-in runs, a root state, `SIGN_IN_STATE`, disables the form and the demo-account button on every visit of the page and shows "Signing in…". Supabase saves the session of each successful sign-in as it answers, so two sign-ins in flight could end on the older account; one at a time prevents that. Both demos call the same `injectSignIn()`. The lock is released when the request settles, not when the page is left, and a page left before then does not navigate. A failure is kept in the same root state, so a visit that came back while the sign-in ran shows it; it is kept only when a sign-in page is open to show it, and cleared by the next attempt, by a success, and when the last open sign-in page is left, so a later visit never shows an old error. A session change (another tab signing in, a sign-out) clears it too, and a failure from before that change is dropped. After 30 seconds without an answer, the page says to reload it and keeps the form disabled: a late answer would still change the session, so the lock is never released early, but reloading is a safe way out, since the session is saved by the page's own script and a reload drops the request before its answer is saved. The demos' sign-in page is not part of what `pidrang init` generates.
+
 ### Local Supabase key
 
 `apps/demo-material/src/environments/environment.local.ts`, `apps/demo-tailwind/src/environments/environment.local.ts`

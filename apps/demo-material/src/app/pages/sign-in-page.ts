@@ -1,7 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
-import { injectAuthProvider } from '@pidrang/core';
-import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
+import { DEMO_ACCOUNT, DemoAccount, injectSignIn } from '@pidrang/demo-shared';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -15,7 +13,7 @@ import { MatInputModule } from '@angular/material/input';
       <mat-card-content>
         <h1>Sign in</h1>
 
-        <form>
+        <form (submit)="submit($event)">
           <mat-form-field>
             <mat-label>Email</mat-label>
             <input
@@ -39,11 +37,19 @@ import { MatInputModule } from '@angular/material/input';
           @if (error()) {
             <p>{{ error() }}</p>
           }
+          @if (stalled()) {
+            <p role="alert">
+              No answer from the server after 30 seconds. Reload the page to try
+              again.
+            </p>
+          } @else if (pending()) {
+            <p role="status">Signing in…</p>
+          }
           <button
             mat-flat-button
             color="primary"
-            type="button"
-            (click)="submit()"
+            type="submit"
+            [disabled]="pending()"
           >
             Sign in
           </button>
@@ -64,6 +70,7 @@ import { MatInputModule } from '@angular/material/input';
             <button
               mat-stroked-button
               type="button"
+              [disabled]="pending()"
               (click)="signInAsDemo(account)"
             >
               Sign in as the demo account
@@ -113,27 +120,30 @@ import { MatInputModule } from '@angular/material/input';
 export class SignInPage {
   protected readonly email = signal('');
   protected readonly password = signal('');
-  protected readonly error = signal<string | null>(null);
   protected readonly demoAccount = inject(DEMO_ACCOUNT);
 
-  private readonly authProvider = injectAuthProvider();
-  private readonly router = inject(Router);
+  private readonly signInState = injectSignIn();
+  protected readonly pending = this.signInState.pending;
+  protected readonly stalled = this.signInState.stalled;
+  protected readonly error = this.signInState.error;
 
-  protected async signInAsDemo(account: DemoAccount): Promise<void> {
-    this.email.set(account.email);
-    this.password.set(account.password);
-    await this.submit();
+  protected async submit(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    await this.signInState.signIn({
+      email: this.email(),
+      password: this.password(),
+    });
   }
 
-  protected async submit(): Promise<void> {
-    try {
-      await this.authProvider.login({
-        email: this.email(),
-        password: this.password(),
-      });
-      await this.router.navigate(['/']);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : String(err));
+  protected async signInAsDemo(account: DemoAccount): Promise<void> {
+    if (this.pending()) {
+      return;
     }
+    this.email.set(account.email);
+    this.password.set(account.password);
+    await this.signInState.signIn({
+      email: account.email,
+      password: account.password,
+    });
   }
 }
