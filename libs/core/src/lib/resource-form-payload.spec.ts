@@ -79,6 +79,28 @@ describe('buildResourcePayload', () => {
     expect(payload).toEqual({ notes: null });
   });
 
+  it('sends an untouched boolean field that has no server default, since unchecked is a real false, not an absence', () => {
+    const fields = [field({ name: 'in_stock', type: 'boolean' })];
+    const payload = buildResourcePayload(
+      fields,
+      { in_stock: false },
+      () => false,
+    );
+    expect(payload).toEqual({ in_stock: false });
+  });
+
+  it('omits an untouched boolean field that has a server default, same as any other defaulted field', () => {
+    const fields = [
+      field({ name: 'active', type: 'boolean', hasDefault: true }),
+    ];
+    const payload = buildResourcePayload(
+      fields,
+      { active: false },
+      () => false,
+    );
+    expect(payload).toEqual({});
+  });
+
   it('never sends a readOnly field, even if the caller left it in fields and it is dirty', () => {
     const fields = [
       field({ name: 'id', readOnly: true }),

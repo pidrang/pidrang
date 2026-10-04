@@ -10,13 +10,23 @@ function valueForField(field: Field, value: unknown): unknown {
   return value;
 }
 
+function shouldIncludeField(
+  field: Field,
+  isDirty: (name: string) => boolean,
+): boolean {
+  if (field.type === 'boolean' && !field.hasDefault) {
+    return true;
+  }
+  return isDirty(field.name);
+}
+
 export function buildResourcePayload<T extends Record<string, unknown>>(
   fields: Field[],
   draft: T,
   isDirty: (name: string) => boolean,
 ): Record<string, unknown> {
   const entries = fields
-    .filter((field) => !field.readOnly && isDirty(field.name))
+    .filter((field) => !field.readOnly && shouldIncludeField(field, isDirty))
     .map(
       (field) => [field.name, valueForField(field, draft[field.name])] as const,
     );
