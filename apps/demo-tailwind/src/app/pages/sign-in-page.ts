@@ -1,7 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
-import { injectAuthProvider } from '@pidrang/core';
-import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
+import { DEMO_ACCOUNT, DemoAccount, injectSignIn } from '@pidrang/demo-shared';
 
 @Component({
   selector: 'app-sign-in-page',
@@ -37,9 +35,18 @@ import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
           @if (error()) {
             <p class="text-red-600">{{ error() }}</p>
           }
+          @if (stalled()) {
+            <p role="alert" class="text-red-600">
+              No answer from the server after 30 seconds. Reload the page to try
+              again.
+            </p>
+          } @else if (pending()) {
+            <p role="status" class="text-gray-500">Signing in…</p>
+          }
           <button
             type="submit"
-            class="self-end rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            [disabled]="pending()"
+            class="self-end rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Sign in
           </button>
@@ -66,7 +73,8 @@ import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
             </p>
             <button
               type="button"
-              class="mt-3 rounded border border-gray-300 px-4 py-2 text-gray-900 hover:bg-gray-50"
+              class="mt-3 rounded border border-gray-300 px-4 py-2 text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              [disabled]="pending()"
               (click)="signInAsDemo(account)"
             >
               Sign in as the demo account
@@ -80,32 +88,30 @@ import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
 export class SignInPage {
   protected readonly email = signal('');
   protected readonly password = signal('');
-  protected readonly error = signal<string | null>(null);
   protected readonly demoAccount = inject(DEMO_ACCOUNT);
 
-  private readonly authProvider = injectAuthProvider();
-  private readonly router = inject(Router);
+  private readonly signInState = injectSignIn();
+  protected readonly pending = this.signInState.pending;
+  protected readonly stalled = this.signInState.stalled;
+  protected readonly error = this.signInState.error;
 
   protected async submit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    await this.signIn();
+    await this.signInState.signIn({
+      email: this.email(),
+      password: this.password(),
+    });
   }
 
   protected async signInAsDemo(account: DemoAccount): Promise<void> {
+    if (this.pending()) {
+      return;
+    }
     this.email.set(account.email);
     this.password.set(account.password);
-    await this.signIn();
-  }
-
-  private async signIn(): Promise<void> {
-    try {
-      await this.authProvider.login({
-        email: this.email(),
-        password: this.password(),
-      });
-      await this.router.navigate(['/']);
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : String(err));
-    }
+    await this.signInState.signIn({
+      email: account.email,
+      password: account.password,
+    });
   }
 }

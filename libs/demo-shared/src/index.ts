@@ -28,3 +28,5 @@ export * from './lib/save-outcome';
 export * from './lib/save-timeout-error';
 export * from './lib/sign-in-path';
 export * from './lib/sign-in-url';
+export * from './lib/sign-in';
+export * from './lib/sign-in-state';
