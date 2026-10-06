@@ -133,7 +133,7 @@ export class ResourceForm<T extends Record<string, unknown>> {
   }
 
   private hasBlockingError(): boolean {
-    return this.fields().some((field) => this.blocksSubmit(field));
+    return this.editableFields().some((field) => this.blocksSubmit(field));
   }
 
   private blocksSubmit(field: Field): boolean {
@@ -145,7 +145,7 @@ export class ResourceForm<T extends Record<string, unknown>> {
   }
 
   private touchBlockingFields(): void {
-    for (const field of this.fields()) {
+    for (const field of this.editableFields()) {
       if (this.blocksSubmit(field)) {
         (this.model as Record<string, SignalField<unknown>>)
           [field.name]()
@@ -165,8 +165,11 @@ export class ResourceForm<T extends Record<string, unknown>> {
   }
 
   private buildPayload(): Partial<T> {
-    return buildResourcePayload(this.fields(), this.draft(), (name) =>
-      this.isDirty(name),
+    return buildResourcePayload(
+      this.mode(),
+      this.fields(),
+      this.draft(),
+      (name) => this.isDirty(name),
     ) as Partial<T>;
   }
 }

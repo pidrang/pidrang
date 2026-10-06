@@ -10,23 +10,31 @@ function valueForField(field: Field, value: unknown): unknown {
   return value;
 }
 
+function isUncheckedAnswerOnCreate(
+  mode: ResourceFormMode,
+  field: Field,
+): boolean {
+  return mode === 'create' && field.type === 'boolean' && !field.hasDefault;
+}
+
 function shouldIncludeField(
+  mode: ResourceFormMode,
   field: Field,
   isDirty: (name: string) => boolean,
 ): boolean {
-  if (field.type === 'boolean' && !field.hasDefault) {
-    return true;
-  }
-  return isDirty(field.name);
+  return isDirty(field.name) || isUncheckedAnswerOnCreate(mode, field);
 }
 
 export function buildResourcePayload<T extends Record<string, unknown>>(
+  mode: ResourceFormMode,
   fields: Field[],
   draft: T,
   isDirty: (name: string) => boolean,
 ): Record<string, unknown> {
   const entries = fields
-    .filter((field) => !field.readOnly && shouldIncludeField(field, isDirty))
+    .filter(
+      (field) => !field.readOnly && shouldIncludeField(mode, field, isDirty),
+    )
     .map(
       (field) => [field.name, valueForField(field, draft[field.name])] as const,
     );

@@ -730,4 +730,129 @@ describe('ResourceForm', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Enter a timestamp');
   });
+
+  it('does not emit save on edit when only an untouched boolean without a default is in the form', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'in_stock', type: 'boolean' },
+    ]);
+    fixture.componentRef.setInput('value', { name: 'Widget', in_stock: false });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([]);
+  });
+
+  it('sends only the renamed field on edit, not an untouched boolean without a default', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'in_stock', type: 'boolean' },
+    ]);
+    fixture.componentRef.setInput('value', { name: 'Widget', in_stock: true });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const nameInput: HTMLInputElement = fixture.nativeElement.querySelector(
+      'input:not([type="checkbox"])',
+    );
+    nameInput.value = 'Widget v2';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget v2' }]);
+  });
+
+  it('sends an untouched boolean without a default on create, but not one with a default', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'in_stock', type: 'boolean' },
+      { name: 'active', type: 'boolean', hasDefault: true },
+    ]);
+    fixture.componentRef.setInput('value', {
+      name: '',
+      in_stock: false,
+      active: false,
+    });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const nameInput: HTMLInputElement = fixture.nativeElement.querySelector(
+      'input:not([type="checkbox"])',
+    );
+    nameInput.value = 'Widget';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget', in_stock: false }]);
+  });
+
+  it.each(['create', 'edit'] as const)(
+    'on %s, does not let an unrendered, invalid readOnly field block save',
+    async (mode) => {
+      TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+      const fixture = TestBed.createComponent(ResourceForm);
+      fixture.componentRef.setInput('mode', mode);
+      fixture.componentRef.setInput('fields', [
+        { name: 'computed_at', type: 'timestamp', readOnly: true },
+        { name: 'total', type: 'numeric', readOnly: true },
+        { name: 'name', type: 'text' },
+      ]);
+      fixture.componentRef.setInput('value', {
+        computed_at: '',
+        total: 'not-a-number',
+        name: '',
+      });
+      await fixture.whenStable();
+
+      const saved: unknown[] = [];
+      fixture.componentInstance.save.subscribe((value: unknown) =>
+        saved.push(value),
+      );
+
+      const input: HTMLInputElement =
+        fixture.nativeElement.querySelector('input');
+      input.value = 'Widget';
+      input.dispatchEvent(new Event('input'));
+      await fixture.whenStable();
+
+      fixture.nativeElement.querySelector('button').click();
+      await fixture.whenStable();
+
+      expect(saved).toEqual([{ name: 'Widget' }]);
+    },
+  );
 });
