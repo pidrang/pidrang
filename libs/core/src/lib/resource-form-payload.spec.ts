@@ -2,6 +2,7 @@ import { Field } from './field';
 import {
   buildResourcePayload,
   normalizeResourceValue,
+  ResourceFormMode,
   shouldBlockSubmit,
 } from './resource-form-payload';
 
@@ -16,6 +17,7 @@ describe('buildResourcePayload', () => {
       field({ name: 'status', hasDefault: true }),
     ];
     const payload = buildResourcePayload(
+      'create',
       fields,
       { name: 'Widget', status: '' },
       (name) => name === 'name',
@@ -25,7 +27,12 @@ describe('buildResourcePayload', () => {
 
   it('omits an untouched, nullable, plain text field instead of sending an empty string', () => {
     const fields = [field({ name: 'note', nullable: true })];
-    const payload = buildResourcePayload(fields, { note: '' }, () => false);
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { note: '' },
+      () => false,
+    );
     expect(payload).toEqual({});
   });
 
@@ -33,13 +40,19 @@ describe('buildResourcePayload', () => {
     const fields = [
       field({ name: 'active', type: 'boolean', hasDefault: true }),
     ];
-    const payload = buildResourcePayload(fields, { active: false }, () => true);
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { active: false },
+      () => true,
+    );
     expect(payload).toEqual({ active: false });
   });
 
   it('preserves full precision of a touched numeric value unchanged', () => {
     const fields = [field({ name: 'amount', type: 'numeric' })];
     const payload = buildResourcePayload(
+      'create',
       fields,
       { amount: '12345678901234.5678' },
       () => true,
@@ -51,54 +64,57 @@ describe('buildResourcePayload', () => {
     const fields = [
       field({ name: 'starts_at', type: 'timestamp', nullable: true }),
     ];
-    const payload = buildResourcePayload(fields, { starts_at: '' }, () => true);
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { starts_at: '' },
+      () => true,
+    );
     expect(payload).toEqual({ starts_at: null });
   });
 
   it('does not convert an empty non-nullable field to null', () => {
     const fields = [field({ name: 'starts_at', type: 'timestamp' })];
-    const payload = buildResourcePayload(fields, { starts_at: '' }, () => true);
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { starts_at: '' },
+      () => true,
+    );
     expect(payload).toEqual({ starts_at: '' });
   });
 
   it('does not convert an empty plain text field to null', () => {
     const fields = [field({ name: 'name', nullable: true })];
-    const payload = buildResourcePayload(fields, { name: '' }, () => true);
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { name: '' },
+      () => true,
+    );
     expect(payload).toEqual({ name: '' });
   });
 
   it('sends an explicit 0 for a touched number field', () => {
     const fields = [field({ name: 'quantity', type: 'number' })];
-    const payload = buildResourcePayload(fields, { quantity: 0 }, () => true);
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { quantity: 0 },
+      () => true,
+    );
     expect(payload).toEqual({ quantity: 0 });
   });
 
   it('preserves an explicit null for a touched field', () => {
     const fields = [field({ name: 'notes', nullable: true })];
-    const payload = buildResourcePayload(fields, { notes: null }, () => true);
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { notes: null },
+      () => true,
+    );
     expect(payload).toEqual({ notes: null });
-  });
-
-  it('sends an untouched boolean field that has no server default, since unchecked is a real false, not an absence', () => {
-    const fields = [field({ name: 'in_stock', type: 'boolean' })];
-    const payload = buildResourcePayload(
-      fields,
-      { in_stock: false },
-      () => false,
-    );
-    expect(payload).toEqual({ in_stock: false });
-  });
-
-  it('omits an untouched boolean field that has a server default, same as any other defaulted field', () => {
-    const fields = [
-      field({ name: 'active', type: 'boolean', hasDefault: true }),
-    ];
-    const payload = buildResourcePayload(
-      fields,
-      { active: false },
-      () => false,
-    );
-    expect(payload).toEqual({});
   });
 
   it('never sends a readOnly field, even if the caller left it in fields and it is dirty', () => {
@@ -107,11 +123,104 @@ describe('buildResourcePayload', () => {
       field({ name: 'name' }),
     ];
     const payload = buildResourcePayload(
+      'create',
       fields,
       { id: 'tampered', name: 'Widget' },
       () => true,
     );
     expect(payload).toEqual({ name: 'Widget' });
+  });
+});
+
+describe('buildResourcePayload on edit', () => {
+  it('omits an untouched non-boolean field, with or without flags', () => {
+    const fields = [
+      field({ name: 'name' }),
+      field({ name: 'note', nullable: true }),
+      field({ name: 'status', hasDefault: true }),
+    ];
+    const payload = buildResourcePayload(
+      'edit',
+      fields,
+      { name: 'Widget', note: '', status: 'draft' },
+      () => false,
+    );
+    expect(payload).toEqual({});
+  });
+});
+
+describe('buildResourcePayload for an untouched boolean', () => {
+  const cases: {
+    mode: ResourceFormMode;
+    hasDefault: boolean;
+    nullable: boolean;
+    sent: boolean;
+  }[] = [
+    { mode: 'create', hasDefault: false, nullable: false, sent: true },
+    { mode: 'create', hasDefault: false, nullable: true, sent: true },
+    { mode: 'create', hasDefault: true, nullable: false, sent: false },
+    { mode: 'create', hasDefault: true, nullable: true, sent: false },
+    { mode: 'edit', hasDefault: false, nullable: false, sent: false },
+    { mode: 'edit', hasDefault: false, nullable: true, sent: false },
+    { mode: 'edit', hasDefault: true, nullable: false, sent: false },
+    { mode: 'edit', hasDefault: true, nullable: true, sent: false },
+  ];
+
+  it.each(cases)(
+    'on $mode, hasDefault $hasDefault, nullable $nullable: sent $sent',
+    ({ mode, hasDefault, nullable, sent }) => {
+      const fields = [
+        field({ name: 'in_stock', type: 'boolean', hasDefault, nullable }),
+      ];
+      const payload = buildResourcePayload(
+        mode,
+        fields,
+        { in_stock: false },
+        () => false,
+      );
+      expect(payload).toEqual(sent ? { in_stock: false } : {});
+    },
+  );
+
+  it.each(['create', 'edit'] as const)(
+    'on %s, sends a touched boolean whatever its flags',
+    (mode) => {
+      const fields = [
+        field({ name: 'in_stock', type: 'boolean', hasDefault: true }),
+      ];
+      const payload = buildResourcePayload(
+        mode,
+        fields,
+        { in_stock: true },
+        () => true,
+      );
+      expect(payload).toEqual({ in_stock: true });
+    },
+  );
+
+  it('on edit, sends only the renamed field next to an untouched boolean', () => {
+    const fields = [
+      field({ name: 'name' }),
+      field({ name: 'in_stock', type: 'boolean' }),
+    ];
+    const payload = buildResourcePayload(
+      'edit',
+      fields,
+      { name: 'Widget v2', in_stock: false },
+      (name) => name === 'name',
+    );
+    expect(payload).toEqual({ name: 'Widget v2' });
+  });
+
+  it('never sends a readOnly boolean, even on create without a default', () => {
+    const fields = [field({ name: 'locked', type: 'boolean', readOnly: true })];
+    const payload = buildResourcePayload(
+      'create',
+      fields,
+      { locked: false },
+      () => false,
+    );
+    expect(payload).toEqual({});
   });
 });
 
