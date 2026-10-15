@@ -57,7 +57,7 @@ describe('ResourceForm', () => {
     fixture.componentRef.setInput('mode', 'create');
     fixture.componentRef.setInput('fields', [
       { name: 'name', type: 'text' },
-      { name: 'price', type: 'number' },
+      { name: 'price', type: 'number', hasDefault: true },
     ]);
     fixture.componentRef.setInput('value', { name: 'USB-C dock', price: 129 });
     await fixture.whenStable();
@@ -817,6 +817,71 @@ describe('ResourceForm', () => {
     await fixture.whenStable();
 
     expect(saved).toEqual([{ name: 'Widget', in_stock: false }]);
+  });
+
+  it('sends an untouched number without a default on create as shown, but not one with a default', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'quantity', type: 'number' },
+      { name: 'rating', type: 'number', nullable: true },
+      { name: 'price', type: 'number', hasDefault: true },
+    ]);
+    fixture.componentRef.setInput('value', {
+      name: '',
+      quantity: 0,
+      rating: 0,
+      price: 0,
+    });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const nameInput: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    nameInput.value = 'Widget';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget', quantity: 0, rating: 0 }]);
+  });
+
+  it('sends only the renamed field on edit, not an untouched number without a default', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'quantity', type: 'number' },
+    ]);
+    fixture.componentRef.setInput('value', { name: 'Widget', quantity: 3 });
+    await fixture.whenStable();
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    const nameInput: HTMLInputElement =
+      fixture.nativeElement.querySelector('input');
+    nameInput.value = 'Widget v2';
+    nameInput.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget v2' }]);
   });
 
   it.each(['create', 'edit'] as const)(

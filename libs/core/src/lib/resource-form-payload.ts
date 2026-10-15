@@ -1,4 +1,4 @@
-import { Field } from './field';
+import { Field, FieldType } from './field';
 import { isTextInputBoundField } from './field-presentation';
 
 export type ResourceFormMode = 'create' | 'edit';
@@ -10,11 +10,17 @@ function valueForField(field: Field, value: unknown): unknown {
   return value;
 }
 
-function isUncheckedAnswerOnCreate(
+const FIELD_TYPES_SHOWN_AS_A_VALUE = new Set<FieldType>(['boolean', 'number']);
+
+function isShownValueSentOnCreate(
   mode: ResourceFormMode,
   field: Field,
 ): boolean {
-  return mode === 'create' && field.type === 'boolean' && !field.hasDefault;
+  return (
+    mode === 'create' &&
+    FIELD_TYPES_SHOWN_AS_A_VALUE.has(field.type) &&
+    !field.hasDefault
+  );
 }
 
 function shouldIncludeField(
@@ -22,7 +28,7 @@ function shouldIncludeField(
   field: Field,
   isDirty: (name: string) => boolean,
 ): boolean {
-  return isDirty(field.name) || isUncheckedAnswerOnCreate(mode, field);
+  return isDirty(field.name) || isShownValueSentOnCreate(mode, field);
 }
 
 export function buildResourcePayload<T extends Record<string, unknown>>(
