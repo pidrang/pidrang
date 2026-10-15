@@ -3,7 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Field } from '@pidrang/core';
 
 @Component({
-  selector: 'lib-resource-table',
+  selector: 'pidrang-tailwind-resource-table',
   imports: [NgTemplateOutlet],
   templateUrl: './resource-table.html',
 })

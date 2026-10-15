@@ -45,7 +45,7 @@ import {
       </p>
     } @else if (!created()) {
       @for (r of [resource()]; track r) {
-        <lib-resource-form
+        <pidrang-material-resource-form
           mode="create"
           [fields]="fields()"
           [value]="initialValue()"

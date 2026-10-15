@@ -76,7 +76,10 @@ import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
         <p class="mt-4 text-gray-500">No records yet.</p>
       } @else if (list.hasValue()) {
         <div class="mt-4">
-          <lib-resource-table [fields]="fields()" [data]="list.value().data">
+          <pidrang-tailwind-resource-table
+            [fields]="fields()"
+            [data]="list.value().data"
+          >
             @if (canShow() || canEdit() || canDelete()) {
               <ng-template #actions let-row>
                 <span class="flex gap-3">
@@ -107,7 +110,7 @@ import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
                 </span>
               </ng-template>
             }
-          </lib-resource-table>
+          </pidrang-tailwind-resource-table>
         </div>
       }
       <nav

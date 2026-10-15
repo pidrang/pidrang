@@ -29,7 +29,8 @@ pidrang/
     ├── tailwind/        Tailwind CSS UI layer (@pidrang/tailwind)
     ├── cli/             provider-agnostic wizard and codegen (@pidrang/cli)
     ├── cli-supabase/    Supabase schema introspection for the CLI (@pidrang/cli-supabase)
-    └── provider-conformance/  shared DataProvider contract tests, used by specs only (private)
+    ├── provider-conformance/  shared DataProvider contract tests, used by specs only (private)
+    └── adapter-coexistence/   renders both UI layers in one component, test only (private)
 ```
 
 ## `@pidrang/core`

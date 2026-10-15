@@ -57,7 +57,7 @@ export const appConfig = {
 ```
 
 ```html
-<lib-resource-table [fields]="fields()" [data]="list.value()?.data ?? []" />
+<pidrang-material-resource-table [fields]="fields()" [data]="list.value()?.data ?? []" />
 ```
 
 The full walkthrough, from a new Angular app to a working list, create and edit flow, is in [`docs/getting-started.md`](./docs/getting-started.md).

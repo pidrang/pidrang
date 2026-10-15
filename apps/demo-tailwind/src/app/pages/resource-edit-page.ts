@@ -65,7 +65,7 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
     } @else if (value(); as value) {
       <div class="mt-4">
         @for (r of [resource() + ':' + id()]; track r) {
-          <lib-resource-form
+          <pidrang-tailwind-resource-form
             mode="edit"
             [fields]="fields()"
             [value]="value"

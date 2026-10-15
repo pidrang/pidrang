@@ -43,11 +43,11 @@ describe('ResourceTable', () => {
     @Component({
       imports: [ResourceTable],
       template: `
-        <lib-resource-table [fields]="fields" [data]="data">
+        <pidrang-material-resource-table [fields]="fields" [data]="data">
           <ng-template #actions let-row>
             <button type="button">Delete {{ row.name }}</button>
           </ng-template>
-        </lib-resource-table>
+        </pidrang-material-resource-table>
       `,
     })
     class HostWithActions {
@@ -68,5 +68,72 @@ describe('ResourceTable', () => {
     expect(rows[1].querySelector('button').textContent.trim()).toBe(
       'Delete Bob',
     );
+  });
+
+  it('renders a real actions field next to the projected actions, under an Actions header', async () => {
+    @Component({
+      imports: [ResourceTable],
+      template: `
+        <pidrang-material-resource-table [fields]="fields" [data]="data">
+          <ng-template #actions let-row>
+            <button type="button">Delete {{ row.name }}</button>
+          </ng-template>
+        </pidrang-material-resource-table>
+      `,
+    })
+    class HostWithActionsField {
+      protected readonly fields = [
+        { name: 'name', type: 'text' as const },
+        { name: 'actions', label: 'Allowed actions', type: 'text' as const },
+      ];
+      protected readonly data = [{ name: 'Alice', actions: 'read' }];
+    }
+
+    TestBed.configureTestingModule({ imports: [HostWithActionsField] });
+
+    const fixture = TestBed.createComponent(HostWithActionsField);
+    await fixture.whenStable();
+
+    const headers = Array.from(
+      fixture.nativeElement.querySelectorAll('th') as NodeListOf<HTMLElement>,
+    ).map((header) => header.textContent?.trim());
+    expect(headers).toEqual(['name', 'Allowed actions', 'Actions']);
+    const cells = Array.from(
+      fixture.nativeElement.querySelectorAll(
+        'tbody td',
+      ) as NodeListOf<HTMLElement>,
+    ).map((cell) => cell.textContent?.trim());
+    expect(cells).toEqual(['Alice', 'read', 'Delete Alice']);
+  });
+
+  it('renders headers and cells of the new fields when the fields change', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceTable] });
+
+    const fixture = TestBed.createComponent(ResourceTable);
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'email', type: 'text' },
+    ]);
+    fixture.componentRef.setInput('data', [
+      { name: 'Alice', email: 'alice@example.test' },
+    ]);
+    await fixture.whenStable();
+
+    fixture.componentRef.setInput('fields', [
+      { name: 'price', type: 'number' },
+    ]);
+    fixture.componentRef.setInput('data', [{ price: 129 }]);
+    await fixture.whenStable();
+
+    const headers = Array.from(
+      fixture.nativeElement.querySelectorAll('th') as NodeListOf<HTMLElement>,
+    ).map((header) => header.textContent?.trim());
+    expect(headers).toEqual(['price']);
+    const cells = Array.from(
+      fixture.nativeElement.querySelectorAll(
+        'tbody td',
+      ) as NodeListOf<HTMLElement>,
+    ).map((cell) => cell.textContent?.trim());
+    expect(cells).toEqual(['129']);
   });
 });

@@ -53,7 +53,7 @@ import {
     } @else if (!created()) {
       <div class="mt-4">
         @for (r of [resource()]; track r) {
-          <lib-resource-form
+          <pidrang-tailwind-resource-form
             mode="create"
             [fields]="fields()"
             [value]="initialValue()"

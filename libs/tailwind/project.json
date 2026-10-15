@@ -2,7 +2,7 @@
   "name": "tailwind",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/tailwind/src",
-  "prefix": "lib",
+  "prefix": "pidrang-tailwind",
   "projectType": "library",
   "tags": [],
   "targets": {
