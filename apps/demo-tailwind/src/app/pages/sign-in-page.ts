@@ -33,7 +33,7 @@ import { DEMO_ACCOUNT, DemoAccount, injectSignIn } from '@pidrang/demo-shared';
             />
           </label>
           @if (error()) {
-            <p class="text-red-600">{{ error() }}</p>
+            <p role="alert" class="text-red-600">{{ error() }}</p>
           }
           @if (stalled()) {
             <p role="alert" class="text-red-600">

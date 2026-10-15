@@ -45,7 +45,7 @@ export function injectSignIn() {
       state.running.set(false);
       state.stalled.set(false);
     }
-    if (destroyRef.destroyed) {
+    if (state.visits() === 0) {
       return;
     }
     try {

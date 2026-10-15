@@ -35,7 +35,7 @@ import { MatInputModule } from '@angular/material/input';
             />
           </mat-form-field>
           @if (error()) {
-            <p>{{ error() }}</p>
+            <p role="alert">{{ error() }}</p>
           }
           @if (stalled()) {
             <p role="alert">

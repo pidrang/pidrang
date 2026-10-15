@@ -109,9 +109,9 @@ describe('SignInPage demo account', () => {
     demoButton(fixture.nativeElement)?.click();
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.textContent).toContain(
-      'Invalid login credentials',
-    );
+    expect(
+      fixture.nativeElement.querySelector('[role="alert"]')?.textContent,
+    ).toContain('Invalid login credentials');
   });
 });
 
@@ -284,6 +284,52 @@ describe('SignInPage across visits', () => {
     await new Promise((resolve) => setTimeout(resolve));
     next.detectChanges();
     expect(submitButton(next.nativeElement)?.disabled).toBe(false);
+  });
+});
+
+describe('SignInPage success across visits', () => {
+  it('goes home when the sign-in finishes after the page was left and opened again', async () => {
+    const running = pending();
+    const login = vi.fn().mockReturnValue(running.promise);
+    configure(login, null);
+    const navigate = vi
+      .spyOn(TestBed.inject(Router), 'navigate')
+      .mockResolvedValue(true);
+    const fixture = TestBed.createComponent(SignInPage);
+    await fixture.whenStable();
+    fill(fixture.nativeElement, 'writer@example.test', 'secret');
+    form(fixture.nativeElement).requestSubmit();
+    fixture.destroy();
+
+    const next = TestBed.createComponent(SignInPage);
+    await next.whenStable();
+    running.resolve();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(['/']);
+  });
+
+  it('does not navigate when the page was opened again and left before the sign-in finished', async () => {
+    const running = pending();
+    const login = vi.fn().mockReturnValue(running.promise);
+    configure(login, null);
+    const navigate = vi
+      .spyOn(TestBed.inject(Router), 'navigate')
+      .mockResolvedValue(true);
+    const fixture = TestBed.createComponent(SignInPage);
+    await fixture.whenStable();
+    fill(fixture.nativeElement, 'writer@example.test', 'secret');
+    form(fixture.nativeElement).requestSubmit();
+    fixture.destroy();
+
+    const next = TestBed.createComponent(SignInPage);
+    await next.whenStable();
+    next.destroy();
+    running.resolve();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
 
