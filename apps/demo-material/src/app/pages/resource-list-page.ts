@@ -76,7 +76,10 @@ import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
       @if (total() === 0) {
         <p>No records yet.</p>
       } @else if (list.hasValue()) {
-        <lib-resource-table [fields]="fields()" [data]="list.value().data">
+        <pidrang-material-resource-table
+          [fields]="fields()"
+          [data]="list.value().data"
+        >
           @if (canShow() || canEdit() || canDelete()) {
             <ng-template #actions let-row>
               @if (canShow()) {
@@ -100,7 +103,7 @@ import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
               }
             </ng-template>
           }
-        </lib-resource-table>
+        </pidrang-material-resource-table>
       }
       <mat-paginator
         aria-label="Pagination"

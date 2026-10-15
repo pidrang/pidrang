@@ -49,7 +49,7 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
       </p>
     } @else if (value(); as value) {
       @for (r of [resource() + ':' + id()]; track r) {
-        <lib-resource-form
+        <pidrang-material-resource-form
           mode="edit"
           [fields]="fields()"
           [value]="value"

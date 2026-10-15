@@ -14,15 +14,15 @@ See the [getting started guide](https://github.com/pidrang/pidrang/blob/main/doc
 
 ## Exports
 
-- `ResourceTable<T>` — renders `fields: Field[]` / `data: T[]` as a plain `<table>`. Project an `#actions` template to add a trailing actions column:
+- `ResourceTable<T>` — renders `fields: Field[]` / `data: T[]` as a plain `<table>`. The element is `<pidrang-tailwind-resource-table>`. Project an `#actions` template to add a trailing column with an `Actions` header; a data field named `actions` still gets its own column:
   ```html
-  <lib-resource-table [fields]="fields()" [data]="data()">
+  <pidrang-tailwind-resource-table [fields]="fields()" [data]="data()">
     <ng-template #actions let-row>
       <a class="text-blue-600 hover:underline" [routerLink]="['/', resource, row.id]">Show</a>
     </ng-template>
-  </lib-resource-table>
+  </pidrang-tailwind-resource-table>
   ```
-- `ResourceForm<T>` — renders `fields: Field[]` into one labeled `<input>`/checkbox per non-`readOnly` field (based on `FieldType`), pre-filled from a `value: T` input. A required `mode: 'create' | 'edit'` input selects submit behavior: on both, only a touched field is sent, so an untouched value is never re-serialized and the server's own default/`NULL` applies to anything left alone, except that on create an untouched `boolean` or `number` without `hasDefault` is sent as shown (an unchecked box means `false`, a `0` means `0`); on edit, `save` does not emit at all if nothing was actually changed (PostgREST rejects an empty `PATCH`), while create still emits an empty payload since "create a row from nothing but defaults" is legitimate. `save` emits `Partial<T>`, reflecting that a payload is genuinely partial. A `pending` input disables the submit button (showing "Saving…", `aria-busy` on the form) and ignores submits while a save is in flight. Built on Signal Forms (`@angular/forms/signals`); never mutates the `value` input.
+- `ResourceForm<T>` (`<pidrang-tailwind-resource-form>`) — renders `fields: Field[]` into one labeled `<input>`/checkbox per non-`readOnly` field (based on `FieldType`), pre-filled from a `value: T` input. A required `mode: 'create' | 'edit'` input selects submit behavior: on both, only a touched field is sent, so an untouched value is never re-serialized and the server's own default/`NULL` applies to anything left alone, except that on create an untouched `boolean` or `number` without `hasDefault` is sent as shown (an unchecked box means `false`, a `0` means `0`); on edit, `save` does not emit at all if nothing was actually changed (PostgREST rejects an empty `PATCH`), while create still emits an empty payload since "create a row from nothing but defaults" is legitimate. `save` emits `Partial<T>`, reflecting that a payload is genuinely partial. A `pending` input disables the submit button (showing "Saving…", `aria-busy` on the form) and ignores submits while a save is in flight. Built on Signal Forms (`@angular/forms/signals`); never mutates the `value` input.
 
 ## Dependencies
 

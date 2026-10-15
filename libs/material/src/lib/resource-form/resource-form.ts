@@ -41,7 +41,7 @@ type ChildStringPath = SchemaPath<
 type ChildPath = SchemaPath<unknown, SchemaPathRules.Supported, PathKind.Child>;
 
 @Component({
-  selector: 'lib-resource-form',
+  selector: 'pidrang-material-resource-form',
   imports: [
     FormField,
     FormRoot,

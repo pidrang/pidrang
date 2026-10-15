@@ -102,7 +102,7 @@ type Row = { id: string } & Record<string, unknown>;
       <p>{{ error.message }}</p>
     }
 
-    <lib-resource-table [fields]="fields()" [data]="list.value()?.data ?? []" />
+    <pidrang-material-resource-table [fields]="fields()" [data]="list.value()?.data ?? []" />
   `,
 })
 export class ResourceListPage {
@@ -149,15 +149,15 @@ Filters combine with AND. The operators are `eq`, `ne`, `lt`, `lte`, `gt`, `gte`
 
 ## 5. Per-row actions
 
-`ResourceTable` projects an `#actions` template as a trailing column. The row is available as the implicit context variable.
+`ResourceTable` projects an `#actions` template as a trailing column with an `Actions` header. The row is available as the implicit context variable. A data field may itself be named `actions`: it gets its own column next to the projected one.
 
 ```html
-<lib-resource-table [fields]="fields()" [data]="list.value()?.data ?? []">
+<pidrang-material-resource-table [fields]="fields()" [data]="list.value()?.data ?? []">
   <ng-template #actions let-row>
     <a [routerLink]="['/', resource(), row.id, 'edit']">Edit</a>
     <button type="button" (click)="remove(row.id)">Delete</button>
   </ng-template>
-</lib-resource-table>
+</pidrang-material-resource-table>
 
 @if (deleteError(); as message) {
 <p role="alert">{{ message }}</p>
@@ -203,7 +203,7 @@ import { ResourceForm } from '@pidrang/material';
   imports: [ResourceForm],
   template: `
     <h1>Create {{ resource() }}</h1>
-    <lib-resource-form mode="create" [fields]="fields()" [value]="initialValue()" (save)="submit($event)" />
+    <pidrang-material-resource-form mode="create" [fields]="fields()" [value]="initialValue()" (save)="submit($event)" />
   `,
 })
 export class ResourceCreatePage {
@@ -254,7 +254,7 @@ protected readonly session = injectAuthSession();
 | `@pidrang/material` | Angular Material         | Requires `@angular/material` and a Material theme.                                 |
 | `@pidrang/tailwind` | Tailwind utility classes | Ships no CSS. Add the library to your Tailwind build so its classes are generated. |
 
-Both expose the same `ResourceTable` and `ResourceForm` API, so switching is a change of import. For Tailwind, add a `@source` line pointing at the installed package in your global stylesheet:
+Both expose the same `ResourceTable` and `ResourceForm` inputs and outputs. Each adapter has its own selectors, `pidrang-material-resource-table`/`pidrang-material-resource-form` and `pidrang-tailwind-resource-table`/`pidrang-tailwind-resource-form`, so an app can use both, and switching is a change of import and of the element name. For Tailwind, add a `@source` line pointing at the installed package in your global stylesheet:
 
 ```css
 @import 'tailwindcss';
