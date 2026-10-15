@@ -4,7 +4,8 @@ Provider-agnostic engine behind `pidrang init`: the interactive wizard, the `Res
 
 ## Exports
 
-- `SchemaProvider` — `listTables()`, `introspectTable(table)` — what a concrete provider implements once connected
+- `SchemaProvider` — `listTables()`, `introspectTable(table)` — what a concrete provider implements once connected. `introspectTable` returns a `TableIntrospection`: the `fields` to generate, the `excludedColumns` left out with a reason, and the `unavailableActions` the wizard shows as disabled with their reason
+- `IntrospectedColumn`, `describeTable(table, columns, unavailableActions?)` — the shared rule a provider uses to build a `TableIntrospection`: a column whose `type` is `{ unsupported }` is left out, and makes create unavailable when it needs a value on insert and has no visible default; edit is unavailable when no kept field is writable
 - `SchemaProviderDefinition<TConnection>` — `id`, `label`, `promptConnection()`, `createSchemaProvider(connection)` — how the wizard discovers and connects to a provider without knowing its connection shape
 - `CrudAction` — `'list' | 'create' | 'show' | 'edit' | 'delete'`
 - `GenerationPlan`, `TablePlan` — the wizard's output: per selected table, its fields, chosen actions, and fields to hide from list/edit views

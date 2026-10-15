@@ -1,9 +1,20 @@
 import { FieldType } from '@pidrang/core';
+import { UnsupportedColumnType } from '@pidrang/cli';
 
+const TEXT_TYPES = new Set(['String', 'UUID']);
 const NUMBER_TYPES = new Set(['Int', 'Float']);
 const PRECISE_NUMBER_TYPES = new Set(['BigInt', 'BigFloat']);
 
-export function graphqlScalarToFieldType(typeName: string): FieldType {
+export function graphqlScalarToFieldType(
+  kind: string,
+  typeName: string,
+): FieldType | UnsupportedColumnType {
+  if (kind === 'LIST') {
+    return { unsupported: `a list of ${typeName}` };
+  }
+  if (kind === 'ENUM') {
+    return { unsupported: `enum ${typeName}` };
+  }
   if (typeName === 'Boolean') {
     return 'boolean';
   }
@@ -22,5 +33,8 @@ export function graphqlScalarToFieldType(typeName: string): FieldType {
   if (PRECISE_NUMBER_TYPES.has(typeName)) {
     return 'numeric';
   }
-  return 'text';
+  if (TEXT_TYPES.has(typeName)) {
+    return 'text';
+  }
+  return { unsupported: typeName };
 }

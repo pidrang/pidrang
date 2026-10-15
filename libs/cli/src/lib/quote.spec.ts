@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import { quote } from './quote';
 
 describe('quote', () => {
@@ -25,5 +26,24 @@ describe('quote', () => {
     expect(quote("o'clock\\n\nreal newline\r")).toBe(
       "'o\\'clock\\\\n\\nreal newline\\r'",
     );
+  });
+
+  it.each([
+    ['a plain name', 'products'],
+    ['a capitalized name', 'Mixed'],
+    ['a space', 'my col'],
+    ['a double quote', 'say "hi"'],
+    ['a trailing backslash', 'ends\\'],
+    ['a backslash before a quote', "\\'"],
+    ['a tab', 'a\tb'],
+    ['a NUL character', 'a\u0000b'],
+    ['a line separator', 'a b'],
+    ['a paragraph separator', 'a b'],
+    ['a template placeholder', '${x}'],
+    ['a character outside the BMP', 'a\u{1D11E}b'],
+    ['an escape-looking text', '\\u0041\\x41'],
+  ])('produces a literal that evaluates back to %s', (_, value) => {
+    expect(runInNewContext(quote(value))).toBe(value);
+    expect(quote(value)).not.toMatch(/[\n\r]/);
   });
 });

@@ -1,7 +1,13 @@
-import { Field } from '@pidrang/core';
-import { SchemaProvider } from '@pidrang/cli';
+import {
+  IntrospectedColumn,
+  SchemaProvider,
+  UnavailableAction,
+  describeTable,
+} from '@pidrang/cli';
 import { GraphQlConnection } from './supabase-connection';
 import { graphqlScalarToFieldType } from './graphql-field-type';
+import { assertPostgrestTableName } from './assert-postgrest-table-name';
+import { postgrestNameProblem } from './postgrest-name-problem';
 
 interface IntrospectionType {
   kind?: string;
@@ -15,15 +21,21 @@ interface IntrospectionField {
   type: IntrospectionType;
 }
 
-interface IntrospectionResponse {
-  data?: {
-    __schema: {
-      queryType: {
-        fields: IntrospectionField[];
-      };
+interface GraphQlResponse<T> {
+  data?: T;
+  errors?: { message: string }[];
+}
+
+interface SchemaData {
+  __schema: {
+    queryType: {
+      fields: IntrospectionField[];
     };
   };
-  errors?: { message: string }[];
+}
+
+interface InputTypeData {
+  __type: { inputFields: { name: string }[] | null } | null;
 }
 
 function typeSelection(depth: number): string {
@@ -60,63 +72,176 @@ const INTROSPECTION_QUERY = `
   }
 `;
 
-async function runIntrospection(
+const INPUT_TYPE_QUERY = `
+  query IntrospectInputType($name: String!) {
+    __type(name: $name) {
+      inputFields {
+        name
+      }
+    }
+  }
+`;
+
+const UNDEFINED_COLUMN = '42703';
+const INSUFFICIENT_PRIVILEGE = '42501';
+
+async function runGraphQl<T>(
   connection: GraphQlConnection,
-): Promise<IntrospectionField[]> {
+  query: string,
+  variables?: Record<string, string>,
+): Promise<T | undefined> {
   const response = await fetch(`${connection.url}/graphql/v1`, {
     method: 'POST',
     headers: {
       apikey: connection.anonKey,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query: INTROSPECTION_QUERY }),
+    body: JSON.stringify({ query, variables }),
   });
   if (!response.ok) {
     throw new Error(
       `Supabase GraphQL introspection failed: ${response.status} ${response.statusText}`,
     );
   }
-  const body = (await response.json()) as IntrospectionResponse;
+  const body = (await response.json()) as GraphQlResponse<T>;
   if (body.errors?.length) {
     throw new Error(
       `Supabase GraphQL introspection failed: ${body.errors[0].message}`,
     );
   }
-  return body.data?.__schema.queryType.fields ?? [];
+  return body.data;
 }
 
-function unwrapObjectFields(
+async function runIntrospection(
+  connection: GraphQlConnection,
+): Promise<IntrospectionField[]> {
+  const data = await runGraphQl<SchemaData>(connection, INTROSPECTION_QUERY);
+  return data?.__schema.queryType.fields ?? [];
+}
+
+async function insertableColumns(
+  connection: GraphQlConnection,
+  nodeTypeName: string,
+): Promise<Set<string> | null> {
+  const data = await runGraphQl<InputTypeData>(connection, INPUT_TYPE_QUERY, {
+    name: `${nodeTypeName}InsertInput`,
+  });
+  const inputFields = data?.__type?.inputFields;
+  return inputFields ? new Set(inputFields.map((field) => field.name)) : null;
+}
+
+function unwrapObjectType(
   type: IntrospectionType | null | undefined,
-): IntrospectionField[] {
+): IntrospectionType | null {
   if (!type) {
-    return [];
+    return null;
   }
-  return type.fields ?? unwrapObjectFields(type.ofType);
+  return type.fields ? type : unwrapObjectType(type.ofType);
 }
 
-function findFieldFields(
+function findFieldType(
   fields: IntrospectionField[],
   name: string,
-): IntrospectionField[] {
+): IntrospectionType | null {
   const field = fields.find((f) => f.name === name);
-  return field ? unwrapObjectFields(field.type) : [];
+  return field ? unwrapObjectType(field.type) : null;
 }
 
-function isScalarField(field: IntrospectionField): boolean {
-  const kind =
-    field.type.kind === 'NON_NULL' ? field.type.ofType?.kind : field.type.kind;
-  return kind === 'SCALAR' || kind === 'ENUM';
+function withoutNonNull(type: IntrospectionType): IntrospectionType {
+  return type.kind === 'NON_NULL' && type.ofType ? type.ofType : type;
 }
 
-function isNullableField(field: IntrospectionField): boolean {
-  return field.type.kind !== 'NON_NULL';
+function columnShape(
+  field: IntrospectionField,
+): { kind: string; typeName: string } | null {
+  const outer = withoutNonNull(field.type);
+  if (outer.kind === 'LIST') {
+    const inner = outer.ofType ? withoutNonNull(outer.ofType) : null;
+    if (inner?.kind === 'SCALAR' || inner?.kind === 'ENUM') {
+      return { kind: 'LIST', typeName: inner.name ?? 'an unknown type' };
+    }
+    return null;
+  }
+  if (outer.kind === 'SCALAR' || outer.kind === 'ENUM') {
+    return { kind: outer.kind, typeName: outer.name ?? 'an unknown type' };
+  }
+  return null;
 }
 
-function scalarTypeName(type: IntrospectionType): string {
-  return type.name ?? type.ofType?.name ?? 'String';
+async function assertRestNames(
+  connection: GraphQlConnection,
+  table: string,
+  columns: string[],
+): Promise<void> {
+  const select = columns.map((column) => `"${column}"`).join(',');
+  const response = await fetch(
+    `${connection.url}/rest/v1/${encodeURIComponent(table)}?select=${encodeURIComponent(select)}&limit=0`,
+    { headers: { apikey: connection.anonKey } },
+  );
+  if (response.ok) {
+    return;
+  }
+  const body = (await response.json().catch(() => ({}))) as {
+    code?: string;
+    message?: string;
+  };
+  const advice =
+    'pg_graphql may have renamed it, and pidrang does not guess the real name; use the direct database connection strategy for this table instead.';
+  if (response.status === 404) {
+    throw new Error(
+      `GraphQL lists a table "${table}", but the REST API the generated pages use has no table with that name: ${advice}`,
+    );
+  }
+  if (body.code === UNDEFINED_COLUMN) {
+    throw new Error(
+      `A GraphQL column of "${table}" is not a column of the REST API the generated pages use (${body.message ?? 'unknown column'}): ${advice}`,
+    );
+  }
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    body.code === INSUFFICIENT_PRIVILEGE
+  ) {
+    throw new Error(
+      `pidrang could not check the REST names of "${table}" with this key (${response.status}). Grant select on it to the anon role, or use the direct database connection strategy.`,
+    );
+  }
+  throw new Error(
+    `pidrang could not check the REST names of "${table}": ${response.status} ${body.message ?? response.statusText}`,
+  );
 }
 
-const LOOKS_RENAMED_BY_GRAPHQL = /[A-Z]/;
+function createAvailability(
+  columns: IntrospectedColumn[],
+  insertable: Set<string> | null,
+): UnavailableAction[] {
+  if (!insertable) {
+    return [
+      {
+        action: 'create',
+        reason:
+          'GraphQL does not show which columns accept a value on insert with this key',
+      },
+    ];
+  }
+  const unknownDefaults = columns
+    .filter(
+      (column) =>
+        typeof column.type === 'string' &&
+        !column.nullable &&
+        insertable.has(column.name),
+    )
+    .map((column) => `"${column.name}"`);
+  if (unknownDefaults.length === 0) {
+    return [];
+  }
+  return [
+    {
+      action: 'create',
+      reason: `GraphQL cannot show whether ${unknownDefaults.join(', ')} ${unknownDefaults.length > 1 ? 'have' : 'has'} a server default; use the direct database connection strategy to generate create`,
+    },
+  ];
+}
 
 export function createGraphQlSchemaProvider(
   connection: GraphQlConnection,
@@ -130,12 +255,7 @@ export function createGraphQlSchemaProvider(
     },
 
     async introspectTable(table) {
-      if (LOOKS_RENAMED_BY_GRAPHQL.test(table)) {
-        throw new Error(
-          `"${table}" does not look like a Postgres table name: pg_graphql may have renamed it when building this GraphQL collection name, or the table may genuinely be named "${table}". pidrang cannot tell which from GraphQL alone, so it cannot scaffold "${table}" from this strategy; use the direct database connection strategy for this table instead.`,
-        );
-      }
-
+      assertPostgrestTableName(table);
       const fields = await runIntrospection(connection);
       const collectionField = fields.find(
         (field) => field.name === `${table}Collection`,
@@ -146,26 +266,53 @@ export function createGraphQlSchemaProvider(
         );
       }
 
-      const collectionFields = unwrapObjectFields(collectionField.type);
-      const edgeFields = findFieldFields(collectionFields, 'edges');
-      const nodeFields = findFieldFields(edgeFields, 'node');
+      const collectionFields =
+        unwrapObjectType(collectionField.type)?.fields ?? [];
+      const edgeFields = findFieldType(collectionFields, 'edges')?.fields ?? [];
+      const nodeType = findFieldType(edgeFields, 'node');
+      const nodeFields = nodeType?.fields ?? [];
 
-      const result = nodeFields
-        .filter((field) => field.name !== 'nodeId' && isScalarField(field))
-        .map(
-          (field): Field => ({
-            name: field.name,
-            type: graphqlScalarToFieldType(scalarTypeName(field.type)),
-            readOnly: field.name === 'id' || undefined,
-            nullable: isNullableField(field) || undefined,
-          }),
-        );
-      if (!result.some((field) => field.name === 'id')) {
+      const shaped = nodeFields
+        .filter((field) => field.name !== 'nodeId')
+        .flatMap((field) => {
+          const shape = columnShape(field);
+          return shape ? [{ field, shape }] : [];
+        });
+      if (!shaped.some(({ field }) => field.name === 'id')) {
         throw new Error(
           `Table "${table}" has no "id" column visible to GraphQL introspection. pidrang only supports a primary key column named "id"; use the direct database connection strategy, which can also confirm there is exactly one primary key column (GraphQL introspection cannot).`,
         );
       }
-      return result;
+
+      const insertable = nodeType?.name
+        ? await insertableColumns(connection, nodeType.name)
+        : null;
+      const columns = shaped.map(({ field, shape }): IntrospectedColumn => {
+        const nameProblem = postgrestNameProblem(field.name);
+        return {
+          name: field.name,
+          type: nameProblem
+            ? { unsupported: nameProblem }
+            : graphqlScalarToFieldType(shape.kind, shape.typeName),
+          readOnly:
+            field.name === 'id' ||
+            (insertable !== null && !insertable.has(field.name)) ||
+            undefined,
+          nullable: field.type.kind !== 'NON_NULL' || undefined,
+        };
+      });
+
+      const description = describeTable(
+        table,
+        columns,
+        createAvailability(columns, insertable),
+      );
+      await assertRestNames(
+        connection,
+        table,
+        description.fields.map((field) => field.name),
+      );
+      return description;
     },
   };
 }

@@ -49,4 +49,137 @@ describe('createSupabaseSchemaProvider', () => {
     expect(createSupabaseSchemaProvider(connection)).toBe('postgres-provider');
     expect(createPostgresSchemaProvider).toHaveBeenCalledWith(connection);
   });
+
+  it('passes the project URL without a trailing slash', () => {
+    createSupabaseSchemaProvider({
+      strategy: 'service-role',
+      url: 'https://example.supabase.co/',
+      serviceRoleKey: 'secret',
+    });
+    expect(createServiceRoleSchemaProvider).toHaveBeenLastCalledWith(
+      expect.objectContaining({ url: 'https://example.supabase.co' }),
+    );
+  });
+
+  it('normalizes the project URL before validating it', () => {
+    createSupabaseSchemaProvider({
+      strategy: 'graphql',
+      url: ' https://example.supabase.co// ',
+      anonKey: ' anon\n',
+    });
+    expect(createGraphQlSchemaProvider).toHaveBeenLastCalledWith({
+      strategy: 'graphql',
+      url: 'https://example.supabase.co',
+      anonKey: 'anon',
+    });
+  });
+
+  it('trims the postgres host, database and user, but never the password', () => {
+    createSupabaseSchemaProvider({
+      strategy: 'postgres',
+      host: ' localhost ',
+      port: 5432,
+      database: ' postgres ',
+      user: 'postgres\n',
+      password: ' spaced password ',
+    });
+    expect(createPostgresSchemaProvider).toHaveBeenLastCalledWith({
+      strategy: 'postgres',
+      host: 'localhost',
+      port: 5432,
+      database: 'postgres',
+      user: 'postgres',
+      password: ' spaced password ',
+    });
+  });
+
+  it.each<[string, SupabaseConnection, string]>([
+    [
+      'a graphql URL that is not a URL',
+      { strategy: 'graphql', url: 'nope', anonKey: 'anon' },
+      'Enter the project URL',
+    ],
+    [
+      'an empty anon key',
+      {
+        strategy: 'graphql',
+        url: 'https://example.supabase.co',
+        anonKey: '',
+      },
+      'The anon key is required',
+    ],
+    [
+      'an empty service role key',
+      {
+        strategy: 'service-role',
+        url: 'https://example.supabase.co',
+        serviceRoleKey: ' ',
+      },
+      'The service role key is required',
+    ],
+    [
+      'a port that is not a number',
+      {
+        strategy: 'postgres',
+        host: 'localhost',
+        port: Number.NaN,
+        database: 'postgres',
+        user: 'postgres',
+        password: 'postgres',
+      },
+      'between 1 and 65535',
+    ],
+    [
+      'an empty host',
+      {
+        strategy: 'postgres',
+        host: '',
+        port: 5432,
+        database: 'postgres',
+        user: 'postgres',
+        password: 'postgres',
+      },
+      'The database host is required',
+    ],
+    [
+      'an empty CA certificate',
+      {
+        strategy: 'postgres',
+        host: 'db.example.com',
+        port: 5432,
+        database: 'postgres',
+        user: 'postgres',
+        password: 'postgres',
+        ssl: { ca: '' },
+      },
+      'The CA certificate is required',
+    ],
+  ])('refuses %s before creating a provider', (_, connection, message) => {
+    vi.mocked(createGraphQlSchemaProvider).mockClear();
+    vi.mocked(createServiceRoleSchemaProvider).mockClear();
+    vi.mocked(createPostgresSchemaProvider).mockClear();
+    expect(() => createSupabaseSchemaProvider(connection)).toThrow(message);
+    expect(createGraphQlSchemaProvider).not.toHaveBeenCalled();
+    expect(createServiceRoleSchemaProvider).not.toHaveBeenCalled();
+    expect(createPostgresSchemaProvider).not.toHaveBeenCalled();
+  });
+
+  it('never repeats a secret in a validation error', () => {
+    const error = (() => {
+      try {
+        createSupabaseSchemaProvider({
+          strategy: 'postgres',
+          host: '',
+          port: 0,
+          database: '',
+          user: '',
+          password: 'top-secret-password',
+        });
+      } catch (err) {
+        return err as Error;
+      }
+      throw new Error('expected a validation error');
+    })();
+    expect(error.message).not.toContain('top-secret-password');
+  });
 });

@@ -1,4 +1,17 @@
 import { FieldType } from '@pidrang/core';
+import { UnsupportedColumnType } from '@pidrang/cli';
+
+const TEXT_FORMATS = new Set([
+  'text',
+  'character varying',
+  'varchar',
+  'character',
+  'char',
+  'bpchar',
+  'uuid',
+]);
+
+const BOOLEAN_FORMATS = new Set(['boolean', 'bool']);
 
 const NUMBER_FORMATS = new Set([
   'int2',
@@ -34,31 +47,45 @@ const TIME_FORMATS = new Set([
   'time with time zone',
 ]);
 
+export interface OpenApiProperty {
+  type?: string;
+  format?: string;
+  description?: string;
+  default?: unknown;
+  enum?: unknown[];
+}
+
 export function openApiPropertyToFieldType(
-  type: string,
-  format: string | undefined,
-): FieldType {
-  if (type === 'boolean') {
+  property: OpenApiProperty,
+): FieldType | UnsupportedColumnType {
+  const format = property.format ?? '';
+  const typeName = property.format ?? property.type ?? 'an unknown type';
+  if (property.enum) {
+    return { unsupported: `enum ${typeName}` };
+  }
+  if (property.type === 'array') {
+    return { unsupported: typeName };
+  }
+  if (property.type === 'boolean' || BOOLEAN_FORMATS.has(format)) {
     return 'boolean';
   }
-  if (format && DATE_FORMATS.has(format)) {
+  if (DATE_FORMATS.has(format)) {
     return 'date';
   }
-  if (format && TIMESTAMP_FORMATS.has(format)) {
+  if (TIMESTAMP_FORMATS.has(format)) {
     return 'timestamp';
   }
-  if (format && TIME_FORMATS.has(format)) {
+  if (TIME_FORMATS.has(format)) {
     return 'time';
   }
-  if (format && PRECISE_NUMBER_FORMATS.has(format)) {
+  if (PRECISE_NUMBER_FORMATS.has(format)) {
     return 'numeric';
   }
-  if (
-    type === 'integer' ||
-    type === 'number' ||
-    (format && NUMBER_FORMATS.has(format))
-  ) {
+  if (NUMBER_FORMATS.has(format)) {
     return 'number';
   }
-  return 'text';
+  if (TEXT_FORMATS.has(format)) {
+    return 'text';
+  }
+  return { unsupported: typeName };
 }
