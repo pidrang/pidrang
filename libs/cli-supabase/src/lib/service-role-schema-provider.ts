@@ -1,14 +1,17 @@
-import { Field } from '@pidrang/core';
-import { SchemaProvider } from '@pidrang/cli';
+import {
+  CrudAction,
+  IntrospectedColumn,
+  SchemaProvider,
+  UnavailableAction,
+  describeTable,
+} from '@pidrang/cli';
 import { ServiceRoleConnection } from './supabase-connection';
-import { openApiPropertyToFieldType } from './service-role-field-type';
-
-interface OpenApiProperty {
-  type: string;
-  format?: string;
-  description?: string;
-  default?: unknown;
-}
+import {
+  OpenApiProperty,
+  openApiPropertyToFieldType,
+} from './service-role-field-type';
+import { assertPostgrestTableName } from './assert-postgrest-table-name';
+import { postgrestNameProblem } from './postgrest-name-problem';
 
 interface OpenApiDefinition {
   properties?: Record<string, OpenApiProperty>;
@@ -17,7 +20,14 @@ interface OpenApiDefinition {
 
 interface OpenApiSchema {
   definitions?: Record<string, OpenApiDefinition>;
+  paths?: Record<string, Record<string, unknown>>;
 }
+
+const WRITE_METHODS: { action: CrudAction; method: string }[] = [
+  { action: 'create', method: 'post' },
+  { action: 'edit', method: 'patch' },
+  { action: 'delete', method: 'delete' },
+];
 
 async function fetchSchema(
   connection: ServiceRoleConnection,
@@ -42,6 +52,20 @@ function hasUsableProperties(
   return Object.keys(definition?.properties ?? {}).length > 0;
 }
 
+function tableMethods(
+  schema: OpenApiSchema,
+  table: string,
+): Record<string, unknown> | undefined {
+  return schema.paths?.[`/${table}`];
+}
+
+function isReadableTable(schema: OpenApiSchema, table: string): boolean {
+  return (
+    hasUsableProperties(schema.definitions?.[table]) &&
+    tableMethods(schema, table)?.['get'] !== undefined
+  );
+}
+
 const PRIMARY_KEY_MARKER = '<pk/>';
 
 function primaryKeyColumns(
@@ -60,17 +84,18 @@ export function createServiceRoleSchemaProvider(
   return {
     async listTables() {
       const schema = await fetchSchema(connection);
-      return Object.entries(schema.definitions ?? {})
-        .filter(([, definition]) => hasUsableProperties(definition))
-        .map(([table]) => table);
+      return Object.keys(schema.definitions ?? {}).filter((table) =>
+        isReadableTable(schema, table),
+      );
     },
 
     async introspectTable(table) {
+      assertPostgrestTableName(table);
       const schema = await fetchSchema(connection);
       const definition = schema.definitions?.[table];
-      if (!hasUsableProperties(definition)) {
+      if (!isReadableTable(schema, table)) {
         throw new Error(
-          `"${table}" has no columns in the Supabase OpenAPI schema. pidrang cannot scaffold a resource with no fields; this is usually an RPC function or a view without a column schema, not a table.`,
+          `"${table}" is not a table or view PostgREST serves with columns. pidrang cannot scaffold it; this is usually an RPC function, not a table.`,
         );
       }
       const primaryKey = primaryKeyColumns(definition);
@@ -91,15 +116,30 @@ export function createServiceRoleSchemaProvider(
       }
       const properties = definition?.properties ?? {};
       const required = definition?.required ?? [];
-      return Object.entries(properties).map(
-        ([name, property]): Field => ({
-          name,
-          type: openApiPropertyToFieldType(property.type, property.format),
-          readOnly: primaryKey.includes(name) || undefined,
-          hasDefault: 'default' in property ? true : undefined,
-          nullable: required.includes(name) ? undefined : true,
+      const columns = Object.entries(properties).map(
+        ([name, property]): IntrospectedColumn => {
+          const nameProblem = postgrestNameProblem(name);
+          return {
+            name,
+            type: nameProblem
+              ? { unsupported: nameProblem }
+              : openApiPropertyToFieldType(property),
+            readOnly: primaryKey.includes(name) || undefined,
+            hasDefault: 'default' in property ? true : undefined,
+            nullable: required.includes(name) ? undefined : true,
+          };
+        },
+      );
+      const methods = tableMethods(schema, table) ?? {};
+      const unavailableActions = WRITE_METHODS.filter(
+        ({ method }) => methods[method] === undefined,
+      ).map(
+        ({ action, method }): UnavailableAction => ({
+          action,
+          reason: `PostgREST does not accept ${method.toUpperCase()} on "${table}", for example a view that cannot be updated`,
         }),
       );
+      return describeTable(table, columns, unavailableActions);
     },
   };
 }

@@ -1,4 +1,7 @@
 import { FieldType } from '@pidrang/core';
+import { UnsupportedColumnType } from '@pidrang/cli';
+
+const TEXT_TYPES = new Set(['text', 'character varying', 'character', 'uuid']);
 
 const NUMBER_TYPES = new Set([
   'smallint',
@@ -16,7 +19,20 @@ const TIMESTAMP_TYPES = new Set([
 
 const TIME_TYPES = new Set(['time without time zone', 'time with time zone']);
 
-export function postgresTypeToFieldType(dataType: string): FieldType {
+function unsupportedTypeName(dataType: string, udtName: string): string {
+  if (dataType === 'ARRAY') {
+    return `${udtName.replace(/^_/, '')}[]`;
+  }
+  if (dataType === 'USER-DEFINED') {
+    return udtName;
+  }
+  return dataType;
+}
+
+export function postgresTypeToFieldType(
+  dataType: string,
+  udtName: string,
+): FieldType | UnsupportedColumnType {
   if (dataType === 'boolean') {
     return 'boolean';
   }
@@ -35,5 +51,8 @@ export function postgresTypeToFieldType(dataType: string): FieldType {
   if (PRECISE_NUMBER_TYPES.has(dataType)) {
     return 'numeric';
   }
-  return 'text';
+  if (TEXT_TYPES.has(dataType)) {
+    return 'text';
+  }
+  return { unsupported: unsupportedTypeName(dataType, udtName) };
 }

@@ -1,8 +1,14 @@
 import { Client } from 'pg';
-import { Field } from '@pidrang/core';
-import { SchemaProvider } from '@pidrang/cli';
+import {
+  IntrospectedColumn,
+  SchemaProvider,
+  UnavailableAction,
+  describeTable,
+} from '@pidrang/cli';
 import { PostgresConnection, PostgresSsl } from './supabase-connection';
 import { postgresTypeToFieldType } from './postgres-field-type';
+import { assertPostgrestTableName } from './assert-postgrest-table-name';
+import { postgrestNameProblem } from './postgrest-name-problem';
 
 function toClientSsl(
   ssl: PostgresSsl | undefined,
@@ -52,7 +58,19 @@ export function createPostgresSchemaProvider(
     },
 
     async introspectTable(table) {
+      assertPostgrestTableName(table);
       return withClient(connection, async (client) => {
+        const relation = await client.query<{ table_type: string }>(
+          `select table_type
+           from information_schema.tables
+           where table_schema = 'public' and table_name = $1`,
+          [table],
+        );
+        if (relation.rows[0]?.table_type !== 'BASE TABLE') {
+          throw new Error(
+            `"${table}" is not a table in the public schema. The direct database connection strategy only scaffolds tables, not views or functions.`,
+          );
+        }
         const primaryKey = await client.query<{ column_name: string }>(
           `select kcu.column_name
            from information_schema.table_constraints tc
@@ -85,26 +103,30 @@ export function createPostgresSchemaProvider(
         const result = await client.query<{
           column_name: string;
           data_type: string;
+          udt_name: string;
           column_default: string | null;
           is_nullable: 'YES' | 'NO';
           is_identity: 'YES' | 'NO';
           identity_generation: 'ALWAYS' | 'BY DEFAULT' | null;
           is_generated: 'ALWAYS' | 'NEVER';
         }>(
-          `select column_name, data_type, column_default, is_nullable,
+          `select column_name, data_type, udt_name, column_default, is_nullable,
                   is_identity, identity_generation, is_generated
            from information_schema.columns
            where table_schema = 'public' and table_name = $1
            order by ordinal_position`,
           [table],
         );
-        return result.rows.map((row): Field => {
+        const columns = result.rows.map((row): IntrospectedColumn => {
           const isPrimaryKey = row.column_name === primaryKeyColumn;
           const isGenerated = row.is_generated === 'ALWAYS';
           const isAlwaysIdentity = row.identity_generation === 'ALWAYS';
+          const nameProblem = postgrestNameProblem(row.column_name);
           return {
             name: row.column_name,
-            type: postgresTypeToFieldType(row.data_type),
+            type: nameProblem
+              ? { unsupported: nameProblem }
+              : postgresTypeToFieldType(row.data_type, row.udt_name),
             readOnly:
               isPrimaryKey || isGenerated || isAlwaysIdentity || undefined,
             hasDefault:
@@ -114,6 +136,17 @@ export function createPostgresSchemaProvider(
             nullable: row.is_nullable === 'YES' ? true : undefined,
           };
         });
+        const id = columns.find((column) => column.name === 'id');
+        const unavailableActions: UnavailableAction[] = id?.hasDefault
+          ? []
+          : [
+              {
+                action: 'create',
+                reason:
+                  '"id" has no server default and the create form never asks for it',
+              },
+            ];
+        return describeTable(table, columns, unavailableActions);
       });
     },
   };
