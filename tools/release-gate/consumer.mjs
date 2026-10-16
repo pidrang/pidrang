@@ -22,6 +22,8 @@ const OFFLINE_BACKEND = {
   publishableKey: 'offline-build-only',
 };
 
+const GENERATORS = ['library', 'bin'];
+
 const ADAPTERS = {
   material: {
     packages: [
@@ -65,6 +67,7 @@ const { values } = parseArgs({
   options: {
     adapter: { type: 'string' },
     plan: { type: 'string' },
+    generator: { type: 'string', default: 'library' },
     backend: { type: 'string' },
     'break-generated-import': { type: 'boolean', default: false },
     'drop-tailwind-source': { type: 'boolean', default: false },
@@ -72,6 +75,11 @@ const { values } = parseArgs({
     'drop-input-binding': { type: 'boolean', default: false },
   },
 });
+
+if (!GENERATORS.includes(values.generator)) {
+  console.error(`--generator must be one of ${GENERATORS.join(', ')}`);
+  process.exit(1);
+}
 
 const adapter = ADAPTERS[values.adapter];
 if (!adapter) {
@@ -138,27 +146,87 @@ function writeFile(base, path, content) {
   writeFileSync(target, content);
 }
 
-function generateFromPlan(consumer, planPath) {
+function generatedFiles(consumer, planPath) {
   const script = `
-const { readFileSync, mkdirSync, writeFileSync } = require('node:fs');
-const { dirname, join } = require('node:path');
+const { readFileSync } = require('node:fs');
 const cli = require('@pidrang/cli');
 const plan = JSON.parse(readFileSync(process.argv[1], 'utf8'));
-const files = [
-  { path: 'src/app/resources.ts', content: cli.generateResourcesFile(plan) },
-  { path: 'src/app/resource-routes.ts', content: cli.RESOURCE_ROUTES_SNIPPET },
-  ...cli.generatePagesBundle(),
-];
-for (const file of files) {
-  const target = join(process.cwd(), file.path);
-  mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, file.content);
-}
-console.log(files.map((file) => file.path).join('\\n'));
+process.stdout.write(JSON.stringify({
+  resources: cli.generateResourcesFile(plan),
+  routes: cli.RESOURCE_ROUTES_SNIPPET,
+  pages: cli.generatePagesBundle(),
+}));
 `;
-  execute('generate', 'node', ['-e', script, resolve(planPath)], {
+  const result = spawnSync('node', ['-e', script, resolve(planPath)], {
     cwd: consumer,
+    encoding: 'utf8',
   });
+  if (result.status !== 0) {
+    throw new Error(
+      `${values.adapter} consumer: reading the installed @pidrang/cli failed: ${result.stderr.trim()}`,
+    );
+  }
+  return JSON.parse(result.stdout);
+}
+
+function generateWithLibrary(consumer, planPath) {
+  const generated = generatedFiles(consumer, planPath);
+  const files = [
+    { path: 'src/app/resources.ts', content: generated.resources },
+    { path: 'src/app/resource-routes.ts', content: generated.routes },
+    ...generated.pages,
+  ];
+  for (const file of files) {
+    writeFile(consumer, file.path, file.content);
+  }
+  writeFileSync(
+    join(output_directory, 'generate.log'),
+    `${files.map((file) => file.path).join('\n')}\n`,
+  );
+}
+
+function initPlanFrom(planPath, url) {
+  const plan = JSON.parse(readFileSync(planPath, 'utf8'));
+  return {
+    provider: plan.providerId,
+    connection: { strategy: 'service-role', url },
+    tables: plan.tables.map(({ table, actions, hiddenFields }) => ({
+      table,
+      actions,
+      hiddenFields,
+    })),
+  };
+}
+
+function generateWithBin(consumer, planPath, url) {
+  if (!process.env['PIDRANG_SUPABASE_SERVICE_ROLE_KEY']) {
+    throw new Error(
+      'the bin generator needs PIDRANG_SUPABASE_SERVICE_ROLE_KEY for the local stack',
+    );
+  }
+  const initPlan = join(output_directory, 'init-plan.json');
+  writeFileSync(
+    initPlan,
+    `${JSON.stringify(initPlanFrom(planPath, url), null, 2)}\n`,
+  );
+  execute(
+    'init',
+    join(consumer, 'node_modules/.bin/pidrang'),
+    ['init', '--plan', initPlan],
+    { cwd: consumer },
+  );
+  const generated = generatedFiles(consumer, planPath);
+  const resources = readFileSync(
+    join(consumer, 'src/app/resources.ts'),
+    'utf8',
+  );
+  if (resources !== generated.resources) {
+    writeFileSync(join(output_directory, 'resources.ts'), resources);
+    throw new Error(
+      `the installed pidrang bin generated another resources.ts from the local stack than ${planPath} describes: update ${planPath} to the introspected fields (the generated file is in ${output_directory}/resources.ts)`,
+    );
+  }
+  writeFile(consumer, 'src/app/resource-routes.ts', generated.routes);
 }
 
 function breakGeneratedImport(consumer) {
@@ -275,7 +343,14 @@ try {
     if (!values.plan) {
       throw new Error('the material consumer needs --plan');
     }
-    generateFromPlan(consumer, values.plan);
+    if (values.generator === 'bin') {
+      if (!values.backend) {
+        throw new Error('the bin generator needs --backend');
+      }
+      generateWithBin(consumer, values.plan, backend.url);
+    } else {
+      generateWithLibrary(consumer, values.plan);
+    }
     if (values['break-generated-import']) {
       breakGeneratedImport(consumer);
     }
@@ -294,6 +369,7 @@ try {
   recorded.consumers[values.adapter] = {
     backend: backend.url,
     plan: values.plan ?? null,
+    generator: values.adapter === 'material' ? values.generator : null,
     installed: Object.fromEntries(
       [
         ...COMMON_DEPENDENCIES,

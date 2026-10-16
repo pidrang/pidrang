@@ -43,14 +43,30 @@ function pack() {
   ]);
 }
 
-function consumer(adapter, backend) {
-  run('node', [
-    'tools/release-gate/consumer.mjs',
-    '--adapter',
-    adapter,
-    ...(adapter === 'material' ? ['--plan', PLAN] : []),
-    ...(backend ? ['--backend', JSON.stringify(backend)] : []),
-  ]);
+function consumer(adapter, keys) {
+  const backend = keys
+    ? { url: keys.apiUrl, publishableKey: keys.publishableKey }
+    : null;
+  run(
+    'node',
+    [
+      'tools/release-gate/consumer.mjs',
+      '--adapter',
+      adapter,
+      ...(adapter === 'material'
+        ? ['--plan', PLAN, '--generator', keys ? 'bin' : 'library']
+        : []),
+      ...(backend ? ['--backend', JSON.stringify(backend)] : []),
+    ],
+    keys
+      ? {
+          env: {
+            ...process.env,
+            PIDRANG_SUPABASE_SERVICE_ROLE_KEY: keys.serviceRoleKey,
+          },
+        }
+      : undefined,
+  );
 }
 
 function usePinnedCli(supabaseDirectory) {
@@ -236,9 +252,8 @@ if (values.mode === 'build') {
   run(join(supabaseDirectory, 'scripts/load-fixtures.sh'), ['--conformance']);
 
   pack();
-  const backend = { url: keys.apiUrl, publishableKey: keys.publishableKey };
-  consumer('material', backend);
-  consumer('tailwind', backend);
+  consumer('material', keys);
+  consumer('tailwind', keys);
   recordFixtures(fixturesCommit);
 
   run(
