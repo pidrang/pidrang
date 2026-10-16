@@ -13,11 +13,18 @@ type Row = { id: string } & Record<string, unknown>;
       <p role="alert">{{ error.message }}</p>
       <button type="button" (click)="list.reload()">Retry</button>
     } @else if (list.hasValue()) {
-      <lib-resource-table [fields]="fields" [data]="list.value().data" />
+      <pidrang-tailwind-resource-table
+        [fields]="fields"
+        [data]="list.value().data"
+      />
     } @else {
       <p role="status">Loading…</p>
     }
-    <lib-resource-form [fields]="formFields" [value]="draft" />
+    <pidrang-tailwind-resource-form
+      mode="create"
+      [fields]="formFields"
+      [value]="draft"
+    />
   `,
 })
 export class App {
