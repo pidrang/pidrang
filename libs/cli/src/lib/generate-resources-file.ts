@@ -1,8 +1,6 @@
-import { CrudAction } from './crud-action';
+import { CRUD_ACTIONS } from './crud-action';
 import { GenerationPlan, TablePlan } from './generation-plan';
 import { quote } from './quote';
-
-const CRUD_ACTIONS: CrudAction[] = ['list', 'create', 'show', 'edit', 'delete'];
 
 export function generateResourcesFile(plan: GenerationPlan): string {
   const resources = plan.tables.map(generateResourceLiteral).join('\n');

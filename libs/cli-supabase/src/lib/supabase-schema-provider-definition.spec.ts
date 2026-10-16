@@ -242,3 +242,302 @@ describe('supabaseSchemaProviderDefinition', () => {
     expect(validatorOf(input, 3)('')).toBe('The database user is required');
   });
 });
+
+describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
+  const fromPlan = (connection: unknown, env: Record<string, string> = {}) =>
+    supabaseSchemaProviderDefinition.connectionFromPlan(connection, env);
+
+  async function problemOf(
+    connection: unknown,
+    env: Record<string, string> = {},
+  ): Promise<string> {
+    const error = await fromPlan(connection, env).then(
+      () => null,
+      (err: Error) => err,
+    );
+    if (!error) {
+      throw new Error('expected the plan connection to be refused');
+    }
+    return error.message;
+  }
+
+  beforeEach(() => {
+    vi.mocked(readFile).mockReset();
+  });
+
+  it.each([
+    ['graphql', 'PIDRANG_SUPABASE_ANON_KEY', 'anonKey'],
+    ['service-role', 'PIDRANG_SUPABASE_SERVICE_ROLE_KEY', 'serviceRoleKey'],
+  ])(
+    'reads a %s key from %s and normalizes the URL like the prompt',
+    async (strategy, envName, keyName) => {
+      expect(
+        await fromPlan(
+          { strategy, url: ' https://example.supabase.co// ' },
+          { [envName]: '  pasted-key\n' },
+        ),
+      ).toEqual({
+        strategy,
+        url: 'https://example.supabase.co',
+        [keyName]: 'pasted-key',
+      });
+    },
+  );
+
+  it.each([
+    ['graphql', 'PIDRANG_SUPABASE_ANON_KEY'],
+    ['service-role', 'PIDRANG_SUPABASE_SERVICE_ROLE_KEY'],
+  ])(
+    'asks for %s key in %s when it is missing or blank',
+    async (strategy, envName) => {
+      const connection = { strategy, url: 'https://example.supabase.co' };
+      expect(await problemOf(connection)).toContain(`set ${envName}`);
+      expect(await problemOf(connection, { [envName]: '  ' })).toContain(
+        `set ${envName}`,
+      );
+    },
+  );
+
+  it.each([
+    ['graphql', 'anonKey', 'PIDRANG_SUPABASE_ANON_KEY'],
+    ['service-role', 'serviceRoleKey', 'PIDRANG_SUPABASE_SERVICE_ROLE_KEY'],
+    ['postgres', 'password', 'PIDRANG_DATABASE_PASSWORD'],
+  ])(
+    'refuses a %s %s written in the plan file without repeating it',
+    async (strategy, keyName, envName) => {
+      const message = await problemOf(
+        {
+          strategy,
+          url: 'https://example.supabase.co',
+          host: 'db.example.com',
+          [keyName]: 'leaked-secret',
+        },
+        { [envName]: 'from-env' },
+      );
+      expect(message).toContain(
+        `${keyName} must not be in the plan file, set ${envName} instead`,
+      );
+      expect(message).not.toContain('leaked-secret');
+      expect(message).not.toContain('from-env');
+    },
+  );
+
+  it.each([
+    ['no strategy', {}],
+    ['an unknown strategy', { strategy: 'rest' }],
+  ])('refuses a connection with %s', async (_, connection) => {
+    expect(await problemOf(connection)).toContain(
+      'strategy must be "graphql", "service-role" or "postgres"',
+    );
+  });
+
+  it('refuses a connection that is not an object', async () => {
+    expect(await problemOf('graphql')).toContain(
+      'connection must be an object',
+    );
+  });
+
+  it.each([
+    ['a missing URL', undefined, 'url must be a string'],
+    ['a URL that is not a string', 1, 'url must be a string'],
+    [
+      'a URL with a path',
+      'https://example.supabase.co/rest/v1',
+      'without /rest/v1',
+    ],
+    [
+      'a URL with credentials',
+      'https://u:p@example.supabase.co',
+      'credentials',
+    ],
+  ])('refuses %s', async (_, url, message) => {
+    expect(
+      await problemOf(
+        { strategy: 'graphql', url },
+        { PIDRANG_SUPABASE_ANON_KEY: 'key' },
+      ),
+    ).toContain(message);
+  });
+
+  it('refuses a property the strategy does not use', async () => {
+    expect(
+      await problemOf(
+        { strategy: 'graphql', url: 'https://example.supabase.co', host: 'x' },
+        { PIDRANG_SUPABASE_ANON_KEY: 'key' },
+      ),
+    ).toContain('"host" is not a graphql connection property');
+  });
+
+  const password = { PIDRANG_DATABASE_PASSWORD: 'db-password' };
+
+  it('defaults the port, database and user, and TLS on for a remote host', async () => {
+    expect(
+      await fromPlan(
+        { strategy: 'postgres', host: ' db.example.com ' },
+        password,
+      ),
+    ).toEqual({
+      strategy: 'postgres',
+      host: 'db.example.com',
+      port: 5432,
+      database: 'postgres',
+      user: 'postgres',
+      password: 'db-password',
+      ssl: true,
+    });
+  });
+
+  it.each(['localhost', '127.0.0.1', '::1'])(
+    'defaults TLS off for %s and then leaves ssl out like the prompt',
+    async (host) => {
+      expect(await fromPlan({ strategy: 'postgres', host }, password)).toEqual({
+        strategy: 'postgres',
+        host,
+        port: 5432,
+        database: 'postgres',
+        user: 'postgres',
+        password: 'db-password',
+      });
+    },
+  );
+
+  it('keeps TLS off when the plan says so for a remote host', async () => {
+    expect(
+      await fromPlan(
+        { strategy: 'postgres', host: 'db.example.com', tls: false },
+        password,
+      ),
+    ).not.toHaveProperty('ssl');
+  });
+
+  it('turns TLS on for a local host when the plan says so', async () => {
+    expect(
+      await fromPlan(
+        { strategy: 'postgres', host: 'localhost', tls: true },
+        password,
+      ),
+    ).toMatchObject({ ssl: true });
+  });
+
+  it.each([true, undefined])(
+    'reads the CA certificate file when tls is %s',
+    async (tls) => {
+      vi.mocked(readFile).mockResolvedValueOnce('-----BEGIN CERTIFICATE-----');
+
+      expect(
+        await fromPlan(
+          {
+            strategy: 'postgres',
+            host: 'localhost',
+            port: 6543,
+            database: 'mydb',
+            user: 'me',
+            tls,
+            caCertificatePath: ' ca.crt ',
+          },
+          password,
+        ),
+      ).toEqual({
+        strategy: 'postgres',
+        host: 'localhost',
+        port: 6543,
+        database: 'mydb',
+        user: 'me',
+        password: 'db-password',
+        ssl: { ca: '-----BEGIN CERTIFICATE-----' },
+      });
+      expect(readFile).toHaveBeenCalledWith('ca.crt', 'utf8');
+    },
+  );
+
+  it('refuses a CA certificate file it cannot read', async () => {
+    vi.mocked(readFile).mockRejectedValueOnce(new Error('ENOENT'));
+
+    await expect(
+      fromPlan(
+        {
+          strategy: 'postgres',
+          host: 'db.example.com',
+          caCertificatePath: 'x.crt',
+        },
+        password,
+      ),
+    ).rejects.toThrow('Could not read the CA certificate file at "x.crt".');
+  });
+
+  it('accepts an empty database password, like the prompt does', async () => {
+    expect(
+      await fromPlan(
+        { strategy: 'postgres', host: 'localhost' },
+        { PIDRANG_DATABASE_PASSWORD: '' },
+      ),
+    ).toMatchObject({ password: '' });
+  });
+
+  it.each([
+    ['no host', { host: undefined }, 'host must be a non-empty string'],
+    ['a blank host', { host: ' ' }, 'host must be a non-empty string'],
+    ['a port as a string', { port: '5432' }, 'port must be a whole number'],
+    ['a port of 0', { port: 0 }, 'port must be a whole number'],
+    ['a port above 65535', { port: 65536 }, 'port must be a whole number'],
+    ['a fractional port', { port: 54.3 }, 'port must be a whole number'],
+    [
+      'a blank database',
+      { database: '' },
+      'database must be a non-empty string',
+    ],
+    [
+      'a user that is not a string',
+      { user: 1 },
+      'user must be a non-empty string',
+    ],
+    ['tls that is not a boolean', { tls: 'yes' }, 'tls must be true or false'],
+    [
+      'a blank CA path',
+      { caCertificatePath: ' ' },
+      'caCertificatePath must be a non-empty string',
+    ],
+    [
+      'a CA path with tls off',
+      { tls: false, caCertificatePath: 'ca.crt' },
+      'caCertificatePath needs tls to be on',
+    ],
+  ])('refuses a postgres connection with %s', async (_, overrides, message) => {
+    expect(
+      await problemOf(
+        { strategy: 'postgres', host: 'db.example.com', ...overrides },
+        password,
+      ),
+    ).toContain(message);
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('asks for the database password when it is not set', async () => {
+    expect(
+      await problemOf({ strategy: 'postgres', host: 'db.example.com' }),
+    ).toContain('set PIDRANG_DATABASE_PASSWORD');
+  });
+
+  it('lists every problem at once without reading the CA file', async () => {
+    expect(
+      await problemOf({
+        strategy: 'postgres',
+        port: 0,
+        caCertificatePath: 'ca.crt',
+      }),
+    ).toBe(
+      'Invalid connection in the plan: host must be a non-empty string; port must be a whole number between 1 and 65535; set PIDRANG_DATABASE_PASSWORD.',
+    );
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('documents every variable it reads in its plan help', () => {
+    for (const name of [
+      'PIDRANG_SUPABASE_ANON_KEY',
+      'PIDRANG_SUPABASE_SERVICE_ROLE_KEY',
+      'PIDRANG_DATABASE_PASSWORD',
+    ]) {
+      expect(supabaseSchemaProviderDefinition.planHelp).toContain(name);
+    }
+  });
+});

@@ -18,12 +18,18 @@ All three are verified against a real local Supabase instance (`supabase start`)
 
 With every strategy, a column of an unsupported type (`json`, `jsonb`, arrays, enums, other user-defined types, `bytea`, ...) is left out of the generated resource. If it needs a value on insert, create is unavailable for that table. If no column is left that a form can edit, edit is unavailable. The wizard shows both. A table with a name PostgREST would read as syntax is refused before anything is written. `postgres` and `service-role` also refuse a table without a primary key, with a composite one or with one not named `id`; `graphql` cannot see primary keys and only checks that an `id` column exists, so a composite key that includes `id` gets through it.
 
+With `pidrang init --plan`, the plan's `connection` object picks the strategy and holds everything but the secret, which comes from an environment variable. A secret in the plan is refused:
+
+- `{ "strategy": "graphql", "url": "..." }` with `PIDRANG_SUPABASE_ANON_KEY`
+- `{ "strategy": "service-role", "url": "..." }` with `PIDRANG_SUPABASE_SERVICE_ROLE_KEY`
+- `{ "strategy": "postgres", "host": "...", "port": 5432, "database": "postgres", "user": "postgres", "tls": true, "caCertificatePath": "..." }` with `PIDRANG_DATABASE_PASSWORD` (it may be set to an empty string, like the prompt accepts). Only `host` is required; the other values default like the prompts, `tls` to on except for `localhost`, `127.0.0.1` and `::1`, and a `caCertificatePath` turns it on.
+
 The connection settings are checked before any request. TLS for `postgres` always verifies the certificate, against the CA file you give or, if you leave the path empty, the system certificates.
 
 ## Exports
 
 - `SupabaseConnection` — discriminated union of the three strategies' connection shapes
-- `supabaseSchemaProviderDefinition` — the `SchemaProviderDefinition<SupabaseConnection>` to register with `runInitWizard`
+- `supabaseSchemaProviderDefinition` — the `SchemaProviderDefinition<SupabaseConnection>` to register with `runInitWizard` or `runScriptedInit`
 
 ## Running unit tests
 

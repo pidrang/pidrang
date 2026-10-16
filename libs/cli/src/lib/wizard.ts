@@ -1,11 +1,19 @@
 import { checkbox, select } from '@inquirer/prompts';
 import { SchemaProvider } from './schema-provider';
-import { SchemaProviderDefinition } from './schema-provider-definition';
-import { CrudAction } from './crud-action';
+import {
+  PlanEnvironment,
+  SchemaProviderDefinition,
+} from './schema-provider-definition';
+import { CRUD_ACTIONS, CrudAction } from './crud-action';
 import { GenerationPlan, TablePlan } from './generation-plan';
+import { InitPlan } from './init-plan';
 import { TableIntrospection } from './table-introspection';
 
-const CRUD_ACTIONS: { name: string; value: CrudAction }[] = [
+export interface InitOptions {
+  takenRoutes?: readonly string[];
+}
+
+const ACTION_CHOICES: { name: string; value: CrudAction }[] = [
   { name: 'List', value: 'list' },
   { name: 'Create', value: 'create' },
   { name: 'Show', value: 'show' },
@@ -24,9 +32,15 @@ function hasControlCharacter(value: string): boolean {
   });
 }
 
-function routeNameProblem(table: string): string | null {
+function routeNameProblem(
+  table: string,
+  takenRoutes: readonly string[],
+): string | null {
   if (ROUTES_OWNED_BY_GENERATED_PAGES.has(table)) {
     return 'collides with a route the generated pages reserve for their own use';
+  }
+  if (takenRoutes.includes(table)) {
+    return 'collides with a route your app.routes.ts already declares';
   }
   if (table.trim() === '' || DOT_SEGMENTS.has(table)) {
     return 'cannot be used as a URL segment';
@@ -40,8 +54,67 @@ function routeNameProblem(table: string): string | null {
   return null;
 }
 
+function assertScaffoldableTables(
+  tables: string[],
+  options: InitOptions,
+): void {
+  if (tables.length === 0) {
+    throw new Error('Select at least one table to scaffold.');
+  }
+  const routeProblems = tables.flatMap((table) => {
+    const problem = routeNameProblem(table, options.takenRoutes ?? []);
+    return problem ? [`${JSON.stringify(table)} ${problem}`] : [];
+  });
+  if (routeProblems.length > 0) {
+    throw new Error(
+      `These tables cannot be scaffolded as a resource: ${routeProblems.join('; ')}.`,
+    );
+  }
+}
+
+function assertSupportedActions(
+  table: string,
+  introspection: TableIntrospection,
+  actions: CrudAction[],
+): void {
+  if (actions.length === 0) {
+    throw new Error(`Select at least one action for "${table}".`);
+  }
+  for (const action of actions) {
+    const reason = unavailableReason(introspection, action);
+    if (reason) {
+      throw new Error(`"${table}" cannot support ${action}: ${reason}.`);
+    }
+  }
+}
+
+function tablePlan(
+  table: string,
+  introspection: TableIntrospection,
+  actions: CrudAction[],
+  hiddenFields: string[],
+): TablePlan {
+  assertSupportedActions(table, introspection, actions);
+  const fieldNames = introspection.fields.map((field) => field.name);
+  const unknownFields = hiddenFields.filter(
+    (field) => !fieldNames.includes(field),
+  );
+  if (unknownFields.length > 0) {
+    throw new Error(
+      `"${table}" has no field to hide named ${unknownFields.map((field) => JSON.stringify(field)).join(', ')}.`,
+    );
+  }
+  return {
+    table,
+    fields: introspection.fields,
+    actions: CRUD_ACTIONS.filter((action) => actions.includes(action)),
+    hiddenFields: fieldNames.filter((field) => hiddenFields.includes(field)),
+  };
+}
+
 export async function runInitWizard(
   providers: SchemaProviderDefinition[],
+  options: InitOptions = {},
 ): Promise<GenerationPlan> {
   const providerDefinition = await chooseProvider(providers);
   const connection = await providerDefinition.promptConnection();
@@ -52,22 +125,63 @@ export async function runInitWizard(
     message: 'Which tables should pidrang scaffold?',
     choices: availableTables.map((table) => ({ name: table, value: table })),
   });
-  if (selectedTables.length === 0) {
-    throw new Error('Select at least one table to scaffold.');
-  }
-  const routeProblems = selectedTables.flatMap((table) => {
-    const problem = routeNameProblem(table);
-    return problem ? [`${JSON.stringify(table)} ${problem}`] : [];
-  });
-  if (routeProblems.length > 0) {
-    throw new Error(
-      `These tables cannot be scaffolded as a resource: ${routeProblems.join('; ')}.`,
-    );
-  }
+  assertScaffoldableTables(selectedTables, options);
 
   const tables: TablePlan[] = [];
   for (const table of selectedTables) {
-    tables.push(await planTable(schemaProvider, table));
+    tables.push(await promptTable(schemaProvider, table));
+  }
+
+  return { providerId: providerDefinition.id, tables };
+}
+
+export async function runScriptedInit(
+  providers: SchemaProviderDefinition[],
+  plan: InitPlan,
+  env: PlanEnvironment,
+  options: InitOptions = {},
+): Promise<GenerationPlan> {
+  const providerDefinition = providers.find(
+    (provider) => provider.id === plan.provider,
+  );
+  if (!providerDefinition) {
+    throw new Error(
+      `Unknown provider ${JSON.stringify(plan.provider)}. Registered providers: ${providers.map((provider) => provider.id).join(', ')}.`,
+    );
+  }
+  const connection = await providerDefinition.connectionFromPlan(
+    plan.connection,
+    env,
+  );
+  const schemaProvider = providerDefinition.createSchemaProvider(connection);
+
+  const availableTables = await schemaProvider.listTables();
+  const plannedTables = plan.tables.map((selection) => selection.table);
+  const missingTables = plannedTables.filter(
+    (table) => !availableTables.includes(table),
+  );
+  if (missingTables.length > 0) {
+    throw new Error(
+      `These tables are not among the tables this connection can scaffold: ${missingTables.map((table) => JSON.stringify(table)).join(', ')}.`,
+    );
+  }
+  const selectedTables = availableTables.filter((table) =>
+    plannedTables.includes(table),
+  );
+  assertScaffoldableTables(selectedTables, options);
+
+  const tables: TablePlan[] = [];
+  for (const table of selectedTables) {
+    const selection = plan.tables.find((planned) => planned.table === table);
+    const introspection = await schemaProvider.introspectTable(table);
+    tables.push(
+      tablePlan(
+        table,
+        introspection,
+        selection?.actions ?? [],
+        selection?.hiddenFields ?? [],
+      ),
+    );
   }
 
   return { providerId: providerDefinition.id, tables };
@@ -119,7 +233,7 @@ function actionsMessage(
   return `${message} These columns are left out: ${excluded}.`;
 }
 
-async function planTable(
+async function promptTable(
   schemaProvider: SchemaProvider,
   table: string,
 ): Promise<TablePlan> {
@@ -127,22 +241,14 @@ async function planTable(
 
   const actions = await checkbox<CrudAction>({
     message: actionsMessage(table, introspection),
-    choices: CRUD_ACTIONS.map((action) => {
+    choices: ACTION_CHOICES.map((action) => {
       const reason = unavailableReason(introspection, action.value);
       return reason
         ? { ...action, disabled: `(unavailable: ${reason})` }
         : { ...action, checked: true };
     }),
   });
-  if (actions.length === 0) {
-    throw new Error(`Select at least one action for "${table}".`);
-  }
-  for (const action of actions) {
-    const reason = unavailableReason(introspection, action);
-    if (reason) {
-      throw new Error(`"${table}" cannot support ${action}: ${reason}.`);
-    }
-  }
+  assertSupportedActions(table, introspection, actions);
 
   const hiddenFields = await checkbox({
     message: `Any fields to hide from the list/edit views for "${table}"? (optional)`,
@@ -152,5 +258,5 @@ async function planTable(
     })),
   });
 
-  return { table, fields: introspection.fields, actions, hiddenFields };
+  return tablePlan(table, introspection, actions, hiddenFields);
 }

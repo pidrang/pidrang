@@ -1,5 +1,6 @@
 import { checkbox, select } from '@inquirer/prompts';
-import { runInitWizard } from './wizard';
+import { runInitWizard, runScriptedInit } from './wizard';
+import { InitPlan } from './init-plan';
 import { SchemaProvider } from './schema-provider';
 import { SchemaProviderDefinition } from './schema-provider-definition';
 import { TableIntrospection } from './table-introspection';
@@ -33,7 +34,9 @@ function fakeDefinition(
   return {
     id,
     label: id,
+    planHelp: `${id} help`,
     promptConnection: vi.fn().mockResolvedValue({}),
+    connectionFromPlan: vi.fn().mockResolvedValue({ from: 'plan' }),
     createSchemaProvider: vi.fn().mockReturnValue(schemaProvider),
   };
 }
@@ -285,5 +288,207 @@ describe('runInitWizard', () => {
       'id',
       'name',
     ]);
+  });
+
+  it('refuses a table named after a route the app already declares', async () => {
+    const schemaProvider = fakeSchemaProvider();
+    const definition = fakeDefinition('supabase', schemaProvider);
+
+    vi.mocked(checkbox).mockResolvedValueOnce(['products', 'orders']);
+
+    const error = await runInitWizard([definition], {
+      takenRoutes: ['login', 'orders'],
+    }).catch((err) => err);
+    expect(error.message).toContain(
+      '"orders" collides with a route your app.routes.ts already declares',
+    );
+    expect(error.message).not.toContain('"products"');
+    expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
+  });
+});
+
+describe('runScriptedInit', () => {
+  function scripted(tables: InitPlan['tables']): InitPlan {
+    return { provider: 'supabase', connection: { url: 'u' }, tables };
+  }
+
+  beforeEach(() => {
+    vi.mocked(checkbox).mockReset();
+    vi.mocked(select).mockReset();
+  });
+
+  it('builds the plan without any prompt, from the connection the provider reads', async () => {
+    const schemaProvider = fakeSchemaProvider();
+    const definition = fakeDefinition('supabase', schemaProvider);
+    const env = { KEY: 'value' };
+
+    const plan = await runScriptedInit(
+      [definition],
+      scripted([
+        { table: 'products', actions: ['list', 'create'], hiddenFields: [] },
+      ]),
+      env,
+    );
+
+    expect(definition.connectionFromPlan).toHaveBeenCalledWith(
+      { url: 'u' },
+      env,
+    );
+    expect(definition.createSchemaProvider).toHaveBeenCalledWith({
+      from: 'plan',
+    });
+    expect(definition.promptConnection).not.toHaveBeenCalled();
+    expect(checkbox).not.toHaveBeenCalled();
+    expect(select).not.toHaveBeenCalled();
+    expect(plan).toEqual({
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'products',
+          fields: [
+            { name: 'id', type: 'number' },
+            { name: 'name', type: 'text' },
+          ],
+          actions: ['list', 'create'],
+          hiddenFields: [],
+        },
+      ],
+    });
+  });
+
+  it('gives the same plan as the wizard for the same choices in any order', async () => {
+    const schemaProvider = fakeSchemaProvider();
+    const definition = fakeDefinition('supabase', schemaProvider);
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products', 'orders'])
+      .mockResolvedValueOnce(['list', 'show', 'delete'])
+      .mockResolvedValueOnce(['id', 'name'])
+      .mockResolvedValueOnce(['create'])
+      .mockResolvedValueOnce([]);
+    const interactive = await runInitWizard([definition]);
+
+    const fromPlan = await runScriptedInit(
+      [definition],
+      scripted([
+        { table: 'orders', actions: ['create'], hiddenFields: [] },
+        {
+          table: 'products',
+          actions: ['delete', 'list', 'show'],
+          hiddenFields: ['name', 'id'],
+        },
+      ]),
+      {},
+    );
+
+    expect(fromPlan).toEqual(interactive);
+  });
+
+  it('names the provider ids it knows when the plan asks for another one', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+
+    await expect(
+      runScriptedInit([definition], { ...scripted([]), provider: 'rest' }, {}),
+    ).rejects.toThrow(
+      'Unknown provider "rest". Registered providers: supabase.',
+    );
+    expect(definition.connectionFromPlan).not.toHaveBeenCalled();
+  });
+
+  it('refuses tables the connection cannot scaffold, before introspecting anything', async () => {
+    const schemaProvider = fakeSchemaProvider();
+    const definition = fakeDefinition('supabase', schemaProvider);
+
+    await expect(
+      runScriptedInit(
+        [definition],
+        scripted([
+          { table: 'products', actions: ['list'], hiddenFields: [] },
+          { table: 'missing', actions: ['list'], hiddenFields: [] },
+        ]),
+        {},
+      ),
+    ).rejects.toThrow(
+      'These tables are not among the tables this connection can scaffold: "missing".',
+    );
+    expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'a reserved route',
+      'resource-unavailable',
+      [],
+      'reserve for their own use',
+    ],
+    ['a route of the app', 'login', ['login'], 'already declares'],
+    ['a slash', 'a/b', [], 'contains "/"'],
+  ])(
+    'refuses a table named after %s like the wizard does',
+    async (_, table, takenRoutes, message) => {
+      const schemaProvider = fakeSchemaProvider();
+      vi.mocked(schemaProvider.listTables).mockResolvedValue([table]);
+      const definition = fakeDefinition('supabase', schemaProvider);
+
+      await expect(
+        runScriptedInit(
+          [definition],
+          scripted([{ table, actions: ['list'], hiddenFields: [] }]),
+          {},
+          { takenRoutes },
+        ),
+      ).rejects.toThrow(message);
+      expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses an action the table cannot support', async () => {
+    const schemaProvider = fakeSchemaProvider({
+      unavailableActions: [{ action: 'delete', reason: 'no DELETE' }],
+    });
+    const definition = fakeDefinition('supabase', schemaProvider);
+
+    await expect(
+      runScriptedInit(
+        [definition],
+        scripted([
+          { table: 'products', actions: ['list', 'delete'], hiddenFields: [] },
+        ]),
+        {},
+      ),
+    ).rejects.toThrow('"products" cannot support delete: no DELETE.');
+  });
+
+  it('refuses an empty action list', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+
+    await expect(
+      runScriptedInit(
+        [definition],
+        scripted([{ table: 'products', actions: [], hiddenFields: [] }]),
+        {},
+      ),
+    ).rejects.toThrow('Select at least one action for "products".');
+  });
+
+  it('refuses to hide a field the table does not have, or one that is left out', async () => {
+    const schemaProvider = fakeSchemaProvider({
+      excludedColumns: [{ name: 'meta', reason: 'jsonb' }],
+    });
+    const definition = fakeDefinition('supabase', schemaProvider);
+
+    await expect(
+      runScriptedInit(
+        [definition],
+        scripted([
+          {
+            table: 'products',
+            actions: ['list'],
+            hiddenFields: ['name', 'meta', 'nope'],
+          },
+        ]),
+        {},
+      ),
+    ).rejects.toThrow('"products" has no field to hide named "meta", "nope".');
   });
 });
