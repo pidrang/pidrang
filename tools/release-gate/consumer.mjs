@@ -87,6 +87,21 @@ if (!adapter) {
   process.exit(1);
 }
 
+if (values.generator === 'bin' && !values.backend) {
+  console.error('--generator bin needs --backend');
+  process.exit(1);
+}
+
+if (
+  values.generator === 'bin' &&
+  !process.env['PIDRANG_SUPABASE_SERVICE_ROLE_KEY']
+) {
+  console.error(
+    '--generator bin needs PIDRANG_SUPABASE_SERVICE_ROLE_KEY for the local stack',
+  );
+  process.exit(1);
+}
+
 const rootManifest = JSON.parse(
   readFileSync(resolve(root, 'package.json'), 'utf8'),
 );
@@ -199,11 +214,6 @@ function initPlanFrom(planPath, url) {
 }
 
 function generateWithBin(consumer, planPath, url) {
-  if (!process.env['PIDRANG_SUPABASE_SERVICE_ROLE_KEY']) {
-    throw new Error(
-      'the bin generator needs PIDRANG_SUPABASE_SERVICE_ROLE_KEY for the local stack',
-    );
-  }
   const initPlan = join(output_directory, 'init-plan.json');
   writeFileSync(
     initPlan,
@@ -344,9 +354,6 @@ try {
       throw new Error('the material consumer needs --plan');
     }
     if (values.generator === 'bin') {
-      if (!values.backend) {
-        throw new Error('the bin generator needs --backend');
-      }
       generateWithBin(consumer, values.plan, backend.url);
     } else {
       generateWithLibrary(consumer, values.plan);
