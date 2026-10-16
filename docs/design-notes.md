@@ -168,7 +168,7 @@ Generated pages cannot know where a consumer app signs users in, so `SIGN_IN_PAT
 
 There is still no `--force`: replacing a file the user may have edited is their call, so the message says which folders to delete. A write can still fail half way (a full disk, Ctrl+C): init then lists what it wrote and what is left, and since what it wrote matches, running it again with the same answers finishes the job. Ctrl+C during the questions exits with 130 and nothing written.
 
-A table named like a route the app declares (`login`) is refused like `resource-unavailable`: whichever route comes first would hide the other. The paths are read from `app.routes.ts` with a pattern, not parsed: every literal `path:` counts, by its first segment, including one in a child route or a comment, and a path built at run time is not seen. `:param`, `**` and the empty path are ignored.
+A table named like a route the app declares (`login`) is refused like `resource-unavailable`: whichever route comes first would hide the other. The paths are read from `app.routes.ts` with a pattern, not parsed: every literal `path:` counts, by its first segment, including one in a child route or a comment, and a path built at run time is not seen. `:param`, `**` and the empty path are ignored. Only `app.routes.ts` is read: a top-level route spread in from another file (`...authRoutes`) is not seen.
 
 `withComponentInputBinding()` is printed with `provideRouter`, and init warns when `app.config.ts` does not mention it, because the generated pages receive `:resource` and `:id` as inputs and stay blank without it.
 

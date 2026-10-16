@@ -22,7 +22,7 @@ With `pidrang init --plan`, the plan's `connection` object picks the strategy an
 
 - `{ "strategy": "graphql", "url": "..." }` with `PIDRANG_SUPABASE_ANON_KEY`
 - `{ "strategy": "service-role", "url": "..." }` with `PIDRANG_SUPABASE_SERVICE_ROLE_KEY`
-- `{ "strategy": "postgres", "host": "...", "port": 5432, "database": "postgres", "user": "postgres", "tls": true, "caCertificatePath": "..." }` with `PIDRANG_DATABASE_PASSWORD` (it may be set to an empty string, like the prompt accepts). Only `host` is required; the other values default like the prompts, `tls` to on except for `localhost`, `127.0.0.1` and `::1`, and a `caCertificatePath` turns it on.
+- `{ "strategy": "postgres", "host": "...", "port": 5432, "database": "postgres", "user": "postgres", "tls": true, "caCertificatePath": "..." }` with `PIDRANG_DATABASE_PASSWORD` (it may be set to an empty string, like the prompt accepts). Only `host` is required; the other values default like the prompts, `tls` to on except for `localhost`, `127.0.0.1` and `::1`, and a `caCertificatePath` turns it on. A relative `caCertificatePath` is read from the folder `pidrang init` runs in, not from the folder of the plan file.
 
 The connection settings are checked before any request. TLS for `postgres` always verifies the certificate, against the CA file you give or, if you leave the path empty, the system certificates.
 
