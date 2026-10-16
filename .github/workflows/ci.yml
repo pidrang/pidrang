@@ -18,6 +18,8 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - run: npm install -g npm@11.21.1
+
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm exec nx run-many -t lint test build
