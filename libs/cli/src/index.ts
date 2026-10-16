@@ -2,6 +2,7 @@ export * from './lib/schema-provider';
 export * from './lib/schema-provider-definition';
 export * from './lib/crud-action';
 export * from './lib/generation-plan';
+export * from './lib/init-plan';
 export * from './lib/table-introspection';
 export * from './lib/excluded-column';
 export * from './lib/unavailable-action';

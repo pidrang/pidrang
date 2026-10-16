@@ -164,10 +164,58 @@ try {
       usage.output,
     );
 
-    const initWorkspace = join(consumer, 'app');
-    mkdirSync(initWorkspace);
+    const help = execute('help', binary, ['--help'], { cwd: consumer });
+    expect(
+      help.status === 0 &&
+        help.output.includes('--plan <file>') &&
+        help.output.includes('PIDRANG_SUPABASE_ANON_KEY'),
+      'the installed pidrang binary does not print its help',
+      help.output,
+    );
+
+    const emptyFolder = join(consumer, 'empty');
+    mkdirSync(emptyFolder);
+    const outsideApp = execute('init outside an app', binary, ['init'], {
+      cwd: emptyFolder,
+      input: '',
+      timeout: 30_000,
+    });
+    expect(
+      outsideApp.status === 1 &&
+        outsideApp.output.includes('there is no angular.json here'),
+      'the installed pidrang binary does not refuse a folder without angular.json',
+      outsideApp.output,
+    );
+    expect(
+      readdirSync(emptyFolder).length === 0,
+      'init wrote files in a folder it cannot set up',
+    );
+
+    const app = join(consumer, 'app');
+    const appFiles = {
+      'angular.json': JSON.stringify({
+        projects: { app: { projectType: 'application', sourceRoot: 'src' } },
+      }),
+      'package.json': JSON.stringify({
+        dependencies: { '@angular/core': '^22.1.0' },
+      }),
+      'src/app/app.config.ts': 'export const appConfig = { providers: [] };\n',
+      'src/app/app.routes.ts': 'export const routes = [];\n',
+      'plan.json': JSON.stringify({
+        provider: 'supabase',
+        connection: { strategy: 'graphql', url: 'http://127.0.0.1:54321' },
+        tables: [{ table: 'products', actions: ['list'] }],
+      }),
+    };
+    for (const [path, content] of Object.entries(appFiles)) {
+      mkdirSync(join(app, path, '..'), { recursive: true });
+      writeFileSync(join(app, path), content);
+    }
+    const appEntries = () => readdirSync(app, { recursive: true }).sort();
+    const before = JSON.stringify(appEntries());
+
     const init = execute('init', binary, ['init'], {
-      cwd: initWorkspace,
+      cwd: app,
       input: '',
       timeout: 30_000,
     });
@@ -177,8 +225,27 @@ try {
       init.output,
     );
     expect(
-      readdirSync(initWorkspace).length === 0,
+      JSON.stringify(appEntries()) === before,
       'init wrote files before completing its prompts',
+    );
+
+    const envWithoutKey = { ...process.env };
+    delete envWithoutKey.PIDRANG_SUPABASE_ANON_KEY;
+    const scripted = execute(
+      'init --plan without a key',
+      binary,
+      ['init', '--plan', 'plan.json'],
+      { cwd: app, env: envWithoutKey, timeout: 30_000 },
+    );
+    expect(
+      scripted.status === 1 &&
+        scripted.output.includes('set PIDRANG_SUPABASE_ANON_KEY'),
+      'the installed pidrang binary does not refuse a plan without its key',
+      scripted.output,
+    );
+    expect(
+      JSON.stringify(appEntries()) === before,
+      'init --plan wrote files although the plan was refused',
     );
   }
 } finally {
