@@ -150,7 +150,9 @@ const PLAN_HELP = `Supabase plan connection, one of:
     "database": "postgres", "user": "postgres", "tls": true,
     "caCertificatePath": "prod-ca.crt" }
       password from ${ENV_DATABASE_PASSWORD}; port, database, user, tls and
-      caCertificatePath are optional, tls defaults to on for a remote host`;
+      caCertificatePath are optional, tls defaults to on for a remote host,
+      and a relative caCertificatePath is read from the current folder, not
+      from the folder of the plan file`;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

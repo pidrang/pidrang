@@ -76,6 +76,7 @@ describe('runCli', () => {
         signal: interruptSignal,
         dispose: () => undefined,
       }),
+      interactive: true,
     };
   }
 
@@ -151,6 +152,8 @@ describe('runCli', () => {
     it.each([
       [[], 'Usage: pidrang init'],
       [['build'], 'Unknown command: build'],
+      [['build', '--help'], 'Unknown command: build'],
+      [['--help', 'init', 'extra'], 'Unknown command: init extra'],
       [['init', 'extra'], 'Unknown command: init extra'],
       [['init', '--force'], "Unknown option '--force'"],
       [['init', '--plan'], "Option '--plan <value>' argument missing"],
@@ -180,9 +183,24 @@ describe('runCli', () => {
         'provideRouter(routes, withComponentInputBinding())',
       );
       expect(out.join('\n')).toContain(
-        'src/app/app.config.ts does not call withComponentInputBinding() yet',
+        'src/app/app.config.ts does not mention withComponentInputBinding() yet',
       );
       expect(err).toEqual([]);
+    });
+
+    it('says how to register the routes and to replace the existing provideRouter', async () => {
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+      expect(out).toContain(
+        'export const routes: Routes = [...resourceRoutes];\n',
+      );
+      expect(out.join('\n')).toContain(
+        'Keep your own fixed paths (such as sign-in) above ...resourceRoutes, and a ** route below it',
+      );
+      expect(out.join('\n')).toContain(
+        'In your src/app/app.config.ts, replace provideRouter(routes) with the provideRouter line below',
+      );
     });
 
     it('does not warn about the router when it already binds component inputs', async () => {
@@ -194,7 +212,7 @@ describe('runCli', () => {
 
       expect(await runCli(['init', '--plan', plan], context())).toBe(0);
       expect(out.join('\n')).not.toContain(
-        'does not call withComponentInputBinding',
+        'does not mention withComponentInputBinding',
       );
     });
 
@@ -446,6 +464,20 @@ describe('runCli', () => {
 
       expect(err).toEqual(['Cancelled: nothing was written.']);
       expect(await snapshot()).toEqual(before);
+    });
+
+    it('points to --plan when the prompts close because there is no terminal', async () => {
+      const closed = new Error('User force closed the prompt');
+      closed.name = 'ExitPromptError';
+      vi.mocked(provider.promptConnection).mockRejectedValueOnce(closed);
+
+      expect(await runCli(['init'], { ...context(), interactive: false })).toBe(
+        130,
+      );
+      expect(err).toEqual([
+        'Cancelled: nothing was written.',
+        'There is no terminal to answer the questions in: pass the answers with --plan <file>, see pidrang --help.',
+      ]);
     });
 
     it('reports a page in the way before asking anything', async () => {

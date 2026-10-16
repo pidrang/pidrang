@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, posix } from 'node:path';
 import { GeneratedFile } from '@pidrang/cli';
 
@@ -24,18 +24,34 @@ export class WriteInterruptedError extends Error {
   }
 }
 
-type Entry = 'missing' | 'file' | 'other';
+type Entry = 'missing' | 'file' | 'other' | 'broken-link';
+
+function isMissing(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'ENOENT' || code === 'ENOTDIR';
+}
 
 async function entryAt(path: string): Promise<Entry> {
+  let entry;
   try {
-    return (await stat(path)).isFile() ? 'file' : 'other';
+    entry = await lstat(path);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT' || code === 'ENOTDIR') {
+    if (isMissing(error)) {
       return 'missing';
     }
     throw error;
   }
+  if (entry.isSymbolicLink()) {
+    try {
+      entry = await stat(path);
+    } catch (error) {
+      if (isMissing(error)) {
+        return 'broken-link';
+      }
+      throw error;
+    }
+  }
+  return entry.isFile() ? 'file' : 'other';
 }
 
 async function blockedParent(
@@ -49,7 +65,10 @@ async function blockedParent(
   ) {
     const entry = await entryAt(join(root, parent));
     if (entry === 'file') {
-      return parent;
+      return `${parent} is a file, not a folder`;
+    }
+    if (entry === 'broken-link') {
+      return `${parent} is a link to something that does not exist`;
     }
     if (entry === 'other') {
       return null;
@@ -66,14 +85,16 @@ async function conflictReason(
   if (entry === 'other') {
     return 'a folder or another non-file entry has this name';
   }
+  if (entry === 'broken-link') {
+    return 'a link to something that does not exist has this name';
+  }
   if (entry === 'file') {
     const existing = await readFile(join(root, file.path), 'utf8');
     return existing.replace(/\r\n/g, '\n') === file.content
       ? 'unchanged'
       : 'differs from what this pidrang version generates';
   }
-  const parent = await blockedParent(root, file.path);
-  return parent ? `${parent} is a file, not a folder` : null;
+  return blockedParent(root, file.path);
 }
 
 export function relocateFiles(

@@ -4,6 +4,7 @@ import {
   readFile,
   readdir,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -97,6 +98,63 @@ describe('write plan', () => {
       expect((await planWrites(root, [page])).conflicts).toEqual([
         { path: page.path, reason: 'src/app is a file, not a folder' },
       ]);
+    });
+  });
+
+  describe('planWrites with links', () => {
+    it('reports a link to nothing in the place of a file as a conflict', async () => {
+      await symlink(join(root, 'nowhere.ts'), join(root, resources.path));
+
+      expect((await planWrites(root, [resources])).conflicts).toEqual([
+        {
+          path: resources.path,
+          reason: 'a link to something that does not exist has this name',
+        },
+      ]);
+    });
+
+    it('reports a link to nothing in the place of a parent folder as a conflict', async () => {
+      await symlink(join(root, 'nowhere'), join(root, 'src/app/pages'));
+
+      expect((await planWrites(root, [page])).conflicts).toEqual([
+        {
+          path: page.path,
+          reason: 'src/app/pages is a link to something that does not exist',
+        },
+      ]);
+    });
+
+    it('compares a linked file by the content it points to', async () => {
+      await put('elsewhere/same.ts', resources.content);
+      await put('elsewhere/other.ts', 'other\n');
+      await symlink(
+        join(root, 'elsewhere/same.ts'),
+        join(root, resources.path),
+      );
+      await mkdir(join(root, 'src/app/pages'));
+      await symlink(join(root, 'elsewhere/other.ts'), join(root, page.path));
+
+      expect(await planWrites(root, [resources, page])).toEqual({
+        create: [],
+        unchanged: [resources],
+        conflicts: [
+          {
+            path: page.path,
+            reason: 'differs from what this pidrang version generates',
+          },
+        ],
+      });
+    });
+
+    it('writes through a parent folder that is a link to a folder', async () => {
+      await mkdir(join(root, 'elsewhere/pages'), { recursive: true });
+      await symlink(join(root, 'elsewhere/pages'), join(root, 'src/app/pages'));
+      const plan = await planWrites(root, [page]);
+
+      expect(await applyWritePlan(root, plan)).toEqual([page.path]);
+      expect(
+        await readFile(join(root, 'elsewhere/pages/list.ts'), 'utf8'),
+      ).toBe(page.content);
     });
   });
 

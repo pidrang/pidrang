@@ -33,7 +33,11 @@ export interface CliContext {
   out: (line: string) => void;
   err: (line: string) => void;
   watchInterrupt: () => { signal: AbortSignal; dispose: () => void };
+  interactive: boolean;
 }
+
+const ROUTES_EXPORT_SNIPPET = `export const routes: Routes = [...resourceRoutes];
+`;
 
 const PROVIDERS_SNIPPET = `provideRouter(routes, withComponentInputBinding()),
 providePidrang({
@@ -120,12 +124,16 @@ function printInstructions(context: CliContext, layout: AppLayout): void {
   );
   context.out(RESOURCE_ROUTES_SNIPPET);
   context.out(
-    `Register the router and the generated resources in your ${layout.configFile}. The pages read :resource and :id as component inputs, so the router needs withComponentInputBinding():\n`,
+    'Then add them to the routes your app exports. Keep your own fixed paths (such as sign-in) above ...resourceRoutes, and a ** route below it:\n',
+  );
+  context.out(ROUTES_EXPORT_SNIPPET);
+  context.out(
+    `In your ${layout.configFile}, replace provideRouter(routes) with the provideRouter line below and add providePidrang. The pages read :resource and :id as component inputs, so the router needs withComponentInputBinding():\n`,
   );
   context.out(PROVIDERS_SNIPPET);
   if (!layout.bindsComponentInputs) {
     context.out(
-      `\n${layout.configFile} does not call withComponentInputBinding() yet: until it does, the list and show pages get no resource or id and stay blank.`,
+      `\n${layout.configFile} does not mention withComponentInputBinding() yet: until the router uses it, the list and show pages get no resource or id and stay blank.`,
     );
   }
   context.out(
@@ -239,14 +247,19 @@ export async function runCli(
     return EXIT_FAILED;
   }
   const { values, positionals } = parsed;
+  const unknownCommand =
+    positionals.length > 1 ||
+    (positionals.length === 1 && positionals[0] !== 'init');
+  if (unknownCommand) {
+    context.err(`Unknown command: ${positionals.join(' ')}`);
+    context.err(usage(context.providers));
+    return EXIT_FAILED;
+  }
   if (values.help) {
     context.out(usage(context.providers));
     return EXIT_OK;
   }
-  if (positionals.length !== 1 || positionals[0] !== 'init') {
-    if (positionals.length > 0) {
-      context.err(`Unknown command: ${positionals.join(' ')}`);
-    }
+  if (positionals.length === 0) {
     context.err(usage(context.providers));
     return EXIT_FAILED;
   }
@@ -256,6 +269,11 @@ export async function runCli(
   } catch (error) {
     if (isPromptExit(error)) {
       context.err('Cancelled: nothing was written.');
+      if (!context.interactive) {
+        context.err(
+          'There is no terminal to answer the questions in: pass the answers with --plan <file>, see pidrang --help.',
+        );
+      }
       return EXIT_CANCELLED;
     }
     if (error instanceof UnsupportedAppError) {
