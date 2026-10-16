@@ -289,7 +289,20 @@ if (values.mode === 'build') {
       finishedAt: new Date().toISOString(),
     };
   });
-  run('node', ['tools/release-gate/verify-identities.mjs', gateDirectory]);
+  const { source } = JSON.parse(
+    readFileSync(join(gateDirectory, MANIFEST), 'utf8'),
+  );
+  const allowDirty = !source.clean && process.env['CI'] !== 'true';
+  run('node', [
+    'tools/release-gate/verify-identities.mjs',
+    gateDirectory,
+    ...(allowDirty ? ['--allow-dirty'] : []),
+  ]);
+  if (allowDirty) {
+    console.log(
+      'The working tree had changes when the tarballs were packed: this run cannot be published.',
+    );
+  }
   console.log(
     `Release gate passed. Tested tarballs and ${MANIFEST} are in ${gateDirectory}.`,
   );

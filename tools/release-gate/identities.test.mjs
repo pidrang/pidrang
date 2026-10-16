@@ -16,6 +16,7 @@ import {
   compareTarballs,
   describeTarballs,
   gateProblems,
+  packageProblems,
 } from './identities.mjs';
 
 let work;
@@ -89,14 +90,103 @@ test('rejects a missing tarball and one the gate never tested', () => {
   );
 });
 
+const clean = { commit: 'abc', clean: true };
+
 test('accepts only a manifest whose full gate passed', () => {
-  assert.deepEqual(gateProblems({ gate: { mode: 'full', passed: true } }), []);
+  assert.deepEqual(
+    gateProblems({ source: clean, gate: { mode: 'full', passed: true } }),
+    [],
+  );
   for (const gate of [
     undefined,
     { mode: null, passed: false },
     { mode: 'build', passed: true },
     { mode: 'full', passed: false },
   ]) {
-    assert.equal(gateProblems({ gate }).length, 1, JSON.stringify(gate));
+    assert.equal(
+      gateProblems({ source: clean, gate }).length,
+      1,
+      JSON.stringify(gate),
+    );
   }
+});
+
+test('accepts only a gate run on a clean working tree', () => {
+  const gate = { mode: 'full', passed: true };
+  for (const source of [
+    undefined,
+    { commit: 'abc' },
+    { commit: 'abc', clean: false },
+  ]) {
+    const problems = gateProblems({ source, gate });
+    assert.equal(problems.length, 1, JSON.stringify(source));
+    assert.match(problems[0], /clean working tree/);
+    assert.deepEqual(gateProblems({ source, gate }, { allowDirty: true }), []);
+  }
+  assert.equal(
+    gateProblems(
+      { source: { commit: 'abc', clean: false }, gate: { mode: 'build' } },
+      { allowDirty: true },
+    ).length,
+    1,
+  );
+});
+
+const NAMES = ['@pidrang/core', 'pidrang'];
+
+function entry(name, version = '1.0.0') {
+  return {
+    name,
+    version,
+    file: `${name.replace('@', '').replace('/', '-')}-${version}.tgz`,
+  };
+}
+
+test('accepts one tarball of each package at the gate version', () => {
+  assert.deepEqual(
+    packageProblems(
+      {
+        version: '1.0.0',
+        tarballs: [entry('@pidrang/core'), entry('pidrang')],
+      },
+      NAMES,
+    ),
+    [],
+  );
+});
+
+test('rejects a manifest without the tarballs of every package', () => {
+  assert.deepEqual(packageProblems({ version: '1.0.0' }, NAMES), [
+    'identities.json has no tarballs list',
+  ]);
+  assert.deepEqual(packageProblems({ version: '1.0.0', tarballs: [] }, NAMES), [
+    '@pidrang/core: not among the tested tarballs',
+    'pidrang: not among the tested tarballs',
+  ]);
+  assert.deepEqual(
+    packageProblems({ version: '1.0.0', tarballs: [entry('pidrang')] }, NAMES),
+    ['@pidrang/core: not among the tested tarballs'],
+  );
+});
+
+test('rejects a repeated package, an unknown one and another version', () => {
+  assert.deepEqual(
+    packageProblems(
+      {
+        version: '1.0.0',
+        tarballs: [
+          entry('@pidrang/core'),
+          entry('@pidrang/core', '1.0.1'),
+          entry('pidrang'),
+          entry('@pidrang/probe'),
+        ],
+      },
+      NAMES,
+    ),
+    [
+      '@pidrang/core: 2 tested tarballs',
+      'pidrang-core-1.0.1.tgz: version is 1.0.1, the gate packed 1.0.0',
+      'pidrang-probe-1.0.0.tgz: @pidrang/probe is not a pidrang package',
+    ],
+  );
 });

@@ -24,7 +24,7 @@ jobs:
 
       - run: pnpm exec nx run-many -t lint test build
 
-      - run: pnpm exec eslint tools/release-gate tools/versioned-packages.mjs tools/verify-artifacts.mjs
+      - run: pnpm exec eslint tools/release-gate tools/shared.mjs tools/versioned-packages.mjs tools/verify-artifacts.mjs
 
       - run: node tools/release-gate/run.mjs --mode build
 
