@@ -32,13 +32,47 @@ export function describeTarballs(directory) {
     .map((file) => describeTarball(directory, file));
 }
 
-export function gateProblems(manifest) {
-  if (manifest.gate?.mode === 'full' && manifest.gate?.passed === true) {
-    return [];
+export function gateProblems(manifest, { allowDirty = false } = {}) {
+  const problems = [];
+  if (manifest.gate?.mode !== 'full' || manifest.gate?.passed !== true) {
+    problems.push(
+      `${MANIFEST} does not record a passed full release gate (gate: ${JSON.stringify(manifest.gate ?? null)})`,
+    );
   }
-  return [
-    `${MANIFEST} does not record a passed full release gate (gate: ${JSON.stringify(manifest.gate ?? null)})`,
-  ];
+  if (!allowDirty && manifest.source?.clean !== true) {
+    problems.push(
+      `${MANIFEST} does not record a clean working tree: the tarballs may hold uncommitted changes (source: ${JSON.stringify(manifest.source ?? null)})`,
+    );
+  }
+  return problems;
+}
+
+export function packageProblems(manifest, names) {
+  if (!Array.isArray(manifest.tarballs)) {
+    return [`${MANIFEST} has no tarballs list`];
+  }
+  const problems = [];
+  for (const name of names) {
+    const count = manifest.tarballs.filter(
+      (entry) => entry.name === name,
+    ).length;
+    if (count === 0) {
+      problems.push(`${name}: not among the tested tarballs`);
+    } else if (count > 1) {
+      problems.push(`${name}: ${count} tested tarballs`);
+    }
+  }
+  for (const entry of manifest.tarballs) {
+    if (!names.includes(entry.name)) {
+      problems.push(`${entry.file}: ${entry.name} is not a pidrang package`);
+    }
+    if (entry.version !== manifest.version) {
+      problems.push(
+        `${entry.file}: version is ${entry.version}, the gate packed ${manifest.version}`,
+      );
+    }
+  }
+  return problems;
 }
 
 export function compareTarballs(expected, actual) {

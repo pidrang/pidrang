@@ -1,14 +1,21 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { parseArgs } from 'node:util';
 
+import { packages } from '../shared.mjs';
 import {
   MANIFEST,
   compareTarballs,
   describeTarballs,
   gateProblems,
+  packageProblems,
 } from './identities.mjs';
 
-const directory = resolve(process.argv[2] ?? 'tmp/release-gate');
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: { 'allow-dirty': { type: 'boolean', default: false } },
+});
+const directory = resolve(positionals[0] ?? 'tmp/release-gate');
 const manifestPath = join(directory, MANIFEST);
 
 if (!existsSync(manifestPath)) {
@@ -18,9 +25,13 @@ if (!existsSync(manifestPath)) {
 
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 const problems = [
-  ...gateProblems(manifest),
+  ...gateProblems(manifest, { allowDirty: values['allow-dirty'] }),
+  ...packageProblems(
+    manifest,
+    packages.map((pkg) => pkg.name),
+  ),
   ...compareTarballs(
-    manifest.tarballs,
+    manifest.tarballs ?? [],
     describeTarballs(join(directory, 'tarballs')),
   ),
 ];

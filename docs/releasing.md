@@ -47,7 +47,7 @@ Do not run `nx release` without `--dry-run` on a laptop: it commits, tags, pushe
 
 ## Verifying the artifacts
 
-`pnpm run verify:artifacts` runs on every pull request and before every release. It checks what would actually be published, not the source tree:
+`pnpm run verify:artifacts` runs before every release, and every pull request runs the same checks through the build mode of the [release gate](#the-release-gate). It checks what would actually be published, not the source tree:
 
 1. builds all seven packages (the four libraries and the three CLI packages) and runs the real `nx release version` step, so the internal `workspace:*` dependencies are rewritten exactly as in a release,
 2. packs each package with `npm pack` (`tools/pack-packages.mjs`),
@@ -101,9 +101,11 @@ Both workflows (`CI` in build mode, `Release gate` in full mode) upload `tmp/rel
 
 The gate stops early when the pidrang/supabase clone is not at the pinned commit or has local changes, and when the demos' `environment.local.ts` does not hold the running stack's publishable key, so a stack started by another CLI version fails too. The gate runs every `supabase` command, including the ones in the fixture scripts, through the CLI version pinned in `supabase/.cli-version`, whatever is installed globally. It takes about six minutes and needs ports 4310, 4311, 4320 and 4321 free.
 
+A local run on a working tree with uncommitted or untracked files can pass, but it says that it cannot be published: its last check runs `verify-identities.mjs --allow-dirty`. In CI (`CI=true`) the same run fails.
+
 ### Publishing what the gate tested
 
-`node tools/release-gate/verify-identities.mjs <directory>` fails unless `<directory>/identities.json` records a passed full gate, then re-hashes the tarballs in `<directory>/tarballs` and fails when any of them differs from the manifest in name, version, size or content, or when one was not tested. Publishing (#25, #57) must run the gate at the release version, download its artifact and publish those tarballs after this check, rather than letting `nx release` pack them again. Until then, the `Release` workflow only runs the gate first and stops when it fails.
+`node tools/release-gate/verify-identities.mjs <directory>` fails unless `<directory>/identities.json` records a passed full gate run on a clean working tree, with one tarball of each of the seven packages, all at the version the gate packed. It then re-hashes the tarballs in `<directory>/tarballs` and fails when any of them differs from the manifest in name, version, size or content, or when one was not tested. Publishing (#25, #57) must run the gate at the release version, download its artifact and publish those tarballs after this check, rather than letting `nx release` pack them again. Until then, the `Release` workflow only runs the gate first and stops when it fails.
 
 The workflow checks out pidrang/supabase with the `SUPABASE_FIXTURES_TOKEN` secret: a fine-grained token with read-only access to the contents of that repository.
 
