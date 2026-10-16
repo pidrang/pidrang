@@ -239,6 +239,8 @@ The gate keeps the tarballs it tested next to their sha256 in `identities.json`,
 
 The installed apps are copied outside the repository before `npm install`. Inside it, Node would resolve any package missing from the app in the repository's own `node_modules`, and a missing peer dependency would go unnoticed.
 
+The `CI` and `Release gate` workflows install npm 11.21.1 over the npm 10 that comes with Node 22. Since `vitest` 4.1.12 (2026-10-15), npm 10 crashes with `Cannot read properties of null (reading 'edgesOut')` while it resolves the optional peer dependencies of `@angular/build`, even in an app with no pidrang package. npm 11 and 12 install the same apps. The version is exact so a new npm release cannot change what the gate tests, and `identities.json` records it.
+
 The old `apps/demo-material-e2e` and `apps/demo-tailwind-e2e` projects were removed. Their only test looked for a "Welcome" heading that no longer exists, and they served the demos against the hosted project. The demo smoke tests now live in the gate, against the local fixtures.
 
 ### Local Supabase key
