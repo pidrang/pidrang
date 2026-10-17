@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact version (for example 0.1.0) or bump keyword (patch, minor, major). Leave empty to derive it from Conventional Commits.
-        required: false
+        description: Exact version to release (for example 0.1.0). The gate packs and tests the tarballs at this version before anything is tagged or published.
+        required: true
         type: string
       first-release:
         description: Set for the very first release, when no version tag exists yet.
@@ -19,24 +19,39 @@ on:
         type: boolean
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  gate:
+  check:
     if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "The version must be exact, for example 0.1.0, not '$VERSION'."
+            exit 1
+          fi
+
+  gate:
+    needs: check
     uses: ./.github/workflows/release-gate.yml
+    with:
+      version: ${{ inputs.version }}
     secrets:
       SUPABASE_FIXTURES_TOKEN: ${{ secrets.SUPABASE_FIXTURES_TOKEN }}
 
-  release:
+  tag:
     needs: gate
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,30 +63,66 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          registry-url: https://registry.npmjs.org
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm exec nx run-many -t lint test build
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-gate-${{ github.sha }}
+          path: tmp/release-gate
 
-      - run: pnpm run verify:artifacts
+      - name: Check the tested tarballs
+        env:
+          VERSION: ${{ inputs.version }}
+        run: node tools/release-gate/verify-identities.mjs tmp/release-gate --version "$VERSION" --commit "$GITHUB_SHA"
+
+      - run: pnpm exec nx run-many -t lint test
 
       - name: Configure git identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Release
+      - name: Version, changelog, tag and GitHub release
         env:
           VERSION: ${{ inputs.version }}
           FIRST_RELEASE: ${{ inputs.first-release }}
           DRY_RUN: ${{ inputs.dry-run }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: 'true'
         run: |
-          args=()
-          if [ -n "$VERSION" ]; then args+=("$VERSION"); fi
+          args=("$VERSION" --skip-publish)
           if [ "$FIRST_RELEASE" = "true" ]; then args+=("--first-release"); fi
           if [ "$DRY_RUN" = "true" ]; then args+=("--dry-run"); fi
-          pnpm exec nx release "${args[@]}" --yes
+          pnpm exec nx release "${args[@]}"
+
+  publish:
+    needs: tag
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - run: npm install -g npm@11.21.1
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-gate-${{ github.sha }}
+          path: tmp/release-gate
+
+      - name: Publish the tested tarballs
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          args=(tmp/release-gate --version "$VERSION" --commit "$GITHUB_SHA")
+          if [ "$DRY_RUN" = "true" ]; then args+=("--dry-run"); fi
+          node tools/release-gate/publish.mjs "${args[@]}"

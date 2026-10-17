@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import {
   compareTarballs,
   describeTarballs,
+  expectationProblems,
   gateProblems,
   packageProblems,
 } from './identities.mjs';
@@ -189,4 +190,38 @@ test('rejects a repeated package, an unknown one and another version', () => {
       'pidrang-probe-1.0.0.tgz: @pidrang/probe is not a pidrang package',
     ],
   );
+});
+
+test('accepts only the release version and commit when they are given', () => {
+  const manifest = { version: '1.0.0', source: { commit: 'abc' } };
+  const cases = [
+    [{}, 0],
+    [{ version: '1.0.0' }, 0],
+    [{ commit: 'abc' }, 0],
+    [{ version: '1.0.0', commit: 'abc' }, 0],
+    [{ version: '1.0.1' }, 1],
+    [{ commit: 'def' }, 1],
+    [{ version: '1.0.1', commit: 'abc' }, 1],
+    [{ version: '1.0.0', commit: 'def' }, 1],
+    [{ version: '1.0.1', commit: 'def' }, 2],
+    [{ version: '' }, 1],
+    [{ commit: '' }, 1],
+  ];
+  for (const [expected, count] of cases) {
+    assert.equal(
+      expectationProblems(manifest, expected).length,
+      count,
+      JSON.stringify(expected),
+    );
+  }
+});
+
+test('rejects a manifest without the version or commit the release expects', () => {
+  const expected = { version: '1.0.0', commit: 'abc' };
+  assert.equal(expectationProblems({}, expected).length, 2);
+  assert.equal(
+    expectationProblems({ version: '1.0.0', source: {} }, expected).length,
+    1,
+  );
+  assert.deepEqual(expectationProblems({}), []);
 });

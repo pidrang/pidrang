@@ -39,6 +39,7 @@ function pack() {
   run('node', [
     '--test',
     'tools/release-gate/identities.test.mjs',
+    'tools/release-gate/publishing.test.mjs',
     'tools/release-gate/spa-file.test.mjs',
   ]);
 }

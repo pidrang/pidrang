@@ -91,7 +91,15 @@
     }
   },
   "release": {
-    "projects": ["core", "supabase", "material", "tailwind"],
+    "projects": [
+      "core",
+      "supabase",
+      "material",
+      "tailwind",
+      "cli",
+      "cli-supabase",
+      "pidrang-cli"
+    ],
     "projectsRelationship": "fixed",
     "releaseTag": {
       "pattern": "v{version}"
