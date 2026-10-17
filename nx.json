@@ -120,6 +120,7 @@
       "workspaceChangelog": {
         "file": "CHANGELOG.md",
         "createRelease": "github",
+        "renderer": "{workspaceRoot}/tools/changelog-renderer.mjs",
         "renderOptions": {
           "authors": false
         }
