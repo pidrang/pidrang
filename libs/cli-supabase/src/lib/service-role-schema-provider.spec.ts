@@ -113,6 +113,18 @@ const openApiSchema = {
         'a.b': { type: 'string', format: 'text' },
       },
     },
+    counters: {
+      required: ['id', 'quantity'],
+      properties: {
+        id: {
+          type: 'integer',
+          format: 'int64',
+          description: PRIMARY_KEY_DESCRIPTION,
+        },
+        quantity: { type: 'integer', format: 'int32', default: 1 },
+        rank: { type: 'integer', format: 'int32' },
+      },
+    },
     unserved: {
       properties: {
         id: {
@@ -133,6 +145,7 @@ const openApiSchema = {
     '/named_key': ALL_METHODS,
     '/totals_view': { get: {} },
     '/shapes': ALL_METHODS,
+    '/counters': ALL_METHODS,
     '/rpc/refresh_stats': { get: {}, post: {} },
   },
 };
@@ -164,6 +177,7 @@ describe('createServiceRoleSchemaProvider', () => {
       'named_key',
       'totals_view',
       'shapes',
+      'counters',
     ]);
   });
 
@@ -176,6 +190,19 @@ describe('createServiceRoleSchemaProvider', () => {
         { name: 'in_stock', type: 'boolean', hasDefault: true },
         { name: 'created_at', type: 'timestamp', hasDefault: true },
         { name: 'notes', type: 'text', nullable: true },
+      ],
+      excludedColumns: [],
+      unavailableActions: [],
+    });
+  });
+
+  it('introspects the integer formats of PostgREST 16 without losing a column', async () => {
+    const provider = createServiceRoleSchemaProvider(connection);
+    expect(await provider.introspectTable('counters')).toEqual({
+      fields: [
+        { name: 'id', type: 'numeric', readOnly: true },
+        { name: 'quantity', type: 'number', hasDefault: true },
+        { name: 'rank', type: 'number', nullable: true },
       ],
       excludedColumns: [],
       unavailableActions: [],

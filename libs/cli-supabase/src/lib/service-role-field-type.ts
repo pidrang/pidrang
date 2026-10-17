@@ -16,6 +16,7 @@ const BOOLEAN_FORMATS = new Set(['boolean', 'bool']);
 const NUMBER_FORMATS = new Set([
   'int2',
   'int4',
+  'int32',
   'smallint',
   'integer',
   'float4',
@@ -26,6 +27,7 @@ const NUMBER_FORMATS = new Set([
 
 const PRECISE_NUMBER_FORMATS = new Set([
   'int8',
+  'int64',
   'bigint',
   'numeric',
   'decimal',

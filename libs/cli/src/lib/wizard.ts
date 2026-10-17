@@ -11,6 +11,7 @@ import { TableIntrospection } from './table-introspection';
 
 export interface InitOptions {
   takenRoutes?: readonly string[];
+  reportLeftOutColumns?: (message: string) => void;
 }
 
 const ACTION_CHOICES: { name: string; value: CrudAction }[] = [
@@ -174,6 +175,10 @@ export async function runScriptedInit(
   for (const table of selectedTables) {
     const selection = plan.tables.find((planned) => planned.table === table);
     const introspection = await schemaProvider.introspectTable(table);
+    const leftOut = leftOutColumns(introspection);
+    if (leftOut) {
+      options.reportLeftOutColumns?.(`"${table}": ${leftOut}`);
+    }
     tables.push(
       tablePlan(
         table,
@@ -219,18 +224,23 @@ function unavailableReason(
   return reasons.length > 0 ? reasons.join('; ') : null;
 }
 
+function leftOutColumns(introspection: TableIntrospection): string | null {
+  if (introspection.excludedColumns.length === 0) {
+    return null;
+  }
+  const excluded = introspection.excludedColumns
+    .map((column) => `${column.name} (${column.reason})`)
+    .join(', ');
+  return `These columns are left out: ${excluded}.`;
+}
+
 function actionsMessage(
   table: string,
   introspection: TableIntrospection,
 ): string {
   const message = `Which actions should "${table}" support?`;
-  if (introspection.excludedColumns.length === 0) {
-    return message;
-  }
-  const excluded = introspection.excludedColumns
-    .map((column) => `${column.name} (${column.reason})`)
-    .join(', ');
-  return `${message} These columns are left out: ${excluded}.`;
+  const leftOut = leftOutColumns(introspection);
+  return leftOut ? `${message} ${leftOut}` : message;
 }
 
 async function promptTable(

@@ -147,7 +147,10 @@ async function collectPlan(
   layout: AppLayout,
   planPath: string | undefined,
 ): Promise<GenerationPlan> {
-  const options = { takenRoutes: layout.takenRoutes };
+  const options = {
+    takenRoutes: layout.takenRoutes,
+    reportLeftOutColumns: context.out,
+  };
   if (planPath === undefined) {
     return runInitWizard(context.providers, options);
   }

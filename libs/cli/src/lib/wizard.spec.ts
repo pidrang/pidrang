@@ -491,4 +491,51 @@ describe('runScriptedInit', () => {
       ),
     ).rejects.toThrow('"products" has no field to hide named "meta", "nope".');
   });
+
+  it('reports the left-out columns of each table that has some, in table order', async () => {
+    const schemaProvider = fakeSchemaProvider();
+    vi.mocked(schemaProvider.introspectTable).mockImplementation(
+      async (table) => ({
+        fields: [{ name: 'id', type: 'number' }],
+        excludedColumns:
+          table === 'orders'
+            ? [
+                { name: 'meta', reason: 'jsonb' },
+                { name: 'tags', reason: 'text[]' },
+              ]
+            : [],
+        unavailableActions: [],
+      }),
+    );
+    const definition = fakeDefinition('supabase', schemaProvider);
+    const reported: string[] = [];
+
+    await runScriptedInit(
+      [definition],
+      scripted([
+        { table: 'orders', actions: ['list'], hiddenFields: [] },
+        { table: 'products', actions: ['list'], hiddenFields: [] },
+      ]),
+      {},
+      { reportLeftOutColumns: (message) => reported.push(message) },
+    );
+
+    expect(reported).toEqual([
+      '"orders": These columns are left out: meta (jsonb), tags (text[]).',
+    ]);
+  });
+
+  it('reports nothing when no column is left out', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+    const reported: string[] = [];
+
+    await runScriptedInit(
+      [definition],
+      scripted([{ table: 'products', actions: ['list'], hiddenFields: [] }]),
+      {},
+      { reportLeftOutColumns: (message) => reported.push(message) },
+    );
+
+    expect(reported).toEqual([]);
+  });
 });

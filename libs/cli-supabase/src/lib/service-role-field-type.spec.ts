@@ -79,6 +79,79 @@ describe('openApiPropertyToFieldType', () => {
     );
   });
 
+  describe.each([
+    [
+      'PostgREST 14',
+      {
+        smallint: { type: 'integer', format: 'smallint' },
+        integer: { type: 'integer', format: 'integer' },
+        bigint: { type: 'integer', format: 'bigint' },
+      },
+    ],
+    [
+      'PostgREST 16',
+      {
+        smallint: { type: 'integer', format: 'int32' },
+        integer: { type: 'integer', format: 'int32' },
+        bigint: { type: 'integer', format: 'int64' },
+      },
+    ],
+  ])('with the column formats of %s', (_, integers) => {
+    it.each([
+      ['smallint', integers.smallint, 'number'],
+      ['integer, serial, identity and generated', integers.integer, 'number'],
+      ['bigint and bigserial', integers.bigint, 'numeric'],
+      ['real', { type: 'number', format: 'real' }, 'number'],
+      [
+        'double precision',
+        { type: 'number', format: 'double precision' },
+        'number',
+      ],
+      ['numeric', { type: 'number', format: 'numeric' }, 'numeric'],
+      ['boolean', { type: 'boolean', format: 'boolean' }, 'boolean'],
+      ['text', { type: 'string', format: 'text' }, 'text'],
+      ['varchar', { type: 'string', format: 'character varying' }, 'text'],
+      ['char', { type: 'string', format: 'character' }, 'text'],
+      ['uuid', { type: 'string', format: 'uuid' }, 'text'],
+      ['date', { type: 'string', format: 'date' }, 'date'],
+      ['time', { type: 'string', format: 'time without time zone' }, 'time'],
+      ['timetz', { type: 'string', format: 'time with time zone' }, 'time'],
+      [
+        'timestamp',
+        { type: 'string', format: 'timestamp without time zone' },
+        'timestamp',
+      ],
+      [
+        'timestamptz',
+        { type: 'string', format: 'timestamp with time zone' },
+        'timestamp',
+      ],
+    ])('maps %s', (_, property, type) => {
+      expect(openApiPropertyToFieldType(property)).toBe(type);
+    });
+
+    it.each([
+      ['json', { format: 'json' }, 'json'],
+      ['jsonb', { format: 'jsonb' }, 'jsonb'],
+      [
+        'integer[]',
+        { type: 'array', format: 'integer[]', items: { type: 'integer' } },
+        'integer[]',
+      ],
+      [
+        'an enum',
+        { type: 'string', format: 'public.mood', enum: ['a', 'b'] },
+        'enum public.mood',
+      ],
+      ['bytea', { type: 'string', format: 'bytea' }, 'bytea'],
+      ['interval', { type: 'string', format: 'interval' }, 'interval'],
+    ])('leaves out %s', (_, property, shownAs) => {
+      expect(openApiPropertyToFieldType(property)).toEqual({
+        unsupported: shownAs,
+      });
+    });
+  });
+
   it.each([
     ['jsonb', { format: 'jsonb' }, 'jsonb'],
     ['json', { format: 'json' }, 'json'],
