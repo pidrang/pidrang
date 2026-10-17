@@ -47,6 +47,21 @@ export function gateProblems(manifest, { allowDirty = false } = {}) {
   return problems;
 }
 
+export function expectationProblems(manifest, { version, commit } = {}) {
+  const problems = [];
+  if (version !== undefined && manifest.version !== version) {
+    problems.push(
+      `${MANIFEST} records version ${manifest.version}, the release is ${version}`,
+    );
+  }
+  if (commit !== undefined && manifest.source?.commit !== commit) {
+    problems.push(
+      `${MANIFEST} records commit ${manifest.source?.commit}, the release is ${commit}`,
+    );
+  }
+  return problems;
+}
+
 export function packageProblems(manifest, names) {
   if (!Array.isArray(manifest.tarballs)) {
     return [`${MANIFEST} has no tarballs list`];

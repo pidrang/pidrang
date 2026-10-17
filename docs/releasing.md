@@ -4,10 +4,10 @@ How a new version of the published packages reaches npm. Maintainers only.
 
 ## Model
 
-- **Published packages:** `@pidrang/core`, `@pidrang/supabase`, `@pidrang/material`, `@pidrang/tailwind`. The CLI packages (`@pidrang/cli`, `@pidrang/cli-supabase`, `pidrang-cli`) are private and not released yet.
-- **One version for all four packages** (a fixed release group). Every release bumps and publishes all of them to the same number, so users never have to work out which `@pidrang/material` goes with which `@pidrang/core`.
+- **Published packages:** the four libraries `@pidrang/core`, `@pidrang/supabase`, `@pidrang/material`, `@pidrang/tailwind`, and the three CLI packages `@pidrang/cli`, `@pidrang/cli-supabase` and `pidrang` (the bin, Nx project `pidrang-cli`).
+- **One version for all seven packages** (a fixed release group). Every release bumps and publishes all of them to the same number, so users never have to work out which `@pidrang/material` goes with which `@pidrang/core`.
 - **Tool:** [Nx Release](https://nx.dev/features/manage-releases), configured under `release` in `nx.json`.
-- **Version source:** Conventional Commits since the last `vX.Y.Z` tag. From 1.0.0 on, `feat` bumps minor, `fix` bumps patch and a breaking change (`!` or a `BREAKING CHANGE:` footer) bumps major. Below 1.0.0 each level shifts down: a breaking change bumps minor, and `feat` and `fix` bump patch. An exact version or a keyword (`patch`, `minor`, `major`) can be passed to override it.
+- **Version source:** Conventional Commits since the last `vX.Y.Z` tag. From 1.0.0 on, `feat` bumps minor, `fix` bumps patch and a breaking change (`!` or a `BREAKING CHANGE:` footer) bumps major. Below 1.0.0 each level shifts down: a breaking change bumps minor, and `feat` and `fix` bump patch. The `Release` workflow takes the exact version (`0.1.0`), because the gate packs and tests the tarballs at that version before anything is tagged; use the local dry run below to see which version the commits call for.
 - **Changelog:** `CHANGELOG.md` at the repository root, generated from the same commits, plus a GitHub Release for each tag.
 
 ## Semver rules
@@ -15,32 +15,32 @@ How a new version of the published packages reaches npm. Maintainers only.
 - Below 1.0.0, minor releases may contain breaking changes and patch releases never do.
 - From 1.0.0 on, breaking changes only ship in a major release.
 - Adding support for a new Angular major is a minor release. Dropping the previous one is a breaking change.
-- `@pidrang/supabase`, `@pidrang/material` and `@pidrang/tailwind` declare `@pidrang/core` as a peer dependency. In the source tree it is `workspace:*`; during a release Nx rewrites it, in the published manifest only, to a caret range of the release version (`^0.2.0`). Below 1.0.0 a caret range allows patch updates only, so a package pinned to `^0.2.0` core does not accept core `0.3.0`. That is intentional: the fixed group guarantees the four packages are released together.
+- `@pidrang/supabase`, `@pidrang/material` and `@pidrang/tailwind` declare `@pidrang/core` as a peer dependency. In the source tree it is `workspace:*`; during a release Nx rewrites it, in the published manifest only, to a caret range of the release version (`^0.2.0`). Below 1.0.0 a caret range allows patch updates only, so a package pinned to `^0.2.0` core does not accept core `0.3.0`. That is intentional: the fixed group guarantees the packages are released together. The same rewrite applies to `@pidrang/cli-supabase` and `pidrang`, which depend on `@pidrang/cli` and `@pidrang/core`.
 
 ## Cutting a release
 
-Releases run from the `Release` GitHub Actions workflow, never from a laptop. The workflow lints, tests and builds, then runs `nx release`, which:
+Releases run from the `Release` GitHub Actions workflow on `main`, never from a laptop. It runs four jobs, each only when the previous one passed:
 
-1. builds the packages with `tools/build-packages.mjs` and copies `LICENSE` into each `dist` folder,
-2. computes the new version and writes it to each `package.json` and its `dist` copy,
-3. prepends the new section to `CHANGELOG.md`,
-4. commits `chore(release): vX.Y.Z`, tags `vX.Y.Z` and pushes both,
-5. creates the GitHub Release,
-6. publishes to npm with provenance.
+1. `check` refuses a version that is not exact (`0.1.0` or `0.2.0-rc.1`).
+2. `gate` runs the full [release gate](#the-release-gate) at that version and uploads the tested tarballs as the `release-gate-<commit>` artifact.
+3. `tag` downloads the artifact, checks it with `verify-identities.mjs --version --commit`, lints and tests, then runs `nx release <version> --skip-publish`. That builds the packages, writes the version to each `package.json`, prepends the new section to `CHANGELOG.md`, commits `chore(release): vX.Y.Z`, tags `vX.Y.Z`, pushes both and creates the GitHub Release. It publishes nothing.
+4. `publish` runs in the `npm` environment. It downloads the same artifact and runs `tools/release-gate/publish.mjs`, which checks the artifact again and publishes the seven tested tarballs with `npm publish <tarball> --access public --provenance`, in dependency order: core, supabase, material, tailwind, cli, cli-supabase, then `pidrang` last. A version with a `-` goes to the `next` tag, any other one to `latest`.
+
+The tagged commit differs from the tested commit only by the version bump and the changelog: the gate packed the tarballs from the tested commit with the same `nx release version` rewrite, so their manifests already hold the release version and the caret ranges.
 
 Steps:
 
 1. Make sure `main` is green and contains everything meant for the release.
-2. Open Actions, Release, Run workflow on `main`. Leave `dry-run` checked first and read the log: version, changelog entry, files that would be published.
+2. Open Actions, Release, Run workflow on `main` and enter the version. Leave `dry-run` checked first and read the log: the gate result, the version and changelog entry of the `tag` job, and the `npm publish --dry-run` output of each package in the `publish` job.
 3. Run it again with `dry-run` unchecked.
 4. Check the tag, the GitHub Release and the npm pages, including the provenance badge on each package page.
 
-For the very first release, set `first-release` and pass an exact version (`0.1.0`), because no version tag exists yet to compute one from.
+For the very first release, set `first-release`, because no version tag exists yet.
 
 To preview locally, without committing, tagging, pushing or publishing:
 
 ```bash
-pnpm exec nx release --dry-run
+pnpm exec nx release --skip-publish --dry-run
 ```
 
 Do not run `nx release` without `--dry-run` on a laptop: it commits, tags, pushes and publishes.
@@ -55,8 +55,6 @@ Do not run `nx release` without `--dry-run` on a laptop: it commits, tags, pushe
 4. `tools/check-install.mjs` installs all the tarballs together in an empty directory, compiles a file importing the four Angular packages through their package exports, imports the libraries at runtime, and runs the installed `pidrang` binary (usage and start of `init`).
 
 The script restores `nx.json`, the package manifests and `pnpm-lock.yaml` when it finishes, so it is safe to run locally. It needs network access to install the peer dependencies from the registry.
-
-Only the four libraries are in the `nx.json` release group. The three CLI packages are prepared and verified but not released until #57; the verification temporarily includes them so their tarballs are checked too.
 
 ## The release gate
 
@@ -107,19 +105,23 @@ A local run on a working tree with uncommitted or untracked files can pass, but 
 
 ### Publishing what the gate tested
 
-`node tools/release-gate/verify-identities.mjs <directory>` fails unless `<directory>/identities.json` records a passed full gate run on a clean working tree, with one tarball of each of the seven packages, all at the version the gate packed. It then re-hashes the tarballs in `<directory>/tarballs` and fails when any of them differs from the manifest in name, version, size or content, or when one was not tested. Publishing (#25, #57) must run the gate at the release version, download its artifact and publish those tarballs after this check, rather than letting `nx release` pack them again. Until then, the `Release` workflow only runs the gate first and stops when it fails.
+`node tools/release-gate/verify-identities.mjs <directory>` fails unless `<directory>/identities.json` records a passed full gate run on a clean working tree, with one tarball of each of the seven packages, all at the version the gate packed. With `--version <version>` and `--commit <sha>` it also fails when the manifest records another version or commit. It then re-hashes the tarballs in `<directory>/tarballs` and fails when any of them differs from the manifest in name, version, size or content, or when one was not tested.
+
+`node tools/release-gate/publish.mjs <directory> --version <version> --commit <sha> [--dry-run]` runs that check with both options and publishes nothing when it fails. The `Release` workflow publishes only through it, so `nx release` never packs the packages again. Before each package it reads the integrity npm records for that exact version: it publishes when the version is not on npm, skips it when npm holds the same tarball, and stops when npm holds a different one.
 
 The workflow checks out pidrang/supabase with the `SUPABASE_FIXTURES_TOKEN` secret: a fine-grained token with read-only access to the contents of that repository.
 
 ## One-time setup
 
 - The `@pidrang` organization exists on npm. Make sure the publishing account is a member with publish rights. An organization does not reserve the unscoped `pidrang` package name used by the CLI: check that `npm view pidrang` returns 404 before the CLI release.
-- Add an npm token as the `NPM_TOKEN` repository secret, limited to the `@pidrang` scope. npm is restricting tokens that bypass two-factor authentication, so read its current guidance before creating one, and prefer trusted publishing from GitHub Actions (OIDC) once the packages exist. The workflow already grants `id-token: write`.
+- Add an npm token as the `NPM_TOKEN` repository secret. It must be able to publish the `@pidrang` scope and the unscoped `pidrang` package. npm is restricting tokens that bypass two-factor authentication, so read its current guidance before creating one, and prefer trusted publishing from GitHub Actions (OIDC) once the packages exist. The `publish` job already grants `id-token: write` and installs npm 11.21.1.
+- The `publish` job runs in the `npm` environment. GitHub creates it on the first run if it does not exist; add required reviewers to it to approve each publish by hand.
 - Provenance requires a public repository. Make the repository public before the first publish.
 - If `main` is protected, allow the release workflow's `github-actions[bot]` to push to it, or the `chore(release)` commit and tag push will be rejected.
 
 ## If something goes wrong
 
-- **Publish failed after the tag was pushed:** npm versions cannot be reused once published, but a version that never reached npm can be published again. Re-run the publish for the same tag; do not create a new version.
+- **Publish failed after the tag was pushed:** npm versions cannot be reused once published, but a version that never reached npm can be published again. Use Re-run failed jobs on the same workflow run: only `publish` runs again, with the same artifact, and it skips the packages npm already holds with the same content. Do not create a new version. The artifact is kept 30 days.
+- **The `tag` job failed after pushing the tag** (for example while creating the GitHub Release): `publish` does not run, and re-running `tag` fails because the tag already exists. The workflow has no automated recovery for this case yet: create the GitHub Release by hand from the `CHANGELOG.md` section and open an issue before publishing that version.
 - **A bad version reached npm:** publish a fixed patch version and, if needed, `npm deprecate` the bad one. Avoid `npm unpublish`.
 - **Wrong changelog entry:** edit `CHANGELOG.md` and the GitHub Release by hand in a follow-up commit.

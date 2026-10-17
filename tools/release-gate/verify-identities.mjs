@@ -7,13 +7,18 @@ import {
   MANIFEST,
   compareTarballs,
   describeTarballs,
+  expectationProblems,
   gateProblems,
   packageProblems,
 } from './identities.mjs';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { 'allow-dirty': { type: 'boolean', default: false } },
+  options: {
+    'allow-dirty': { type: 'boolean', default: false },
+    version: { type: 'string' },
+    commit: { type: 'string' },
+  },
 });
 const directory = resolve(positionals[0] ?? 'tmp/release-gate');
 const manifestPath = join(directory, MANIFEST);
@@ -26,6 +31,10 @@ if (!existsSync(manifestPath)) {
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 const problems = [
   ...gateProblems(manifest, { allowDirty: values['allow-dirty'] }),
+  ...expectationProblems(manifest, {
+    version: values.version,
+    commit: values.commit,
+  }),
   ...packageProblems(
     manifest,
     packages.map((pkg) => pkg.name),
