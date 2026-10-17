@@ -188,6 +188,34 @@ describe('runCli', () => {
       expect(err).toEqual([]);
     });
 
+    it('names the columns it leaves out before writing, and only then', async () => {
+      const plan = await planFile(PLAN);
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+      expect(output()).not.toContain('left out');
+
+      await rm(join(root, 'src/app/resources.ts'));
+      out = [];
+      vi.mocked(provider.createSchemaProvider).mockReturnValue({
+        listTables: vi.fn().mockResolvedValue(['products']),
+        introspectTable: vi.fn().mockResolvedValue({
+          fields: [
+            { name: 'id', type: 'number', readOnly: true },
+            { name: 'name', type: 'text' },
+          ],
+          excludedColumns: [{ name: 'quantity', reason: 'int32' }],
+          unavailableActions: [],
+        }),
+      });
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+      const leftOut = out.indexOf(
+        '"products": These columns are left out: quantity (int32).',
+      );
+      expect(leftOut).toBeGreaterThanOrEqual(0);
+      expect(leftOut).toBeLessThan(out.indexOf('Wrote src/app/resources.ts'));
+      expect(err).toEqual([]);
+    });
+
     it('says how to register the routes and to replace the existing provideRouter', async () => {
       const plan = await planFile(PLAN);
 
