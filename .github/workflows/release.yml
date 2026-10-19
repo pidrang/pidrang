@@ -121,7 +121,6 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           DRY_RUN: ${{ inputs.dry-run }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           args=(tmp/release-gate --version "$VERSION" --commit "$GITHUB_SHA")
           if [ "$DRY_RUN" = "true" ]; then args+=("--dry-run"); fi
