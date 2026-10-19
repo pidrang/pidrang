@@ -1,6 +1,6 @@
 {
   "name": "@pidrang/cli",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Provider-agnostic engine behind the pidrang CLI: interactive wizard and Resource code generation.",
   "license": "MIT",
   "repository": {

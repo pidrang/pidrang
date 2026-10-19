@@ -1,6 +1,6 @@
 {
   "name": "@pidrang/supabase",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Supabase DataProvider and AuthProvider for Pidrang.",
   "license": "MIT",
   "repository": {

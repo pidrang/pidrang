@@ -1,6 +1,6 @@
 {
   "name": "@pidrang/core",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Headless contracts and signal-based primitives for building Angular admin applications.",
   "license": "MIT",
   "repository": {

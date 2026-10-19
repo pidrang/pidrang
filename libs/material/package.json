@@ -1,6 +1,6 @@
 {
   "name": "@pidrang/material",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Schema-driven ResourceTable and ResourceForm for Pidrang, built on Angular Material and Signal Forms.",
   "license": "MIT",
   "repository": {

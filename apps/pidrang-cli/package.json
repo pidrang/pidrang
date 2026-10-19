@@ -1,6 +1,6 @@
 {
   "name": "pidrang",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "The pidrang command line: scaffold Resource definitions and CRUD pages from a Supabase schema.",
   "license": "MIT",
   "repository": {
