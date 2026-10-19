@@ -17,12 +17,12 @@
 - **core:** add auth session change subscription and PidrangError ([4be8cd3](https://github.com/pidrang/pidrang/commit/4be8cd3))
 - **core:** add typed list filters with validation and legacy record support ([4261f1b](https://github.com/pidrang/pidrang/commit/4261f1b))
 - **core,supabase:** add auth provider contract and Supabase implementation ([22e9bbf](https://github.com/pidrang/pidrang/commit/22e9bbf))
-- **demo:** wire core + supabase in apps/demo with generic CRUD pages ([9148f78](https://github.com/pidrang/pidrang/commit/9148f78))
-- **demo:** improve some UI ([560e1a2](https://github.com/pidrang/pidrang/commit/560e1a2))
+- **core,supabase:** let injectResourceList follow a reactive resource name and return a plain DataProvider from provideSupabaseDataProvider ([9148f78](https://github.com/pidrang/pidrang/commit/9148f78))
+- **material:** add an actions column to ResourceTable and give ResourceForm a wider layout ([560e1a2](https://github.com/pidrang/pidrang/commit/560e1a2))
 - **material:** add ResourceTable, first @pidrang/material component ([8b14d8e](https://github.com/pidrang/pidrang/commit/8b14d8e))
 - **material:** add ResourceForm, typed Create/Edit form component ([b1b6e80](https://github.com/pidrang/pidrang/commit/b1b6e80))
 - **material:** add pending input to ResourceForm ([730f979](https://github.com/pidrang/pidrang/commit/730f979))
-- **pidrang-cli:** add the  bin entrypoint ([32da414](https://github.com/pidrang/pidrang/commit/32da414))
+- **pidrang:** add the bin entrypoint ([32da414](https://github.com/pidrang/pidrang/commit/32da414))
 - **supabase:** implement SupabaseDataProvider ([56b6df3](https://github.com/pidrang/pidrang/commit/56b6df3))
 - **supabase:** map typed filters to PostgREST and return an empty page past the last row ([34fb39a](https://github.com/pidrang/pidrang/commit/34fb39a))
 - **tailwind:** add ResourceTable, first @pidrang/tailwind component ([40e39cb](https://github.com/pidrang/pidrang/commit/40e39cb))
@@ -31,9 +31,8 @@
 
 ### Fixes
 
-- unusual comments ([d42a263](https://github.com/pidrang/pidrang/commit/d42a263))
 - type filters per operator and reject shapes and field names providers cannot honor ([20e6309](https://github.com/pidrang/pidrang/commit/20e6309))
-- ⚠️  give each UI adapter its own selectors and an Actions column header ([#53](https://github.com/pidrang/pidrang/issues/53))
+- **material,tailwind:** give each UI adapter its own selectors and an Actions column header ([#53](https://github.com/pidrang/pidrang/issues/53))
 - **auth:** keep the session value while reloading, never throw from value(), skip same-user SIGNED_IN ([d3657a2](https://github.com/pidrang/pidrang/commit/d3657a2))
 - **cli:** enforce resource action flags in generated pages ([4fc7466](https://github.com/pidrang/pidrang/commit/4fc7466))
 - **cli:** generate the race-safe pages and pin them to demo-material ([0f70603](https://github.com/pidrang/pidrang/commit/0f70603))
@@ -51,16 +50,16 @@
 - **core:** reject non-object filter entries and treat null filters as none ([7d9c1c6](https://github.com/pidrang/pidrang/commit/7d9c1c6))
 - **core:** send an untouched boolean on create only, ignore readOnly in submit checks ([cba68c3](https://github.com/pidrang/pidrang/commit/cba68c3))
 - **core:** send an untouched number without a default on create as shown ([1edf5d8](https://github.com/pidrang/pidrang/commit/1edf5d8))
-- **demo:** base auth hints on error categories and show session errors ([988c051](https://github.com/pidrang/pidrang/commit/988c051))
-- **demo:** scope the in-flight delete to the current resource ([7f35962](https://github.com/pidrang/pidrang/commit/7f35962))
-- **demo:** ignore stale delete failures and lock pagination while deleting ([b5380ce](https://github.com/pidrang/pidrang/commit/b5380ce))
-- **demo:** refresh the list through a params revision so no delete refresh is dropped ([2b38817](https://github.com/pidrang/pidrang/commit/2b38817))
-- **demo:** scope the create/edit saving state to the current route ([51422d4](https://github.com/pidrang/pidrang/commit/51422d4))
-- **demo:** lock each record's save across visits and report its outcome ([9747004](https://github.com/pidrang/pidrang/commit/9747004))
-- **demo:** keep only running saves, time out silent requests and hide outcomes across sessions ([4eab988](https://github.com/pidrang/pidrang/commit/4eab988))
-- **demo:** keep a running delete locked across visits and report how it ended ([7e8594b](https://github.com/pidrang/pidrang/commit/7e8594b))
+- **cli:** base the sign-in hints of the generated pages on error categories and show session errors ([988c051](https://github.com/pidrang/pidrang/commit/988c051))
+- **cli:** scope the in-flight delete of the generated list page to the current resource ([7f35962](https://github.com/pidrang/pidrang/commit/7f35962))
+- **cli:** ignore stale delete failures and lock pagination while deleting in the generated list page ([b5380ce](https://github.com/pidrang/pidrang/commit/b5380ce))
+- **cli:** refresh the generated list through a params revision so no delete refresh is dropped ([2b38817](https://github.com/pidrang/pidrang/commit/2b38817))
+- **cli:** scope the saving state of the generated create/edit pages to the current route ([51422d4](https://github.com/pidrang/pidrang/commit/51422d4))
+- **cli:** lock each record's save across visits and report its outcome in the generated pages ([9747004](https://github.com/pidrang/pidrang/commit/9747004))
+- **cli:** keep only running saves, time out silent requests and hide outcomes across sessions in the generated pages ([4eab988](https://github.com/pidrang/pidrang/commit/4eab988))
+- **cli:** keep a running delete locked across visits and report how it ended in the generated list page ([7e8594b](https://github.com/pidrang/pidrang/commit/7e8594b))
 - **forms:** preserve defaults and lossless scalar values ([#51](https://github.com/pidrang/pidrang/issues/51))
-- **forms:** block save only on touched invalid fields, finish CLI serialization) ([bddd41b](https://github.com/pidrang/pidrang/commit/bddd41b))
+- **forms:** block save only on touched invalid fields, finish CLI serialization ([bddd41b](https://github.com/pidrang/pidrang/commit/bddd41b))
 - **forms:** address review feedback on defaults and lossless scalars ([435ab3d](https://github.com/pidrang/pidrang/commit/435ab3d))
 - **forms:** stop required() blocking defaulted fields, fix service-role flags, normalize text-bound values ([532b0ca](https://github.com/pidrang/pidrang/commit/532b0ca))
 - **forms:** omit an untouched field on create too, not just hasDefault ones ([5106fc7](https://github.com/pidrang/pidrang/commit/5106fc7))
@@ -77,16 +76,9 @@
 
 ### Refactors
 
-- **demo:** share the demos' helpers, config and routes through libs/demo-shared ([57880be](https://github.com/pidrang/pidrang/commit/57880be))
-- **demo:** move the CRUD page logic into shared page state functions ([ee9bb3a](https://github.com/pidrang/pidrang/commit/ee9bb3a))
+- **cli:** generate the pages from the helpers, config and routes shared with the demos ([57880be](https://github.com/pidrang/pidrang/commit/57880be))
+- **cli:** move the logic of the generated CRUD pages into page state functions ([ee9bb3a](https://github.com/pidrang/pidrang/commit/ee9bb3a))
 
-### ⚠️  Breaking Changes
-
-- give each UI adapter its own selectors and an Actions column header  ([#53](https://github.com/pidrang/pidrang/issues/53))
-  use pidrang-material-resource-form/table and
-  pidrang-tailwind-resource-form/table instead of lib-resource-form/table.
-  Closes #53
-
-# Changelog
+---
 
 All notable changes to the published packages are documented in this file. Entries are generated from Conventional Commits when a release is cut, see [`docs/releasing.md`](./docs/releasing.md). The packages follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html); while the version is below 1.0.0, minor releases may contain breaking changes.
