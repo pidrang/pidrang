@@ -3,6 +3,7 @@ import { join, posix } from 'node:path';
 
 export interface AppLayout {
   project: string;
+  sourceRoot: string;
   appDirectory: string;
   routesFile: string;
   configFile: string;
@@ -181,6 +182,7 @@ export async function preflightApp(
 
   return {
     project,
+    sourceRoot,
     appDirectory,
     routesFile,
     configFile,

@@ -5,7 +5,7 @@ import {
   SchemaProviderDefinition,
 } from './schema-provider-definition';
 import { CRUD_ACTIONS, CrudAction } from './crud-action';
-import { GenerationPlan, TablePlan } from './generation-plan';
+import { InitResult, TablePlan } from './generation-plan';
 import { InitPlan } from './init-plan';
 import { TableIntrospection } from './table-introspection';
 
@@ -116,7 +116,7 @@ function tablePlan(
 export async function runInitWizard(
   providers: SchemaProviderDefinition[],
   options: InitOptions = {},
-): Promise<GenerationPlan> {
+): Promise<InitResult> {
   const providerDefinition = await chooseProvider(providers);
   const connection = await providerDefinition.promptConnection();
   const schemaProvider = providerDefinition.createSchemaProvider(connection);
@@ -133,7 +133,11 @@ export async function runInitWizard(
     tables.push(await promptTable(schemaProvider, table));
   }
 
-  return { providerId: providerDefinition.id, tables };
+  return {
+    providerId: providerDefinition.id,
+    tables,
+    setup: providerDefinition.appSetup(connection),
+  };
 }
 
 export async function runScriptedInit(
@@ -141,7 +145,7 @@ export async function runScriptedInit(
   plan: InitPlan,
   env: PlanEnvironment,
   options: InitOptions = {},
-): Promise<GenerationPlan> {
+): Promise<InitResult> {
   const providerDefinition = providers.find(
     (provider) => provider.id === plan.provider,
   );
@@ -189,7 +193,11 @@ export async function runScriptedInit(
     );
   }
 
-  return { providerId: providerDefinition.id, tables };
+  return {
+    providerId: providerDefinition.id,
+    tables,
+    setup: providerDefinition.appSetup(connection),
+  };
 }
 
 async function chooseProvider(

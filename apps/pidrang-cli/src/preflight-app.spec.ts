@@ -60,6 +60,7 @@ describe('preflightApp', () => {
 
     expect(await preflightApp(root)).toEqual({
       project: 'shop',
+      sourceRoot: 'src',
       appDirectory: 'src/app',
       routesFile: 'src/app/app.routes.ts',
       configFile: 'src/app/app.config.ts',

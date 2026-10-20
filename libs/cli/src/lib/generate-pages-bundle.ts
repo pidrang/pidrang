@@ -40,6 +40,12 @@ export const SIGN_IN_PATH_SNIPPET = `import { provideSignInPath } from './pidran
 provideSignInPath('/your-sign-in-route')
 `;
 
+export const RESOURCE_ROUTES_FILE = 'src/app/resource-routes.ts';
+
+export function generateResourceRoutesFile(): GeneratedFile {
+  return { path: RESOURCE_ROUTES_FILE, content: RESOURCE_ROUTES_SNIPPET };
+}
+
 export function generatePagesBundle(): GeneratedFile[] {
   return GENERATED_PAGE_FILES.map((file) => ({ ...file }));
 }
