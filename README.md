@@ -7,9 +7,17 @@
   </a>
 </p>
 
+<br>
+
+<div align="center">
+
 [![CI](https://github.com/pidrang/pidrang/actions/workflows/ci.yml/badge.svg)](https://github.com/pidrang/pidrang/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@pidrang/core?label=%40pidrang%2Fcore)](https://www.npmjs.com/package/@pidrang/core)
 [![License: MIT](https://img.shields.io/github/license/pidrang/pidrang)](./LICENSE)
+
+</div>
+
+<br>
 
 Pidrang is an open-source, headless framework designed to eliminate boilerplate code when building Angular administration panels, dashboards, and internal tools. Inspired by the architecture of Refine, it brings data providers, authentication management, and state tracking to the Angular ecosystem.
 
