@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { select, input, password, confirm } from '@inquirer/prompts';
 import { PlanEnvironment, SchemaProviderDefinition } from '@pidrang/cli';
+import { supabaseAppSetup } from './supabase-app-setup';
 import { PostgresSsl, SupabaseConnection } from './supabase-connection';
 import { createSupabaseSchemaProvider } from './supabase-schema-provider';
 import {
@@ -364,4 +365,6 @@ export const supabaseSchemaProviderDefinition: SchemaProviderDefinition<Supabase
     createSchemaProvider(connection) {
       return createSupabaseSchemaProvider(connection);
     },
+
+    appSetup: supabaseAppSetup,
   };

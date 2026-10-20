@@ -1,13 +1,14 @@
 import { access, readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join, posix, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
-  GenerationPlan,
+  AppSetup,
+  InitResult,
   PlanEnvironment,
-  RESOURCE_ROUTES_SNIPPET,
   SIGN_IN_PATH_SNIPPET,
   SchemaProviderDefinition,
   generatePagesBundle,
+  generateResourceRoutesFile,
   generateResourcesFile,
   parseInitPlan,
   runInitWizard,
@@ -17,10 +18,24 @@ import { AppLayout, UnsupportedAppError, preflightApp } from './preflight-app';
 import {
   WriteInterruptedError,
   WritePlan,
+  FileEditPlan,
   applyWritePlan,
+  planEdits,
   planWrites,
   relocateFiles,
 } from './write-plan';
+import { AppTooling, loadAppTooling } from './app-tooling';
+import { ConfigRequest, FileEdit, editAppConfig } from './edit-app-config';
+import { editAppRoutes } from './edit-app-routes';
+import { editAppHtml } from './edit-app-html';
+import {
+  addEnvironmentFileReplacements,
+  environmentFiles,
+  environmentImportPath,
+  environmentLines,
+  environmentPaths,
+} from './edit-environments';
+import { formatDiff } from './line-diff';
 
 export const EXIT_OK = 0;
 export const EXIT_FAILED = 1;
@@ -34,16 +49,8 @@ export interface CliContext {
   err: (line: string) => void;
   watchInterrupt: () => { signal: AbortSignal; dispose: () => void };
   interactive: boolean;
+  tooling?: AppTooling;
 }
-
-const ROUTES_EXPORT_SNIPPET = `export const routes: Routes = [...resourceRoutes];
-`;
-
-const PROVIDERS_SNIPPET = `provideRouter(routes, withComponentInputBinding()),
-providePidrang({
-  dataProvider: ...,
-  resources: [...resources],
-})`;
 
 function usage(providers: SchemaProviderDefinition[]): string {
   return [
@@ -69,8 +76,11 @@ function usage(providers: SchemaProviderDefinition[]): string {
     '',
     ...providers.map((provider) => provider.planHelp),
     '',
-    'Nothing is written unless every file can be written. A file that already exists is never',
-    'overwritten: an identical one is left as it is, a different one stops init before any write.',
+    'It writes the resources, pages, helpers and resource routes, and it edits app.config.ts,',
+    'app.routes.ts and app.html. It also creates src/environments when the app has none. A file',
+    'it writes is never overwritten: one that already exists with other content stops init before',
+    'any write. When a file cannot be edited safely, init adds a "pidrang:" comment that lists the',
+    'exact change to make.',
     '',
     'Exit status: 0 done or nothing to do, 1 invalid input, unsupported app or conflicting file,',
     '130 cancelled.',
@@ -79,6 +89,17 @@ function usage(providers: SchemaProviderDefinition[]): string {
 
 function isPromptExit(error: unknown): boolean {
   return error instanceof Error && error.name === 'ExitPromptError';
+}
+
+async function readOptional(
+  root: string,
+  path: string,
+): Promise<string | null> {
+  try {
+    return await readFile(join(root, path), 'utf8');
+  } catch {
+    return null;
+  }
 }
 
 async function readPlanFile(cwd: string, path: string): Promise<unknown> {
@@ -118,35 +139,30 @@ function reportConflicts(
   );
 }
 
-function printInstructions(context: CliContext, layout: AppLayout): void {
-  context.out(
-    `\nAdd these routes to your ${layout.routesFile}, above any other :resource-like route:\n`,
-  );
-  context.out(RESOURCE_ROUTES_SNIPPET);
-  context.out(
-    'Then add them to the routes your app exports. Keep your own fixed paths (such as sign-in) above ...resourceRoutes, and a ** route below it:\n',
-  );
-  context.out(ROUTES_EXPORT_SNIPPET);
-  context.out(
-    `In your ${layout.configFile}, replace provideRouter(routes) with the provideRouter line below and add providePidrang. The pages read :resource and :id as component inputs, so the router needs withComponentInputBinding():\n`,
-  );
-  context.out(PROVIDERS_SNIPPET);
-  if (!layout.bindsComponentInputs) {
-    context.out(
-      `\n${layout.configFile} does not mention withComponentInputBinding() yet: until the router uses it, the list and show pages get no resource or id and stay blank.`,
-    );
+function editCandidate(
+  path: string,
+  before: string,
+  edit: FileEdit,
+): FileEditPlan[] {
+  if (edit.kind === 'unchanged') {
+    return [];
   }
-  context.out(
-    `\nWhen a write needs a signed-in user, the pages say so in plain text. To turn that into a link to your sign-in page, add this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of that page inside your app:\n`,
-  );
-  context.out(SIGN_IN_PATH_SNIPPET);
+  return [
+    {
+      path,
+      before,
+      after: edit.content,
+      manual: edit.kind === 'manual',
+      reason: edit.kind === 'manual' ? edit.reason : undefined,
+    },
+  ];
 }
 
 async function collectPlan(
   context: CliContext,
   layout: AppLayout,
   planPath: string | undefined,
-): Promise<GenerationPlan> {
+): Promise<InitResult> {
   const options = {
     takenRoutes: layout.takenRoutes,
     reportLeftOutColumns: context.out,
@@ -158,6 +174,17 @@ async function collectPlan(
   return runScriptedInit(context.providers, plan, context.env, options);
 }
 
+function printDiff(
+  context: CliContext,
+  path: string,
+  before: string | null,
+  after: string,
+): void {
+  context.out(`--- ${before === null ? '/dev/null' : `a/${path}`}`);
+  context.out(`+++ b/${path}`);
+  formatDiff(before ?? '', after).forEach((line) => context.out(line));
+}
+
 async function writeFiles(
   context: CliContext,
   plan: WritePlan,
@@ -165,7 +192,25 @@ async function writeFiles(
   const interrupt = context.watchInterrupt();
   try {
     const written = await applyWritePlan(context.cwd, plan, interrupt.signal);
-    written.forEach((path) => context.out(`Wrote ${path}`));
+    const touched = new Set(written);
+    plan.create.forEach((file) => {
+      if (!touched.has(file.path)) {
+        return;
+      }
+      context.out('');
+      context.out(`Wrote ${file.path}`);
+      printDiff(context, file.path, null, file.content);
+    });
+    (plan.edits ?? []).forEach((edit) => {
+      if (!touched.has(edit.path)) {
+        return;
+      }
+      context.out('');
+      context.out(
+        `${edit.manual ? 'Needs a manual change' : 'Modified'} ${edit.path}${edit.reason ? `: ${edit.reason}` : ''}`,
+      );
+      printDiff(context, edit.path, edit.before, edit.after);
+    });
     plan.unchanged.forEach((file) =>
       context.out(`Unchanged (already up to date) ${file.path}`),
     );
@@ -189,13 +234,60 @@ async function writeFiles(
   }
 }
 
+interface SetupReport {
+  setup: AppSetup;
+  edits: FileEditPlan[];
+  environmentPath: string;
+  environmentDevelopmentPath: string;
+  createdEnvironment: boolean;
+  environmentLines: string[];
+}
+
+function printInstructions(
+  context: CliContext,
+  layout: AppLayout,
+  report: SetupReport,
+): void {
+  const manual = report.edits.filter((edit) => edit.manual);
+  if (manual.length > 0) {
+    context.out('');
+    context.out(
+      'pidrang could not edit these files safely. Each one now starts with a pidrang comment that lists the exact change to make:',
+    );
+    manual.forEach((edit) =>
+      context.out(`  ${edit.path}: ${edit.reason ?? 'see the comment'}`),
+    );
+  }
+  if (report.createdEnvironment) {
+    context.out('');
+    context.out(
+      `Created ${report.environmentPath} and ${report.environmentDevelopmentPath}. Set the Supabase values there:`,
+    );
+    context.out(`  supabaseUrl: your project URL, from Project Settings, API`);
+    context.out(`  supabaseAnonKey: the anon (publishable) key of the project`);
+  } else if (report.environmentLines.length > 0) {
+    context.out('');
+    context.out(`Add these lines to ${report.environmentPath}:`);
+    report.environmentLines.forEach((line) => context.out(line));
+  }
+  report.setup.notes.forEach((note) => context.out(`\n${note}`));
+  context.out('');
+  context.out(
+    `When a write needs a signed-in user, the pages say so in plain text. To turn that into a link to your sign-in page, add this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of that page inside your app:\n`,
+  );
+  context.out(SIGN_IN_PATH_SNIPPET);
+}
+
 async function runInit(
   context: CliContext,
   planPath: string | undefined,
   project: string | undefined,
 ): Promise<number> {
   const layout = await preflightApp(context.cwd, project);
-  const pages = relocateFiles(generatePagesBundle(), layout.appDirectory);
+  const pages = relocateFiles(
+    [...generatePagesBundle(), generateResourceRoutesFile()],
+    layout.appDirectory,
+  );
   const pagesPlan = await planWrites(context.cwd, pages);
   if (pagesPlan.conflicts.length > 0) {
     const resourcesExist = await access(
@@ -217,14 +309,112 @@ async function runInit(
     ],
     layout.appDirectory,
   );
-  const plan = await planWrites(context.cwd, [resources, ...pages]);
-  if (plan.conflicts.length > 0) {
-    reportConflicts(context, layout, plan);
+
+  const tooling = context.tooling ?? (await loadAppTooling(context.cwd));
+  const environment = environmentPaths(layout.sourceRoot);
+  const existingEnvironment = await readOptional(
+    context.cwd,
+    environment.default,
+  );
+  const existingDevelopment = await readOptional(
+    context.cwd,
+    environment.development,
+  );
+  const createdEnvironment =
+    existingEnvironment === null && existingDevelopment === null;
+  const environmentFilesToWrite = createdEnvironment
+    ? environmentFiles(layout.sourceRoot, generation.setup.environment)
+    : [];
+  const noticeSource = existingEnvironment ?? existingDevelopment;
+  const environmentLinesToAdd =
+    createdEnvironment || noticeSource === null
+      ? []
+      : environmentLines(generation.setup.environment, noticeSource);
+
+  const configSource = await readFile(
+    join(context.cwd, layout.configFile),
+    'utf8',
+  );
+  const configRequest: ConfigRequest = {
+    setup: generation.setup,
+    environmentImport: environmentImportPath(
+      layout.appDirectory,
+      layout.sourceRoot,
+    ),
+    resourcesImport: './resources',
+  };
+  const configEdit = editAppConfig(
+    tooling.typescript,
+    layout.configFile,
+    configSource,
+    configRequest,
+  );
+  const routesSource = await readFile(
+    join(context.cwd, layout.routesFile),
+    'utf8',
+  );
+  const routesEdit = editAppRoutes(
+    tooling.typescript,
+    layout.routesFile,
+    routesSource,
+    './resource-routes',
+  );
+  const htmlPath = posix.join(layout.appDirectory, 'app.html');
+  const htmlSource = await readOptional(context.cwd, htmlPath);
+  const htmlEdit =
+    htmlSource === null
+      ? { kind: 'unchanged' as const }
+      : editAppHtml(htmlPath, htmlSource, tooling.welcomeTemplate);
+
+  const candidates: FileEditPlan[] = [
+    ...editCandidate(layout.configFile, configSource, configEdit),
+    ...editCandidate(layout.routesFile, routesSource, routesEdit),
+    ...(htmlSource === null
+      ? []
+      : editCandidate(htmlPath, htmlSource, htmlEdit)),
+  ];
+
+  if (createdEnvironment) {
+    const workspaceSource = await readOptional(context.cwd, 'angular.json');
+    const workspaceAfter =
+      workspaceSource === null
+        ? null
+        : addEnvironmentFileReplacements(
+            workspaceSource,
+            layout.project,
+            layout.sourceRoot,
+          );
+    if (workspaceSource !== null && workspaceAfter !== null) {
+      candidates.push({
+        path: 'angular.json',
+        before: workspaceSource,
+        after: workspaceAfter,
+        manual: false,
+      });
+    }
+  }
+
+  const plan = await planWrites(context.cwd, [
+    resources,
+    ...pages,
+    ...environmentFilesToWrite,
+  ]);
+  const editPlan = await planEdits(context.cwd, candidates);
+  const conflicts = [...plan.conflicts, ...editPlan.conflicts];
+  if (conflicts.length > 0) {
+    reportConflicts(context, layout, { ...plan, conflicts });
     return EXIT_FAILED;
   }
-  const status = await writeFiles(context, plan);
+  const status = await writeFiles(context, { ...plan, edits: editPlan.edits });
   if (status === EXIT_OK) {
-    printInstructions(context, layout);
+    printInstructions(context, layout, {
+      setup: generation.setup,
+      edits: editPlan.edits,
+      environmentPath: environment.default,
+      environmentDevelopmentPath: environment.development,
+      createdEnvironment,
+      environmentLines: environmentLinesToAdd,
+    });
   }
   return status;
 }

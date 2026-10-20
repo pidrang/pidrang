@@ -7,10 +7,19 @@ export interface WriteConflict {
   reason: string;
 }
 
+export interface FileEditPlan {
+  path: string;
+  before: string;
+  after: string;
+  manual: boolean;
+  reason?: string;
+}
+
 export interface WritePlan {
   create: GeneratedFile[];
   unchanged: GeneratedFile[];
   conflicts: WriteConflict[];
+  edits?: FileEditPlan[];
 }
 
 export class WriteInterruptedError extends Error {
@@ -130,6 +139,41 @@ export async function planWrites(
   return plan;
 }
 
+export type EditCandidate = FileEditPlan;
+
+export async function planEdits(
+  root: string,
+  candidates: EditCandidate[],
+): Promise<{ edits: FileEditPlan[]; conflicts: WriteConflict[] }> {
+  const plan = {
+    edits: [] as FileEditPlan[],
+    conflicts: [] as WriteConflict[],
+  };
+  for (const candidate of candidates) {
+    let current: string;
+    try {
+      current = await readFile(join(root, candidate.path), 'utf8');
+    } catch {
+      plan.conflicts.push({
+        path: candidate.path,
+        reason: 'disappeared while pidrang was reading the app',
+      });
+      continue;
+    }
+    if (
+      current.replace(/\r\n/g, '\n') !== candidate.before.replace(/\r\n/g, '\n')
+    ) {
+      plan.conflicts.push({
+        path: candidate.path,
+        reason: 'changed while pidrang was reading the app',
+      });
+      continue;
+    }
+    plan.edits.push(candidate);
+  }
+  return plan;
+}
+
 export async function applyWritePlan(
   root: string,
   plan: WritePlan,
@@ -138,9 +182,14 @@ export async function applyWritePlan(
   if (plan.conflicts.length > 0) {
     throw new Error('A write plan with conflicts cannot be applied.');
   }
+  const edits = plan.edits ?? [];
   const written: string[] = [];
-  const remaining = () =>
-    plan.create.slice(written.length).map((file) => file.path);
+  const remaining = () => [
+    ...plan.create.slice(written.length).map((file) => file.path),
+    ...edits
+      .slice(Math.max(0, written.length - plan.create.length))
+      .map((file) => file.path),
+  ];
   for (const file of plan.create) {
     if (signal?.aborted) {
       throw new WriteInterruptedError(written, remaining(), 'cancelled');
@@ -160,6 +209,42 @@ export async function applyWritePlan(
       );
     }
     written.push(file.path);
+  }
+  for (const edit of edits) {
+    if (signal?.aborted) {
+      throw new WriteInterruptedError(written, remaining(), 'cancelled');
+    }
+    let current: string;
+    try {
+      current = await readFile(join(root, edit.path), 'utf8');
+    } catch {
+      throw new WriteInterruptedError(
+        written,
+        remaining(),
+        `${edit.path} disappeared while pidrang was writing`,
+      );
+    }
+    if (current.replace(/\r\n/g, '\n') !== edit.before.replace(/\r\n/g, '\n')) {
+      throw new WriteInterruptedError(
+        written,
+        remaining(),
+        `${edit.path} changed while pidrang was writing`,
+      );
+    }
+    const content = current.includes('\r\n')
+      ? edit.after.replace(/\n/g, '\r\n')
+      : edit.after;
+    try {
+      await writeFile(join(root, edit.path), content, 'utf8');
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      throw new WriteInterruptedError(
+        written,
+        remaining(),
+        `could not write ${edit.path} (${code ?? 'unknown error'})`,
+      );
+    }
+    written.push(edit.path);
   }
   return written;
 }

@@ -8,10 +8,36 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { SchemaProviderDefinition, generatePagesBundle } from '@pidrang/cli';
+import {
+  AppSetup,
+  SchemaProviderDefinition,
+  generatePagesBundle,
+} from '@pidrang/cli';
+import * as typescript from 'typescript';
+import { AppTooling } from './app-tooling';
 import { CliContext, runCli } from './run-cli';
 
 const SECRET = 'fake-secret-value';
+
+const SETUP: AppSetup = {
+  imports: [
+    { name: 'providePidrang', from: '@pidrang/core' },
+    { name: 'createClient', from: '@supabase/supabase-js' },
+  ],
+  constants: [
+    {
+      name: 'client',
+      initializer:
+        'createClient(environment.supabaseUrl, environment.supabaseAnonKey)',
+    },
+  ],
+  pidrangConfig: [{ name: 'dataProvider', value: 'provideFake({ client })' }],
+  environment: [
+    { name: 'supabaseUrl', value: 'https://abc.supabase.co' },
+    { name: 'supabaseAnonKey', value: 'YOUR-ANON-KEY' },
+  ],
+  notes: ['Use the anon key in the browser, never the service role key.'],
+};
 
 const STOCK_FILES: Record<string, string> = {
   'angular.json': JSON.stringify({
@@ -22,6 +48,32 @@ const STOCK_FILES: Record<string, string> = {
   }),
   'src/app/app.config.ts': 'export const appConfig = { providers: [] };',
   'src/app/app.routes.ts': 'export const routes: Routes = [];',
+};
+
+const NG_CONFIG = `import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { routes } from './app.routes';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideBrowserGlobalErrorListeners(),
+    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideRouter(routes)
+  ]
+};
+`;
+
+const NG_ROUTES = `import { Routes } from '@angular/router';
+
+export const routes: Routes = [];
+`;
+
+const NG_HTML = `<div class="welcome">Welcome</div>
+<router-outlet />`;
+
+const STRUCTURAL: AppTooling = {
+  typescript,
+  welcomeTemplate: NG_HTML,
 };
 
 function fakeProvider(): SchemaProviderDefinition<{ key: string }> {
@@ -47,6 +99,7 @@ function fakeProvider(): SchemaProviderDefinition<{ key: string }> {
         unavailableActions: [],
       }),
     })),
+    appSetup: vi.fn(() => SETUP),
   };
 }
 
@@ -65,6 +118,7 @@ describe('runCli', () => {
 
   function context(
     env: Record<string, string> = { FAKE_KEY: SECRET },
+    tooling?: AppTooling,
   ): CliContext {
     return {
       providers: [provider],
@@ -77,6 +131,7 @@ describe('runCli', () => {
         dispose: () => undefined,
       }),
       interactive: true,
+      tooling,
     };
   }
 
@@ -121,6 +176,9 @@ describe('runCli', () => {
   const generatedPaths = [
     'src/app/resources.ts',
     ...generatePagesBundle().map((file) => file.path),
+    'src/app/resource-routes.ts',
+    'src/environments/environment.ts',
+    'src/environments/environment.development.ts',
   ];
 
   beforeEach(async () => {
@@ -179,11 +237,10 @@ describe('runCli', () => {
         await readFile(join(root, 'src/app/resources.ts'), 'utf8'),
       ).toContain("name: 'products'");
       expect(out).toContain('Wrote src/app/resources.ts');
-      expect(out.join('\n')).toContain(
-        'provideRouter(routes, withComponentInputBinding())',
-      );
-      expect(out.join('\n')).toContain(
-        'src/app/app.config.ts does not mention withComponentInputBinding() yet',
+      expect(out).toContain('--- /dev/null');
+      expect(out).toContain('+++ b/src/app/resources.ts');
+      expect(out).toContain(
+        'Needs a manual change src/app/app.config.ts: TypeScript is not installed in this app',
       );
       expect(err).toEqual([]);
     });
@@ -216,32 +273,153 @@ describe('runCli', () => {
       expect(err).toEqual([]);
     });
 
-    it('says how to register the routes and to replace the existing provideRouter', async () => {
+    it('edits app.config.ts, app.routes.ts and app.html when TypeScript is available', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        'src/app/app.html': NG_HTML,
+      });
       const plan = await planFile(PLAN);
 
-      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const config = await readFile(
+        join(root, 'src/app/app.config.ts'),
+        'utf8',
+      );
+      expect(config).toContain(
+        "import { provideRouter, withComponentInputBinding } from '@angular/router';",
+      );
+      expect(config).toContain(
+        "import { providePidrang } from '@pidrang/core';",
+      );
+      expect(config).toContain(
+        "import { createClient } from '@supabase/supabase-js';",
+      );
+      expect(config).toContain(
+        "import { environment } from '../environments/environment';",
+      );
+      expect(config).toContain("import { resources } from './resources';");
+      expect(config).toContain(
+        'const client = createClient(environment.supabaseUrl, environment.supabaseAnonKey);',
+      );
+      expect(config).toContain(
+        'provideRouter(routes, withComponentInputBinding()),',
+      );
+      expect(config).toContain('providePidrang({');
+      expect(config).toContain('      dataProvider: provideFake({ client }),');
+      expect(config).toContain('      resources,');
+
+      const routes = await readFile(
+        join(root, 'src/app/app.routes.ts'),
+        'utf8',
+      );
+      expect(routes).toContain(
+        "import { resourceRoutes } from './resource-routes';",
+      );
+      expect(routes).toContain(
+        'export const routes: Routes = [\n  ...resourceRoutes,\n];',
+      );
+
+      expect(await readFile(join(root, 'src/app/app.html'), 'utf8')).toBe(
+        '<router-outlet />\n',
+      );
+
+      expect(out).toContain('Modified src/app/app.config.ts');
+      expect(out).toContain('--- a/src/app/app.config.ts');
+      expect(out).toContain('+++ b/src/app/app.config.ts');
+      expect(out).toContain('-    provideRouter(routes)');
       expect(out).toContain(
-        'export const routes: Routes = [...resourceRoutes];\n',
+        '+    provideRouter(routes, withComponentInputBinding()),',
       );
-      expect(out.join('\n')).toContain(
-        'Keep your own fixed paths (such as sign-in) above ...resourceRoutes, and a ** route below it',
-      );
-      expect(out.join('\n')).toContain(
-        'In your src/app/app.config.ts, replace provideRouter(routes) with the provideRouter line below',
-      );
+      expect(err).toEqual([]);
     });
 
-    it('does not warn about the router when it already binds component inputs', async () => {
+    it.each([
+      ['already has an outlet', '<main><router-outlet /></main>\n', null],
+      ['has no outlet', '<main>Custom</main>\n', '<!-- pidrang:'],
+    ])('handles an app.html that %s', async (_, html, marker) => {
+      await put({ 'src/app/app.html': html });
+      const plan = await planFile(PLAN);
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const content = await readFile(join(root, 'src/app/app.html'), 'utf8');
+      if (marker === null) {
+        expect(content).toBe(html);
+      } else {
+        expect(content).toContain(marker);
+        expect(content).toContain('<router-outlet />');
+        expect(out.join('\n')).toContain(
+          'Needs a manual change src/app/app.html: app.html was customized and has no router outlet',
+        );
+      }
+      expect(err).toEqual([]);
+    });
+
+    it('keeps the environment files it finds and prints the values to add', async () => {
       await put({
-        'src/app/app.config.ts':
-          'provideRouter(routes, withComponentInputBinding())',
+        'src/environments/environment.ts': 'export const environment = {};\n',
+        'src/environments/environment.development.ts':
+          'export const environment = {};\n',
       });
       const plan = await planFile(PLAN);
 
       expect(await runCli(['init', '--plan', plan], context())).toBe(0);
-      expect(out.join('\n')).not.toContain(
-        'does not mention withComponentInputBinding',
+
+      expect(
+        await readFile(join(root, 'src/environments/environment.ts'), 'utf8'),
+      ).toBe('export const environment = {};\n');
+      expect(out).toContain(
+        'Add these lines to src/environments/environment.ts:',
       );
+      expect(out).toContain("  supabaseUrl: 'https://abc.supabase.co',");
+      expect(out).toContain("  supabaseAnonKey: 'YOUR-ANON-KEY',");
+      expect(out.join('\n')).toContain(
+        'Use the anon key in the browser, never the service role key.',
+      );
+    });
+
+    it('adds the development environment file to angular.json when it creates the files', async () => {
+      await put({
+        'angular.json': JSON.stringify({
+          projects: {
+            shop: {
+              projectType: 'application',
+              sourceRoot: 'src',
+              architect: {
+                build: {
+                  defaultConfiguration: 'production',
+                  configurations: {
+                    production: { budgets: [] },
+                    development: { optimization: false },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      });
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+
+      const workspace = JSON.parse(
+        await readFile(join(root, 'angular.json'), 'utf8'),
+      );
+      const configurations =
+        workspace.projects.shop.architect.build.configurations;
+      expect(configurations.development.fileReplacements).toEqual([
+        {
+          replace: 'src/environments/environment.ts',
+          with: 'src/environments/environment.development.ts',
+        },
+      ]);
+      expect(configurations.production.fileReplacements).toBeUndefined();
     });
 
     it('leaves everything as it is on a second identical run', async () => {
@@ -273,6 +451,7 @@ describe('runCli', () => {
       );
       expect(await listFiles('src/app')).toEqual(
         generatedPaths
+          .filter((path) => path.startsWith('src/app/'))
           .concat(
             Object.keys(STOCK_FILES).filter((path) => path.startsWith('src/')),
           )
@@ -473,7 +652,9 @@ describe('runCli', () => {
       expect(await runCli(['init', '--plan', plan], context())).toBe(130);
 
       expect(err).toContain('\nWriting stopped: cancelled.');
-      expect(err).toContain(`Not written: ${generatedPaths.join(', ')}.`);
+      expect(err).toContain(
+        `Not written: ${[...generatedPaths, 'src/app/app.config.ts', 'src/app/app.routes.ts'].join(', ')}.`,
+      );
       expect(await listFiles('src/app')).toEqual([
         'src/app/app.config.ts',
         'src/app/app.routes.ts',

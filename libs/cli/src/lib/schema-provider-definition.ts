@@ -1,3 +1,4 @@
+import { AppSetup } from './app-setup';
 import { SchemaProvider } from './schema-provider';
 
 export type PlanEnvironment = Readonly<Record<string, string | undefined>>;
@@ -15,4 +16,6 @@ export interface SchemaProviderDefinition<TConnection = unknown> {
   ): Promise<TConnection>;
 
   createSchemaProvider(connection: TConnection): SchemaProvider;
+
+  appSetup(connection: TConnection): AppSetup;
 }

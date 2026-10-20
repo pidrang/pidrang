@@ -1,4 +1,5 @@
 import { checkbox, select } from '@inquirer/prompts';
+import { AppSetup } from './app-setup';
 import { runInitWizard, runScriptedInit } from './wizard';
 import { InitPlan } from './init-plan';
 import { SchemaProvider } from './schema-provider';
@@ -9,6 +10,14 @@ vi.mock('@inquirer/prompts', () => ({
   checkbox: vi.fn(),
   select: vi.fn(),
 }));
+
+const SETUP: AppSetup = {
+  imports: [{ name: 'provideFake', from: 'fake' }],
+  constants: [],
+  pidrangConfig: [{ name: 'dataProvider', value: 'provideFake()' }],
+  environment: [],
+  notes: [],
+};
 
 function fakeSchemaProvider(
   introspection: Partial<TableIntrospection> = {},
@@ -38,6 +47,7 @@ function fakeDefinition(
     promptConnection: vi.fn().mockResolvedValue({}),
     connectionFromPlan: vi.fn().mockResolvedValue({ from: 'plan' }),
     createSchemaProvider: vi.fn().mockReturnValue(schemaProvider),
+    appSetup: vi.fn().mockReturnValue(SETUP),
   };
 }
 
@@ -60,6 +70,7 @@ describe('runInitWizard', () => {
 
     expect(select).not.toHaveBeenCalled();
     expect(definition.promptConnection).toHaveBeenCalled();
+    expect(definition.appSetup).toHaveBeenCalledWith({});
     expect(plan).toEqual({
       providerId: 'supabase',
       tables: [
@@ -73,6 +84,7 @@ describe('runInitWizard', () => {
           hiddenFields: [],
         },
       ],
+      setup: SETUP,
     });
   });
 
@@ -337,6 +349,7 @@ describe('runScriptedInit', () => {
     expect(definition.createSchemaProvider).toHaveBeenCalledWith({
       from: 'plan',
     });
+    expect(definition.appSetup).toHaveBeenCalledWith({ from: 'plan' });
     expect(definition.promptConnection).not.toHaveBeenCalled();
     expect(checkbox).not.toHaveBeenCalled();
     expect(select).not.toHaveBeenCalled();
@@ -353,6 +366,7 @@ describe('runScriptedInit', () => {
           hiddenFields: [],
         },
       ],
+      setup: SETUP,
     });
   });
 

@@ -10,8 +10,10 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
+  FileEditPlan,
   WriteInterruptedError,
   applyWritePlan,
+  planEdits,
   planWrites,
   relocateFiles,
 } from './write-plan';
@@ -213,6 +215,167 @@ describe('write plan', () => {
       expect(await readFile(join(root, page.path), 'utf8')).toBe(
         'written meanwhile\n',
       );
+    });
+  });
+
+  describe('planEdits', () => {
+    const edit: FileEditPlan = {
+      path: 'src/app/app.routes.ts',
+      before: 'routes before\n',
+      after: 'routes after\n',
+      manual: false,
+    };
+
+    it('accepts a file that still has the content pidrang read', async () => {
+      await put(edit.path, edit.before);
+
+      expect(await planEdits(root, [edit])).toEqual({
+        edits: [edit],
+        conflicts: [],
+      });
+    });
+
+    it('accepts a file that differs only by its line endings', async () => {
+      await put(edit.path, edit.before.replace(/\n/g, '\r\n'));
+
+      expect((await planEdits(root, [edit])).conflicts).toEqual([]);
+    });
+
+    it('reports a file that changed since pidrang read it', async () => {
+      await put(edit.path, 'routes changed by hand\n');
+
+      expect(await planEdits(root, [edit])).toEqual({
+        edits: [],
+        conflicts: [
+          {
+            path: edit.path,
+            reason: 'changed while pidrang was reading the app',
+          },
+        ],
+      });
+    });
+
+    it('reports a file that disappeared since pidrang read it', async () => {
+      expect(await planEdits(root, [edit])).toEqual({
+        edits: [],
+        conflicts: [
+          {
+            path: edit.path,
+            reason: 'disappeared while pidrang was reading the app',
+          },
+        ],
+      });
+    });
+  });
+
+  describe('applyWritePlan with edits', () => {
+    const edit: FileEditPlan = {
+      path: 'src/app/app.config.ts',
+      before: 'config before\n',
+      after: 'config after\n',
+      manual: false,
+    };
+
+    it('applies the edits after the created files', async () => {
+      await put(edit.path, edit.before);
+      const planned = await planWrites(root, [resources]);
+      const writePlan = {
+        ...planned,
+        edits: (await planEdits(root, [edit])).edits,
+      };
+
+      expect(await applyWritePlan(root, writePlan)).toEqual([
+        resources.path,
+        edit.path,
+      ]);
+      expect(await readFile(join(root, edit.path), 'utf8')).toBe(edit.after);
+      expect(await readFile(join(root, resources.path), 'utf8')).toBe(
+        resources.content,
+      );
+    });
+
+    it('applies the edits when there is nothing to create', async () => {
+      await put(edit.path, edit.before);
+
+      expect(
+        await applyWritePlan(root, {
+          create: [],
+          unchanged: [],
+          conflicts: [],
+          edits: [edit],
+        }),
+      ).toEqual([edit.path]);
+      expect(await readFile(join(root, edit.path), 'utf8')).toBe(edit.after);
+    });
+
+    it('keeps the Windows line endings of an edited file', async () => {
+      await put(edit.path, 'config before\r\n');
+      const crlfEdit = { ...edit, after: 'config before\none more\n' };
+
+      await applyWritePlan(root, {
+        create: [],
+        unchanged: [],
+        conflicts: [],
+        edits: [crlfEdit],
+      });
+
+      expect(await readFile(join(root, edit.path), 'utf8')).toBe(
+        'config before\r\none more\r\n',
+      );
+    });
+
+    it('stops without overwriting an edited file that changed after planning', async () => {
+      await put(edit.path, edit.before);
+      const writePlan = {
+        ...(await planWrites(root, [resources])),
+        edits: [edit],
+      };
+      await put(edit.path, 'written meanwhile\n');
+
+      const error = await applyWritePlan(root, writePlan).catch((err) => err);
+      expect(error).toMatchObject({
+        written: [resources.path],
+        remaining: [edit.path],
+        reason: `${edit.path} changed while pidrang was writing`,
+      });
+      expect(await readFile(join(root, edit.path), 'utf8')).toBe(
+        'written meanwhile\n',
+      );
+    });
+
+    it('names the edits that are left once cancelled', async () => {
+      await put(edit.path, edit.before);
+      const controller = new AbortController();
+      controller.abort();
+
+      const error = await applyWritePlan(
+        root,
+        {
+          create: [resources],
+          unchanged: [],
+          conflicts: [],
+          edits: [edit],
+        },
+        controller.signal,
+      ).catch((err) => err);
+      expect(error).toMatchObject({
+        written: [],
+        remaining: [resources.path, edit.path],
+        reason: 'cancelled',
+      });
+      expect(await readFile(join(root, edit.path), 'utf8')).toBe(edit.before);
+    });
+
+    it('names the edits that are left when a create fails', async () => {
+      await put(edit.path, edit.before);
+      const writePlan = { ...(await planWrites(root, [page])), edits: [edit] };
+      await put(page.path, 'written meanwhile\n');
+
+      const error = await applyWritePlan(root, writePlan).catch((err) => err);
+      expect(error).toMatchObject({
+        written: [],
+        remaining: [page.path, edit.path],
+      });
     });
   });
 
