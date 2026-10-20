@@ -193,7 +193,7 @@ describe('generatePagesBundle', () => {
       'pagination: { current: page(), pageSize: pageSize() }',
     );
     expect(listState?.content).toContain(
-      "sorters: [{ field: 'id', order: 'asc' }]",
+      "sorters: definition()?.defaultSorters ?? [{ field: 'id', order: 'asc' }]",
     );
     expect(listPage?.content).not.toContain('list.value()?.data');
   });

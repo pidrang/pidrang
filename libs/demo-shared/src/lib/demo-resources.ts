@@ -14,6 +14,10 @@ export const DEMO_RESOURCES: Resource[] = [
         readOnly: true,
       },
     ],
+    defaultSorters: [
+      { field: 'created_at', order: 'desc' },
+      { field: 'id', order: 'asc' },
+    ],
   },
   {
     name: 'products',
@@ -28,6 +32,10 @@ export const DEMO_RESOURCES: Resource[] = [
         readOnly: true,
       },
     ],
+    defaultSorters: [
+      { field: 'created_at', order: 'desc' },
+      { field: 'id', order: 'asc' },
+    ],
   },
   {
     name: 'orders',
@@ -41,6 +49,10 @@ export const DEMO_RESOURCES: Resource[] = [
         type: 'timestamp',
         readOnly: true,
       },
+    ],
+    defaultSorters: [
+      { field: 'created_at', order: 'desc' },
+      { field: 'id', order: 'asc' },
     ],
   },
 ];
