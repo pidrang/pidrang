@@ -90,7 +90,7 @@ export function injectResourceListState(resource: Signal<string>) {
     revision();
     return {
       pagination: { current: page(), pageSize: pageSize() },
-      sorters: [{ field: 'id', order: 'asc' }],
+      sorters: definition()?.defaultSorters ?? [{ field: 'id', order: 'asc' }],
     };
   });
   const total = linkedSignal<

@@ -139,4 +139,125 @@ export const resources: Resource[] = [
     expect(output).toContain(`name: 'products'`);
     expect(output).toContain(`name: 'orders'`);
   });
+
+  it('sorts newest first when created_at is a timestamp', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'products',
+          fields: [
+            { name: 'id', type: 'text', readOnly: true },
+            { name: 'created_at', type: 'timestamp', hasDefault: true },
+          ],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    expect(generateResourcesFile(plan)).toBe(
+      `import { Resource } from '@pidrang/core';
+
+export const resources: Resource[] = [
+  {
+    name: 'products',
+    fields: [
+      { name: 'id', type: 'text', readOnly: true },
+      { name: 'created_at', type: 'timestamp', hasDefault: true },
+    ],
+    defaultSorters: [
+      { field: 'created_at', order: 'desc' },
+      { field: 'id', order: 'asc' },
+    ],
+    list: true,
+    create: false,
+    show: false,
+    edit: false,
+    delete: false,
+  },
+];
+`,
+    );
+  });
+
+  it.each([
+    ['a timestamp', 'timestamp', [], true],
+    ['a date', 'date', [], true],
+    ['a hidden timestamp', 'timestamp', ['created_at'], true],
+    ['a hidden date', 'date', ['created_at'], true],
+    ['text', 'text', [], false],
+    ['a number', 'number', [], false],
+    ['a time of day', 'time', [], false],
+  ] as const)(
+    'with created_at as %s, emits default sorters: %s',
+    (_label, type, hiddenFields, expected) => {
+      const plan: GenerationPlan = {
+        providerId: 'supabase',
+        tables: [
+          {
+            table: 'products',
+            fields: [
+              { name: 'id', type: 'number' },
+              { name: 'created_at', type },
+            ],
+            actions: ['list'],
+            hiddenFields: [...hiddenFields],
+          },
+        ],
+      };
+
+      expect(generateResourcesFile(plan).includes('defaultSorters')).toBe(
+        expected,
+      );
+    },
+  );
+
+  it('emits no default sorters when the table has no created_at field', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'tags',
+          fields: [
+            { name: 'id', type: 'number' },
+            { name: 'createdAt', type: 'timestamp' },
+            { name: 'updated_at', type: 'timestamp' },
+          ],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    expect(generateResourcesFile(plan)).not.toContain('defaultSorters');
+  });
+
+  it('decides the default sorters per table', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'tags',
+          fields: [{ name: 'id', type: 'number' }],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+        {
+          table: 'orders',
+          fields: [
+            { name: 'id', type: 'number' },
+            { name: 'created_at', type: 'timestamp' },
+          ],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    const [tags, orders] = generateResourcesFile(plan).split("name: 'orders'");
+
+    expect(tags).not.toContain('defaultSorters');
+    expect(orders).toContain('defaultSorters');
+  });
 });

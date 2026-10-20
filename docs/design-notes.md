@@ -128,6 +128,12 @@ This is why `postgres-schema-provider.spec.ts`'s fixture for a `bigint` `id` col
 
 Nothing publishes to npm yet, so no running consumer was affected by these gaps; the Postgres strategy is the one that sees everything.
 
+### The default list order is chosen when `resources.ts` is generated
+
+`libs/demo-shared/src/lib/resource-list-state.ts`, `libs/cli/src/lib/generate-resources-file.ts`
+
+The generic list page used to sort every resource by `id`. With uuid keys, that order is random, so a row created a second ago could land on any page (#111). The page cannot just sort by `created_at`: a table without that column would fail to load. The CLI, on the other hand, sees the columns of each table, so it writes `defaultSorters` on the `Resource` only when a `created_at` field of type `timestamp` or `date` exists, and the page uses `defaultSorters` when there is one and `id` otherwise. `id` stays as the second sorter because many rows can share the same `created_at`. A hidden `created_at` still counts, since a column can sort without being shown; a column left out because its type is unsupported does not, since it is not in `fields`. Other names (`inserted_at`, `createdAt`) are not detected: a hand-written `defaultSorters` covers them.
+
 ### Unsupported columns are left out, never mapped to text
 
 `libs/cli/src/lib/describe-table.ts`, `libs/cli-supabase/src/lib/*-field-type.ts`

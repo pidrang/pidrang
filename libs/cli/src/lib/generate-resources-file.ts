@@ -1,3 +1,4 @@
+import { Field } from '@pidrang/core';
 import { CRUD_ACTIONS } from './crud-action';
 import { GenerationPlan, TablePlan } from './generation-plan';
 import { quote } from './quote';
@@ -39,7 +40,21 @@ function generateResourceLiteral(table: TablePlan): string {
     `    fields: [`,
     fields,
     `    ],`,
+    ...defaultSortersLines(table.fields),
     actions,
     `  },`,
   ].join('\n');
+}
+
+function defaultSortersLines(fields: Field[]): string[] {
+  const createdAt = fields.find((field) => field.name === 'created_at');
+  if (createdAt?.type !== 'timestamp' && createdAt?.type !== 'date') {
+    return [];
+  }
+  return [
+    `    defaultSorters: [`,
+    `      { field: 'created_at', order: 'desc' },`,
+    `      { field: 'id', order: 'asc' },`,
+    `    ],`,
+  ];
 }
