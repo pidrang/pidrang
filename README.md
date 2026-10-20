@@ -54,7 +54,7 @@ ng add @angular/material
 npx pidrang init
 ```
 
-`pidrang init` generates the resources and pages, then prints the routes and providers to paste. Step by step: [Getting started](./docs/getting-started.md).
+`pidrang init` generates the resources and pages, then wires them into the app: it edits `app.config.ts`, `app.routes.ts` and `app.html`, and creates the environment files (with their `angular.json` file replacement) when the app has none. Step by step: [Getting started](./docs/getting-started.md).
 
 ## Quick look
 
