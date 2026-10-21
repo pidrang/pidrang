@@ -158,7 +158,7 @@ function writeFile(base, path, content) {
   writeFileSync(target, content);
 }
 
-function generatedFiles(consumer, planPath) {
+function generatedFiles(consumer, planPath, ui) {
   const script = `
 const { readFileSync } = require('node:fs');
 const cli = require('@pidrang/cli');
@@ -167,9 +167,10 @@ process.stdout.write(JSON.stringify({
   resources: cli.generateResourcesFile(plan),
   routes: cli.RESOURCE_ROUTES_SNIPPET,
   pages: cli.generatePagesBundle(),
+  layout: process.argv[2] === 'material' ? cli.generateLayoutFile('material') : null,
 }));
 `;
-  const result = spawnSync('node', ['-e', script, resolve(planPath)], {
+  const result = spawnSync('node', ['-e', script, resolve(planPath), ui], {
     cwd: consumer,
     encoding: 'utf8',
   });
@@ -181,12 +182,20 @@ process.stdout.write(JSON.stringify({
   return JSON.parse(result.stdout);
 }
 
+function requiredLayout(generated) {
+  if (generated.layout === null) {
+    throw new Error('the installed @pidrang/cli exports no layout file');
+  }
+  return generated.layout;
+}
+
 function generateWithLibrary(consumer, planPath) {
-  const generated = generatedFiles(consumer, planPath);
+  const generated = generatedFiles(consumer, planPath, values.adapter);
   const files = [
     { path: 'src/app/resources.ts', content: generated.resources },
     { path: 'src/app/resource-routes.ts', content: generated.routes },
     ...generated.pages,
+    requiredLayout(generated),
   ];
   for (const file of files) {
     writeFile(consumer, file.path, file.content);
@@ -222,7 +231,7 @@ function generateWithBin(consumer, planPath, url) {
     ['init', '--plan', initPlan],
     { cwd: consumer },
   );
-  const generated = generatedFiles(consumer, planPath);
+  const generated = generatedFiles(consumer, planPath, values.adapter);
   const resources = readFileSync(
     join(consumer, 'src/app/resources.ts'),
     'utf8',
@@ -234,6 +243,14 @@ function generateWithBin(consumer, planPath, url) {
     );
   }
   writeFile(consumer, 'src/app/resource-routes.ts', generated.routes);
+  writeFile(
+    consumer,
+    'src/app/app.routes.ts',
+    "import { Routes } from '@angular/router';\n\nimport { resourceRoutes } from './resource-routes';\n\nexport const routes: Routes = [...resourceRoutes];\n",
+  );
+  const layout = requiredLayout(generated);
+  mkdirSync(dirname(join(consumer, layout.path)), { recursive: true });
+  writeFileSync(join(consumer, layout.path), layout.content);
 }
 
 function breakGeneratedImport(consumer) {
@@ -390,5 +407,9 @@ try {
   );
   console.log(`[${values.adapter}] built into ${site}`);
 } finally {
-  rmSync(consumer, { recursive: true, force: true });
+  if (!process.env['PIDRANG_GATE_KEEP']) {
+    rmSync(consumer, { recursive: true, force: true });
+  } else {
+    console.log(`[${values.adapter}] kept ${consumer}`);
+  }
 }

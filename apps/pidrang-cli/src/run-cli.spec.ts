@@ -76,7 +76,7 @@ const NG_ROUTES = `import { Routes } from '@angular/router';
 export const routes: Routes = [];
 `;
 
-const NG_HTML = `<div class="welcome">Welcome</div>
+const NG_HTML = `<div class="welcome">Congratulations! Your app is running.</div>
 <router-outlet />`;
 
 const NG_SPEC_AFTER = `import { TestBed } from '@angular/core/testing';
@@ -106,6 +106,7 @@ const NG_SPEC = NG_SPEC_AFTER.replace(
 const STRUCTURAL: AppTooling = {
   typescript,
   welcomeTemplate: NG_HTML,
+  layoutUi: 'material',
 };
 
 function fakeProvider(): SchemaProviderDefinition<{ key: string }> {
@@ -251,6 +252,10 @@ describe('runCli', () => {
         expect(await runCli(argv, context())).toBe(0);
         expect(out.join('\n')).toContain(
           'Usage: pidrang init [--plan <file>] [--project <name>] [--skip-install]',
+        );
+        expect(out.join('\n')).toContain('"layout": "sidebar"');
+        expect(out.join('\n')).toContain(
+          'layout is "sidebar" to add a header and a side menu of the resources to a new app',
         );
         expect(out.join('\n')).toContain('Fake plan connection');
         expect(err).toEqual([]);
@@ -636,7 +641,8 @@ export const routes: Routes = [
     it('prints the redirect a new app should have when it cannot add one', async () => {
       await put({
         'src/app/app.html': NG_HTML,
-        'src/app/app.routes.ts': "const computed = getRoutes();\nexport const routes: Routes = computed;\n",
+        'src/app/app.routes.ts':
+          'const computed = getRoutes();\nexport const routes: Routes = computed;\n',
       });
       const plan = await planFile(PLAN);
 
@@ -668,13 +674,16 @@ export const routes: Routes = [
         await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
       ).toBe(0);
 
-      const routes = await readFile(join(root, 'src/app/app.routes.ts'), 'utf8');
+      const routes = await readFile(
+        join(root, 'src/app/app.routes.ts'),
+        'utf8',
+      );
       expect(routes).not.toContain('redirectTo');
       expect(routes).toContain(
         "export const routes: Routes = [\n  ...resourceRoutes,\n  { path: 'sign-in', component: SignInPage },\n];",
       );
       expect(output()).toContain(
-        "The app already has its own pages and routes, so pidrang only added the resource routes to src/app/app.routes.ts.",
+        'The app already has its own pages and routes, so pidrang only added the resource routes to src/app/app.routes.ts.',
       );
       expect(output()).toContain(
         "  { path: '', pathMatch: 'full', redirectTo: '/products' },",
@@ -875,6 +884,155 @@ export const routes: Routes = [
         'src/app/app.config.ts',
         'src/app/app.routes.ts',
       ]);
+    });
+  });
+
+  describe('the navigation layout', () => {
+    function newAppFiles(extra: Record<string, string> = {}) {
+      return {
+        ...STOCK_FILES,
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        'src/app/app.html': NG_HTML,
+        'src/app/app.spec.ts': NG_SPEC,
+        ...extra,
+      };
+    }
+
+    const STRUCTURAL_CONTEXT = () =>
+      context(undefined, {
+        ...STRUCTURAL,
+        typescript: null,
+        layoutUi: 'material',
+      });
+
+    it('writes the Material layout into a new app that asks for it', async () => {
+      await put(newAppFiles());
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const layout = await readFile(
+        join(root, 'src/app/layout/app-layout.ts'),
+        'utf8',
+      );
+      expect(layout).toContain("selector: 'app-layout'");
+      expect(layout).toContain('MatToolbarModule');
+      expect(layout).toContain(
+        "import { SIGN_IN_PATH } from '../pidrang/index';",
+      );
+      expect(layout).not.toContain('@pidrang/demo-shared');
+
+      expect(await readFile(join(root, 'src/app/app.html'), 'utf8')).toBe(
+        'import { AppLayout } from \'./layout/app-layout\';\n\n<app-layout appName="Shop" />\n\n',
+      );
+      const config = await readFile(
+        join(root, 'src/app/app.config.ts'),
+        'utf8',
+      );
+      expect(config).toContain(
+        "// pidrang:   import { provideSignInPath } from './pidrang/index';",
+      );
+      expect(config).toContain(
+        "// pidrang:   provideSignInPath('/your-sign-in-route')",
+      );
+      expect(output()).not.toContain(
+        'add this provider to your src/app/app.config.ts',
+      );
+      expect(
+        await readFile(join(root, 'src/app/app.routes.ts'), 'utf8'),
+      ).toContain(
+        "// pidrang:   { path: '', pathMatch: 'full', redirectTo: '/products' },",
+      );
+    });
+
+    it('writes the Tailwind layout when the app depends on @pidrang/tailwind', async () => {
+      await put(
+        newAppFiles({
+          'package.json': JSON.stringify({
+            dependencies: {
+              '@angular/core': '^22.1.0',
+              '@pidrang/tailwind': '^0.1.0',
+            },
+          }),
+        }),
+      );
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(
+        await runCli(
+          ['init', '--plan', plan],
+          context(undefined, {
+            ...STRUCTURAL,
+            typescript: null,
+            layoutUi: 'tailwind',
+          }),
+        ),
+      ).toBe(0);
+
+      const layout = await readFile(
+        join(root, 'src/app/layout/app-layout.ts'),
+        'utf8',
+      );
+      expect(layout).toContain('flex min-h-svh');
+      expect(layout).not.toContain('MatToolbarModule');
+    });
+
+    it('leaves the welcome page alone when the plan asks for no layout', async () => {
+      await put(newAppFiles());
+      const before = await snapshot();
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/layout/app-layout.ts']).toBeUndefined();
+      expect(after['src/app/app.html']).toBe('<router-outlet />\n');
+      expect(before['src/app/app.html']).toBe(NG_HTML);
+      expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+    });
+
+    it('leaves the layout alone in an app that already has its own pages', async () => {
+      await put({
+        ...newAppFiles(),
+        'src/app/app.routes.ts': `import { Routes } from '@angular/router';
+
+import { SignInPage } from './sign-in-page';
+
+export const routes: Routes = [
+  { path: 'sign-in', component: SignInPage },
+];
+`,
+      });
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/layout/app-layout.ts']).toBeUndefined();
+      expect(after['src/app/app.html']).toBe('<router-outlet />\n');
+      expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+    });
+
+    it('stops before writing when the layout file is already there', async () => {
+      await put(newAppFiles({ 'src/app/layout/app-layout.ts': '// mine\n' }));
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        1,
+      );
+
+      const after = await snapshot();
+      expect(err.join('\n')).toContain('src/app/layout/app-layout.ts');
+      expect(after['src/app/layout/app-layout.ts']).toBe('// mine\n');
+      expect(after['src/app/resources.ts']).toBeUndefined();
+      expect(after['src/app/app.html']).toBe(NG_HTML);
     });
   });
 

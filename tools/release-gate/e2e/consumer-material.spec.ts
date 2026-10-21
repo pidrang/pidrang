@@ -31,6 +31,44 @@ function deleteRequests(page: Page): string[] {
   return sent;
 }
 
+test('lands on the first resource list with the generated layout', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('mat-toolbar')).toContainText(
+    'Pidrang release gate',
+  );
+  await expect(
+    page.locator('#app-menu').getByRole('link', { name: 'Products' }),
+  ).toBeVisible();
+  await page
+    .locator('#app-menu')
+    .getByRole('link', { name: 'Products' })
+    .click();
+  await expect(page).toHaveURL(/\/products$/);
+  expect(await rowIds(page)).toHaveLength(10);
+});
+
+test('signs in from the layout header and out again', async ({ page }) => {
+  await page.goto('/');
+  await page
+    .locator('mat-toolbar')
+    .getByRole('link', { name: 'Sign in' })
+    .click();
+  await page.getByLabel('Email').fill(expectations.writer.email);
+  await page.getByLabel('Password').fill(expectations.writer.password);
+  await page.getByLabel('Password').press('Enter');
+  await expect(page.locator('.identity')).toHaveText(expectations.writer.email);
+  await page
+    .locator('mat-toolbar')
+    .getByRole('button', { name: 'Sign out' })
+    .click();
+  await expect(
+    page.locator('mat-toolbar').getByRole('link', { name: 'Sign in' }),
+  ).toBeVisible();
+  await expect(page.locator('.identity')).toHaveCount(0);
+});
+
 test('signs in with the keyboard and out again', async ({ page }) => {
   await signIn(page);
   await page.getByRole('button', { name: 'Sign out' }).click();

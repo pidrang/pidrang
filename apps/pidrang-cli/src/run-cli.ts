@@ -8,9 +8,12 @@ import {
   PlanEnvironment,
   SIGN_IN_PATH_SNIPPET,
   SchemaProviderDefinition,
+  generateLayoutFile,
   generatePagesBundle,
   generateResourceRoutesFile,
   generateResourcesFile,
+  layoutAppHtml,
+  layoutImport,
   parseInitPlan,
   runInitWizard,
   runScriptedInit,
@@ -102,9 +105,12 @@ function usage(providers: SchemaProviderDefinition[]): string {
     '    "connection": { ... },',
     '    "tables": [',
     '      { "table": "products", "actions": ["list", "create", "show", "edit", "delete"], "hiddenFields": ["created_at"] }',
-    '    ]',
+    '    ],',
+    '    "layout": "sidebar"',
     '  }',
     '  actions lists at least one of list, create, show, edit, delete. hiddenFields is optional.',
+    '  layout is "sidebar" to add a header and a side menu of the resources to a new app, or',
+    '  "none" to leave the pages bare. It defaults to "none" and an existing app never gets one.',
     '  Credentials never go in the plan file: they come from environment variables.',
     '',
     ...providers.map((provider) => provider.planHelp),
@@ -201,9 +207,11 @@ async function collectPlan(
   context: CliContext,
   layout: AppLayout,
   planPath: string | undefined,
+  isNewApp: boolean,
 ): Promise<InitResult> {
   const options = {
     takenRoutes: layout.takenRoutes,
+    isNewApp,
     reportLeftOutColumns: context.out,
     warn: context.err,
   };
@@ -226,9 +234,7 @@ function printExistingAppNotice(
   context.out(
     `The app already has its own pages and routes, so pidrang only added the resource routes to ${layout.routesFile}. To open the first generated page, add this route above the others:`,
   );
-  context.out(
-    `  { path: '', pathMatch: 'full', redirectTo: '${planned}' },`,
-  );
+  context.out(`  { path: '', pathMatch: 'full', redirectTo: '${planned}' },`);
 }
 
 function printDiff(
@@ -293,6 +299,7 @@ async function writeFiles(
 
 interface SetupReport {
   setup: AppSetup;
+  signInFile: string | null;
   edits: FileEditPlan[];
   environmentPath: string;
   environmentDevelopmentPath: string;
@@ -332,10 +339,17 @@ function printInstructions(
     report.environmentLines.forEach((line) => context.out(line));
   }
   report.setup.notes.forEach((note) => context.out(`\n${note}`));
-  context.out('');
-  context.out(
-    `When a write needs a signed-in user, the pages say so in plain text. To turn that into a link to your sign-in page, add this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of that page inside your app:\n`,
-  );
+  if (report.signInFile !== null) {
+    context.out('');
+    context.out(
+      `When a write needs a signed-in user, or the navigation asks for a sign-in page, the pages say so in plain text. To turn that into a link, pass this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of your sign-in page inside the app:\n`,
+    );
+  } else {
+    context.out('');
+    context.out(
+      `When a write needs a signed-in user, the pages say so in plain text. To turn that into a link to your sign-in page, add this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of that page inside your app:\n`,
+    );
+  }
   context.out(SIGN_IN_PATH_SNIPPET);
 }
 
@@ -484,7 +498,25 @@ async function runInit(
     reportConflicts(context, layout, pagesPlan, resourcesExist);
     return EXIT_FAILED;
   }
-  const generation = await collectPlan(context, layout, planPath);
+  const tooling = context.tooling ?? (await loadAppTooling(context.cwd));
+  const routesSource = await readFile(
+    join(context.cwd, layout.routesFile),
+    'utf8',
+  );
+  const htmlPath = posix.join(layout.appDirectory, 'app.html');
+  const htmlSource = await readOptional(context.cwd, htmlPath);
+  const newApp = isNewApp(
+    tooling.typescript,
+    routesSource,
+    htmlSource,
+    tooling.welcomeTemplate,
+  );
+  const generation = await collectPlan(context, layout, planPath, newApp);
+  const withLayout = newApp && generation.layout === 'sidebar';
+  const signInPath = withLayout ? '/your-sign-in-route' : undefined;
+  const signInPathFile = withLayout
+    ? posix.join(layout.appDirectory, 'pidrang/index.ts')
+    : null;
   const [resources] = relocateFiles(
     [
       {
@@ -495,7 +527,6 @@ async function runInit(
     layout.appDirectory,
   );
 
-  const tooling = context.tooling ?? (await loadAppTooling(context.cwd));
   const environment = environmentPaths(layout.sourceRoot);
   const existingEnvironment = await readOptional(
     context.cwd,
@@ -527,24 +558,14 @@ async function runInit(
       layout.sourceRoot,
     ),
     resourcesImport: './resources',
+    signInPath,
+    ...(signInPathFile === null ? {} : { signInPathFile }),
   };
   const configEdit = editAppConfig(
     tooling.typescript,
     layout.configFile,
     configSource,
     configRequest,
-  );
-  const routesSource = await readFile(
-    join(context.cwd, layout.routesFile),
-    'utf8',
-  );
-  const htmlPath = posix.join(layout.appDirectory, 'app.html');
-  const htmlSource = await readOptional(context.cwd, htmlPath);
-  const newApp = isNewApp(
-    tooling.typescript,
-    routesSource,
-    htmlSource,
-    tooling.welcomeTemplate,
   );
   const routesEdit = editAppRoutes(
     tooling.typescript,
@@ -556,7 +577,12 @@ async function runInit(
   const htmlEdit =
     htmlSource === null
       ? { kind: 'unchanged' as const }
-      : editAppHtml(htmlPath, htmlSource, tooling.welcomeTemplate);
+      : withLayout
+        ? {
+            kind: 'edited' as const,
+            content: `${layoutImport()}\n${layoutAppHtml(layout.projectName)}\n`,
+          }
+        : editAppHtml(htmlPath, htmlSource, tooling.welcomeTemplate);
 
   const specPath = posix.join(layout.appDirectory, 'app.spec.ts');
   const specSource =
@@ -599,10 +625,14 @@ async function runInit(
     }
   }
 
+  const layoutFiles = withLayout
+    ? relocateFiles([generateLayoutFile(tooling.layoutUi)], layout.appDirectory)
+    : [];
   const plan = await planWrites(context.cwd, [
     resources,
     ...pages,
     ...environmentFilesToWrite,
+    ...layoutFiles,
   ]);
   const editPlan = await planEdits(context.cwd, candidates);
   const conflicts = [...plan.conflicts, ...editPlan.conflicts];
@@ -630,6 +660,7 @@ async function runInit(
     environmentDevelopmentPath: environment.development,
     createdEnvironment,
     environmentLines: environmentLinesToAdd,
+    signInFile: signInPathFile,
   });
   printInstallReport(context, installPlan, installResult);
   return INSTALL_STATUS[installResult.outcome];
