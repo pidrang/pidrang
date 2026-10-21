@@ -131,6 +131,38 @@ describe('supabaseSchemaProviderDefinition', () => {
     },
   );
 
+  it.each([
+    ['service-role', 'secret-key'],
+    ['graphql', 'anon-key'],
+  ])(
+    'asks the URL again for %s, keeping the strategy and the key, when it cannot be reached',
+    async (strategy, key) => {
+      const unreachable = new SupabaseConnectionError(
+        'unreachable-url',
+        'Could not reach https://exmaple.supabase.co (ENOTFOUND).',
+      );
+      vi.mocked(input)
+        .mockResolvedValueOnce('https://exmaple.supabase.co')
+        .mockResolvedValueOnce(`${URL}/`);
+      vi.mocked(select).mockResolvedValue(strategy);
+      vi.mocked(password).mockResolvedValueOnce(key);
+      listTables.mockRejectedValueOnce(unreachable).mockResolvedValueOnce([]);
+
+      const connection =
+        await supabaseSchemaProviderDefinition.promptConnection();
+
+      expect(input).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(input).mock.calls[1][0]).toMatchObject({
+        message: `${unreachable.message}\nSupabase project URL:`,
+        default: 'https://exmaple.supabase.co',
+      });
+      expect(select).toHaveBeenCalledTimes(1);
+      expect(password).toHaveBeenCalledTimes(1);
+      expect(connection).toMatchObject({ strategy, url: URL });
+      expect(Object.values(connection)).toContain(key);
+    },
+  );
+
   it('offers the service role key, keeping the URL, when pg_graphql is not enabled', async () => {
     vi.mocked(input).mockResolvedValueOnce(URL);
     vi.mocked(select).mockResolvedValue('graphql');

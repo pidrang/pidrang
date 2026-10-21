@@ -361,8 +361,80 @@ describe('createServiceRoleSchemaProvider', () => {
         apikey: 'secret-key',
         Authorization: 'Bearer secret-key',
       },
+      signal: expect.any(AbortSignal),
     });
   });
+
+  function jwt(payload: object): string {
+    const part = (value: object) =>
+      Buffer.from(JSON.stringify(value)).toString('base64url');
+    return `${part({ alg: 'HS256', typ: 'JWT' })}.${part(payload)}.signature`;
+  }
+
+  it.each([
+    ['a publishable key', 'sb_publishable_abc123'],
+    ['a legacy anon key', jwt({ role: 'anon', iss: 'supabase' })],
+  ])(
+    'refuses %s before any request, since a local stack accepts it',
+    async (_, key) => {
+      const error = await createServiceRoleSchemaProvider({
+        ...connection,
+        serviceRoleKey: key,
+      })
+        .listTables()
+        .catch((err) => err);
+      expect(error).toBeInstanceOf(SupabaseConnectionError);
+      expect(error.problem).toBe('rejected-key');
+      expect(error.message).toBe(
+        'This looks like the publishable (anon) key. Paste the secret (service role) key from Project Settings, API.',
+      );
+      expect(error.message).not.toContain(key);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    jwt({ role: 'service_role', iss: 'supabase' }),
+    'sb_secret_abc123',
+    'not.a-jwt.payload',
+  ])('sends any other key %s to Supabase', async (key) => {
+    await createServiceRoleSchemaProvider({
+      ...connection,
+      serviceRoleKey: key,
+    }).listTables();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a project URL it cannot reach', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(
+        Object.assign(new TypeError('fetch failed'), {
+          cause: { code: 'ECONNREFUSED' },
+        }),
+      ),
+    );
+    const error = await createServiceRoleSchemaProvider(connection)
+      .listTables()
+      .catch((err) => err);
+    expect(error).toBeInstanceOf(SupabaseConnectionError);
+    expect(error.problem).toBe('unreachable-url');
+    expect(error.message).toContain(
+      'Could not reach https://example.supabase.co (ECONNREFUSED)',
+    );
+  });
+
+  it.each([404, 500])(
+    'throws when the request fails with %i',
+    async (status) => {
+      failWith(status, { message: 'boom' });
+      const error = await createServiceRoleSchemaProvider(connection)
+        .listTables()
+        .catch((err) => err);
+      expect(error).not.toBeInstanceOf(SupabaseConnectionError);
+      expect(error.message).toMatch(new RegExp(`Failed to fetch .* ${status}`));
+    },
+  );
 
   it('throws when the request fails for another reason', async () => {
     failWith(500, { message: 'boom' });

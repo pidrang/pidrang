@@ -10,7 +10,7 @@ The wizard asks for the project URL first, then which strategy to use (in this o
 - **`postgres`** — connects directly to Postgres and reads `information_schema` (host/port/database/user/password). No Supabase-specific dependency — the most broadly reliable option. The project URL fills `supabaseUrl` in the app.
 - **`graphql`** — introspects via `pg_graphql` (`/graphql/v1`), needs only the project URL and an anon/publishable key. Requires the `pg_graphql` extension, which is not enabled on a new project (Dashboard, Database, Extensions).
 
-The wizard tries the key before going on. When Supabase refuses it (`401`, "No API key found", "Invalid API key"), it asks for the key again. When `pg_graphql` is not enabled, it says how to enable it and offers to continue with the secret key instead. The direct database connection is not tried until the tables are listed.
+The wizard tries the key before going on. When Supabase refuses it (`401`, "No API key found", "Invalid API key"), or when a publishable (`sb_publishable_...`) or legacy anon key is pasted as the service role key, it asks for the key again. When the project URL cannot be reached (DNS failure, refused connection, no answer after 15 seconds), it asks for the URL again and keeps the strategy and the key. When `pg_graphql` is not enabled, it says how to enable it and offers to continue with the secret key instead. The direct database connection is not tried until the tables are listed. `pidrang init --plan` stops with the same messages instead of asking again.
 
 All three are verified against a real local Supabase instance (`supabase start`), but they do not see the same things (`docs/design-notes.md` has the details):
 

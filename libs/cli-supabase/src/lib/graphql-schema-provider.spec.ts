@@ -345,7 +345,10 @@ describe('createGraphQlSchemaProvider', () => {
     const restCall = fetchMock.mock.calls.find(([url]) =>
       url.includes('/rest/v1/'),
     );
-    expect(restCall?.[1]).toEqual({ headers: { apikey: 'anon-key' } });
+    expect(restCall?.[1]).toEqual({
+      headers: { apikey: 'anon-key' },
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('accepts a table and column whose real Postgres names contain capitals', async () => {
@@ -496,6 +499,25 @@ describe('createGraphQlSchemaProvider', () => {
       expect(error.message).not.toContain('anon-key');
     },
   );
+
+  it('reports a project URL it cannot reach', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(
+        Object.assign(new TypeError('fetch failed'), {
+          cause: { code: 'ENOTFOUND' },
+        }),
+      ),
+    );
+    const error = await createGraphQlSchemaProvider(connection)
+      .listTables()
+      .catch((err) => err);
+    expect(error).toBeInstanceOf(SupabaseConnectionError);
+    expect(error.problem).toBe('unreachable-url');
+    expect(error.message).toContain(
+      'Could not reach https://example.supabase.co (ENOTFOUND)',
+    );
+  });
 
   it('throws when the response is not ok for another reason', async () => {
     const error = await listTablesError(500, {});
