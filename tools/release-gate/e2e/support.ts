@@ -71,6 +71,15 @@ test.beforeEach(() => reloadFixtures());
 
 export { expect };
 
+export async function productIdsNewestFirst(page: Page): Promise<string[]> {
+  const response = await page.request.get(
+    'http://127.0.0.1:54321/rest/v1/products?select=id&order=created_at.desc,id.asc',
+    { headers: { apikey: publishableKey } },
+  );
+  const rows = (await response.json()) as { id: string }[];
+  return rows.map(({ id }) => id);
+}
+
 export async function rowIds(page: Page): Promise<string[]> {
   const rows = page.locator('tbody tr');
   await expect(rows.first()).toBeVisible();
