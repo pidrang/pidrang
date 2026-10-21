@@ -236,6 +236,8 @@ The generated code imports `@pidrang/core`, the provider's packages and the UI l
 
 The install runs after the files are written: files that are already in place stay useful when the network or the registry fails, and the exact commands are printed instead. A failed install exits with `1` so CI notices. `--plan` never installs: it asks no question, and installing is a change to the app that a CI run should opt into by running the printed commands. Node.js is checked before anything else against the `engines` range, since npm only warns about it, and a test keeps the two in sync.
 
+A second run must not undo what the app already set up: running the Material schematic again would ask its questions again and may add a theme next to the app's own. A package counts as present when `package.json` declares it and `node_modules` holds it, and an `@pidrang` one only at the version of the CLI. The package manager follows what the Angular CLI itself reads (`cli.packageManager`), then `packageManager`, then lockfiles up to the git root, so an app inside a pnpm or yarn workspace is not installed with npm. Outside a git repository only the app folder is searched, so a stray lockfile in a home directory does not decide. With Yarn Plug'n'Play there is no `node_modules`, so every package counts as missing: `yarn add` runs again, which changes nothing, and so does `ng add @angular/material`, which asks its questions again.
+
 ### Route order matters
 
 `apps/demo-material/src/app/app.routes.ts`, `apps/demo-tailwind/src/app/app.routes.ts`, `RESOURCE_ROUTES_SNIPPET` in `libs/cli/src/lib/generate-pages-bundle.ts`

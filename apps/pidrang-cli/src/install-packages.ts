@@ -1,9 +1,13 @@
 import { spawn } from 'node:child_process';
-import { access } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { UiLayerPackages } from '@pidrang/cli';
 
-export type PackageManager = 'npm' | 'pnpm' | 'yarn';
+export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
+
+export type PackageManagerChoice =
+  | { manager: PackageManager }
+  | { unsupported: string };
 
 export interface Command {
   command: string;
@@ -14,9 +18,18 @@ export type RunCommand = (command: Command) => Promise<boolean>;
 
 export const CORE_PACKAGE = '@pidrang/core';
 
+const PACKAGE_MANAGERS: readonly PackageManager[] = [
+  'npm',
+  'pnpm',
+  'yarn',
+  'bun',
+];
+
 const LOCKFILES: [string, PackageManager][] = [
   ['pnpm-lock.yaml', 'pnpm'],
   ['yarn.lock', 'yarn'],
+  ['bun.lock', 'bun'],
+  ['bun.lockb', 'bun'],
   ['package-lock.json', 'npm'],
 ];
 
@@ -27,30 +40,125 @@ async function exists(path: string): Promise<boolean> {
   );
 }
 
-export async function detectPackageManager(
-  root: string,
-): Promise<PackageManager> {
-  for (const [lockfile, manager] of LOCKFILES) {
-    if (await exists(join(root, lockfile))) {
-      return manager;
+function asObject(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+async function readJsonObject(path: string): Promise<Record<string, unknown>> {
+  try {
+    return asObject(JSON.parse(await readFile(path, 'utf8')));
+  } catch {
+    return {};
+  }
+}
+
+function choiceFromName(name: string): PackageManagerChoice {
+  const manager = PACKAGE_MANAGERS.find((known) => known === name);
+  return manager === undefined ? { unsupported: name } : { manager };
+}
+
+async function declaredManager(root: string): Promise<string | null> {
+  const workspace = await readJsonObject(join(root, 'angular.json'));
+  const configured = asObject(workspace['cli'])['packageManager'];
+  if (typeof configured === 'string' && configured !== '') {
+    return configured;
+  }
+  const manifest = await readJsonObject(join(root, 'package.json'));
+  const field = manifest['packageManager'];
+  if (typeof field === 'string' && field !== '') {
+    return field.split('@')[0];
+  }
+  return null;
+}
+
+async function lockfileSearchPath(root: string): Promise<string[]> {
+  const directories: string[] = [];
+  let directory = root;
+  for (;;) {
+    directories.push(directory);
+    if (await exists(join(directory, '.git'))) {
+      return directories;
+    }
+    const parent = dirname(directory);
+    if (parent === directory) {
+      return [root];
+    }
+    directory = parent;
+  }
+}
+
+async function lockfileManager(root: string): Promise<PackageManager | null> {
+  for (const directory of await lockfileSearchPath(root)) {
+    for (const [lockfile, manager] of LOCKFILES) {
+      if (await exists(join(directory, lockfile))) {
+        return manager;
+      }
     }
   }
-  return 'npm';
+  return null;
 }
 
-function pinned(name: string, version: string): string {
-  return name.startsWith('@pidrang/') ? `${name}@${version}` : name;
+export async function detectPackageManager(
+  root: string,
+): Promise<PackageManagerChoice> {
+  const declared = await declaredManager(root);
+  if (declared !== null) {
+    return choiceFromName(declared);
+  }
+  return { manager: (await lockfileManager(root)) ?? 'npm' };
 }
 
-export function packagesToInstall(
+export function requiredPackages(
   setupPackages: string[],
   uiLayer: UiLayerPackages,
-  version: string,
 ): string[] {
-  const names = [
-    ...new Set([CORE_PACKAGE, ...setupPackages, ...uiLayer.install]),
-  ];
-  return names.map((name) => pinned(name, version));
+  return [...new Set([CORE_PACKAGE, ...setupPackages, ...uiLayer.install])];
+}
+
+function isPidrangPackage(name: string): boolean {
+  return name.startsWith('@pidrang/');
+}
+
+async function isPresent(
+  root: string,
+  declared: Record<string, unknown>,
+  name: string,
+  version: string,
+): Promise<boolean> {
+  if (!(name in declared)) {
+    return false;
+  }
+  const installed = await readJsonObject(
+    join(root, 'node_modules', name, 'package.json'),
+  );
+  if (typeof installed['version'] !== 'string') {
+    return false;
+  }
+  return !isPidrangPackage(name) || installed['version'] === version;
+}
+
+export async function missingPackages(
+  root: string,
+  names: string[],
+  version: string,
+): Promise<string[]> {
+  const manifest = await readJsonObject(join(root, 'package.json'));
+  const declared = {
+    ...asObject(manifest['devDependencies']),
+    ...asObject(manifest['dependencies']),
+  };
+  const present = await Promise.all(
+    names.map((name) => isPresent(root, declared, name, version)),
+  );
+  return names.filter((_, index) => !present[index]);
+}
+
+export function pinPackages(names: string[], version: string): string[] {
+  return names.map((name) =>
+    isPidrangPackage(name) ? `${name}@${version}` : name,
+  );
 }
 
 function installCommand(manager: PackageManager, packages: string[]): Command {
@@ -61,23 +169,26 @@ function installCommand(manager: PackageManager, packages: string[]): Command {
 
 function ngAddCommand(manager: PackageManager, name: string): Command {
   const ngAdd = ['ng', 'add', name];
-  if (manager === 'npm') {
-    return { command: 'npx', args: ngAdd };
+  switch (manager) {
+    case 'npm':
+      return { command: 'npx', args: ngAdd };
+    case 'pnpm':
+      return { command: 'pnpm', args: ['exec', ...ngAdd] };
+    case 'yarn':
+      return { command: 'yarn', args: ngAdd };
+    case 'bun':
+      return { command: 'bunx', args: ngAdd };
   }
-  if (manager === 'pnpm') {
-    return { command: 'pnpm', args: ['exec', ...ngAdd] };
-  }
-  return { command: 'yarn', args: ngAdd };
 }
 
 export function installCommands(
   manager: PackageManager,
   packages: string[],
-  uiLayer: UiLayerPackages,
+  ngAdd: string[],
 ): Command[] {
   return [
-    installCommand(manager, packages),
-    ...uiLayer.ngAdd.map((name) => ngAddCommand(manager, name)),
+    ...(packages.length > 0 ? [installCommand(manager, packages)] : []),
+    ...ngAdd.map((name) => ngAddCommand(manager, name)),
   ];
 }
 

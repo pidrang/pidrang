@@ -967,5 +967,115 @@ describe('runCli', () => {
       expect(runCommand).not.toHaveBeenCalled();
       expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
     });
+
+    async function installed(versions: Record<string, string>): Promise<void> {
+      await put({
+        'package.json': JSON.stringify({
+          dependencies: {
+            '@angular/core': '^22.1.0',
+            ...Object.fromEntries(
+              Object.keys(versions).map((name) => [name, '*']),
+            ),
+          },
+        }),
+        ...Object.fromEntries(
+          Object.entries(versions).map(([name, version]) => [
+            `node_modules/${name}/package.json`,
+            JSON.stringify({ version }),
+          ]),
+        ),
+      });
+    }
+
+    const EVERY_PACKAGE = {
+      '@pidrang/core': '9.8.7',
+      '@pidrang/fake': '9.8.7',
+      'fake-client': '1.0.0',
+      '@pidrang/material': '9.8.7',
+      '@angular/material': '22.2.4',
+    };
+
+    it('asks nothing when every package is already there at the expected version', async () => {
+      await installed(EVERY_PACKAGE);
+
+      expect(await runCli(['init'], context())).toBe(0);
+
+      expect(confirmInstall).not.toHaveBeenCalled();
+      expect(runCommand).not.toHaveBeenCalled();
+      expect(out.at(-1)).toBe('The required packages are already installed.');
+    });
+
+    it('installs only what is missing or at another version, and leaves Material alone when it is there', async () => {
+      await installed({
+        ...EVERY_PACKAGE,
+        '@pidrang/core': '9.8.6',
+        'fake-client': '1.0.0',
+      });
+      await rm(join(root, 'node_modules/fake-client'), { recursive: true });
+
+      expect(await runCli(['init'], context())).toBe(0);
+
+      expect(runCommand.mock.calls).toEqual([
+        [
+          {
+            command: 'npm',
+            args: ['install', '@pidrang/core@9.8.7', 'fake-client'],
+          },
+        ],
+      ]);
+    });
+
+    it('prints only the missing commands', async () => {
+      await installed({ ...EVERY_PACKAGE, '@angular/material': '' });
+      await rm(join(root, 'node_modules/@angular/material'), {
+        recursive: true,
+      });
+
+      expect(await runCli(['init', '--skip-install'], context())).toBe(0);
+
+      expect(out.slice(-2)).toEqual([
+        'Install the packages manually, then run ng build:',
+        '  npx ng add @angular/material',
+      ]);
+    });
+
+    it('runs nothing with a package manager it cannot run and prints the npm commands', async () => {
+      await put({
+        'angular.json': JSON.stringify({
+          cli: { packageManager: 'cnpm' },
+          projects: { shop: { projectType: 'application', sourceRoot: 'src' } },
+        }),
+      });
+
+      expect(await runCli(['init'], context())).toBe(0);
+
+      expect(confirmInstall).not.toHaveBeenCalled();
+      expect(runCommand).not.toHaveBeenCalled();
+      expect(out.slice(-MANUAL.length)).toEqual([
+        'pidrang cannot run cnpm, the package manager this app names. Install the packages with it, then run ng build. With npm, the commands would be:',
+        ...MANUAL.slice(1),
+      ]);
+    });
+
+    it('exits with 130 and prints what is left when interrupted during the install', async () => {
+      const controller = new AbortController();
+      interruptSignal = controller.signal;
+      runCommand.mockImplementation(async (command) => {
+        if (command.command === 'npx') {
+          controller.abort();
+          return false;
+        }
+        return true;
+      });
+
+      expect(await runCli(['init'], context())).toBe(130);
+
+      expect(runCommand).toHaveBeenCalledTimes(2);
+      expect(out.slice(-2)).toEqual([
+        'Install the packages manually, then run ng build:',
+        '  npx ng add @angular/material',
+      ]);
+      expect(output()).not.toContain('failed: see its output above');
+    });
   });
 });
