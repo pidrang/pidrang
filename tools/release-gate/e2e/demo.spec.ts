@@ -1,4 +1,10 @@
-import { expect, expectations, rowIds, test } from './support';
+import {
+  expect,
+  expectations,
+  productIdsNewestFirst,
+  rowIds,
+  test,
+} from './support';
 
 const { products } = expectations.resources;
 
@@ -11,13 +17,10 @@ test('opens the home page and the products list up to row eleven', async ({
   ).toBeVisible();
   await page.getByRole('link', { name: 'products' }).click();
 
-  const firstPage = await rowIds(page);
-  expect(firstPage).toHaveLength(10);
-  expect(firstPage[0]).toBe(products.firstId);
+  const newest = await productIdsNewestFirst(page);
+  expect(await rowIds(page)).toEqual(newest.slice(0, 10));
   await page.getByRole('button', { name: /^Next( page)?$/ }).click();
-  await expect(page.locator('tbody tr').first()).toContainText(
-    products.eleventhId,
-  );
+  await expect(page.locator('tbody tr').first()).toContainText(newest[10]);
 });
 
 test('opens the show, edit and create pages of a record', async ({ page }) => {
@@ -47,6 +50,7 @@ test('signs in with the fixture writer and deletes a record', async ({
     page.getByText(`Signed in as ${expectations.writer.email}`),
   ).toBeVisible();
 
+  const [newestId] = await productIdsNewestFirst(page);
   await page.goto('/products');
   page.on('dialog', (dialog) => dialog.accept());
   await page
@@ -54,9 +58,7 @@ test('signs in with the fixture writer and deletes a record', async ({
     .first()
     .getByRole('button', { name: 'Delete' })
     .click();
-  await expect(page.locator('tbody tr').first()).not.toContainText(
-    products.firstId,
-  );
+  await expect(page.locator('tbody tr').first()).not.toContainText(newestId);
 });
 
 test('shows the not-available page for an unknown resource', async ({

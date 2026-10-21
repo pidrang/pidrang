@@ -1,8 +1,15 @@
 import { Page } from '@playwright/test';
 
-import { expect, expectations, publishableKey, rowIds, test } from './support';
+import {
+  expect,
+  expectations,
+  productIdsNewestFirst,
+  publishableKey,
+  rowIds,
+  test,
+} from './support';
 
-const { products, fixture_items } = expectations.resources;
+const { fixture_items } = expectations.resources;
 
 async function signIn(page: Page): Promise<void> {
   await page.goto('/sign-in');
@@ -51,15 +58,11 @@ test('says a sign-in failed and clears the message on the next try', async ({
 test('lists a resource page by page up to row eleven', async ({ page }) => {
   await page.goto('/products');
   await expect(page.getByRole('heading', { name: 'products' })).toBeVisible();
-  const firstPage = await rowIds(page);
-  expect(firstPage).toHaveLength(10);
-  expect(firstPage[0]).toBe(products.firstId);
-  expect(firstPage).toEqual([...firstPage].sort());
+  const newest = await productIdsNewestFirst(page);
+  expect(await rowIds(page)).toEqual(newest.slice(0, 10));
 
   await page.getByRole('button', { name: 'Next page' }).click();
-  await expect(page.locator('tbody tr').first()).toContainText(
-    products.eleventhId,
-  );
+  await expect(page.locator('tbody tr').first()).toContainText(newest[10]);
 });
 
 test('creates, shows, edits and deletes a record as the writer', async ({
@@ -103,9 +106,7 @@ test('creates, shows, edits and deletes a record as the writer', async ({
   await expect.poll(() => messages).toHaveLength(1);
   expect(messages[0]).toContain('from products?');
   await page.reload();
-  await expect(page.locator('tbody tr').first()).toContainText(
-    products.firstId,
-  );
+  await expect(page.locator('tbody tr').first()).toContainText(id);
   expect(sent).toEqual([]);
 
   page.once('dialog', (dialog) => dialog.accept());
@@ -114,9 +115,7 @@ test('creates, shows, edits and deletes a record as the writer', async ({
     .first()
     .getByRole('button', { name: 'Delete' })
     .click();
-  await expect(page.locator('tbody tr').first()).not.toContainText(
-    products.firstId,
-  );
+  await expect(page.locator('tbody tr').first()).not.toContainText(id);
   expect(sent).toHaveLength(1);
 });
 
@@ -124,6 +123,7 @@ test('retries a delete after a network failure and clears the error', async ({
   page,
 }) => {
   await signIn(page);
+  const [newestId] = await productIdsNewestFirst(page);
   await page.goto('/products');
   const sent = deleteRequests(page);
   let failNext = true;
@@ -141,12 +141,10 @@ test('retries a delete after a network failure and clears the error', async ({
   const alert = page.getByRole('alert');
   await expect(alert).toBeVisible();
   await expect(alert).not.toContainText('sign in');
-  await expect(firstRow).toContainText(products.firstId);
+  await expect(firstRow).toContainText(newestId);
 
   await firstRow.getByRole('button', { name: 'Delete' }).click();
-  await expect(page.locator('tbody tr').first()).not.toContainText(
-    products.firstId,
-  );
+  await expect(page.locator('tbody tr').first()).not.toContainText(newestId);
   await expect(alert).toHaveCount(0);
   expect(sent).toHaveLength(2);
 });
@@ -209,15 +207,14 @@ test('asks an anonymous user to sign in, then lets the write through', async ({
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByTestId('identity')).toBeVisible();
 
+  const [newestId] = await productIdsNewestFirst(page);
   await page.goto('/products');
   await page
     .locator('tbody tr')
     .first()
     .getByRole('button', { name: 'Delete' })
     .click();
-  await expect(page.locator('tbody tr').first()).not.toContainText(
-    products.firstId,
-  );
+  await expect(page.locator('tbody tr').first()).not.toContainText(newestId);
 });
 
 test('honours the generated action flags', async ({ page }) => {
