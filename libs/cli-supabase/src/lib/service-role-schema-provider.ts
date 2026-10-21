@@ -12,6 +12,7 @@ import {
 } from './service-role-field-type';
 import { assertPostgrestTableName } from './assert-postgrest-table-name';
 import { postgrestNameProblem } from './postgrest-name-problem';
+import { rejectedKeyError } from './supabase-connection-error';
 
 interface OpenApiDefinition {
   properties?: Record<string, OpenApiProperty>;
@@ -39,6 +40,13 @@ async function fetchSchema(
     },
   });
   if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    const problem = rejectedKeyError('service role key', response.status, body);
+    if (problem) {
+      throw problem;
+    }
     throw new Error(
       `Failed to fetch Supabase OpenAPI schema: ${response.status} ${response.statusText}`,
     );

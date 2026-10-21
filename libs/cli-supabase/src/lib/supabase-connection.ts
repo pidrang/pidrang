@@ -20,6 +20,7 @@ export interface PostgresConnection {
   user: string;
   password: string;
   ssl?: PostgresSsl;
+  url?: string;
 }
 
 export type SupabaseConnection =

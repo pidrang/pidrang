@@ -269,6 +269,8 @@ Run `pidrang init` from the root of an Angular 22.1 (or later 22.x) standalone a
 
 When a table has a `created_at` column of type `timestamp` or `date`, even a hidden one, the generated `Resource` gets `defaultSorters` with `created_at` descending, then `id`, so a new row shows on the first page. Other tables are sorted by `id`.
 
+It asks for the project URL first, then how to read your table definitions. The default is the service role (secret) key, on the same dashboard page as the URL (Project Settings, API): it is only used to read the schema and is never written to disk or into the app. The other choices are a direct database connection and GraphQL with the anon key, which requires the `pg_graphql` extension (not enabled on a new project). A key Supabase refuses is asked again, and when `pg_graphql` is off the wizard offers to continue with the service role key.
+
 It also wires the app itself, so nothing has to be pasted by hand:
 
 - `app.config.ts`: imports `providePidrang`, `provideSupabaseDataProvider`, `provideSupabaseAuthProvider` and `createClient`, creates the Supabase client once, adds `providePidrang({ dataProvider, authProvider, resources })` to `providers`, and adds `withComponentInputBinding()` to the existing `provideRouter(...)` call. Input binding is required: the pages receive the resource name and the record id as inputs, and stay blank without it.
@@ -286,13 +288,13 @@ To run it without questions, for example in CI, put the answers in a plan file a
 ```json
 {
   "provider": "supabase",
-  "connection": { "strategy": "graphql", "url": "https://abcdefgh.supabase.co" },
+  "connection": { "strategy": "service-role", "url": "https://abcdefgh.supabase.co" },
   "tables": [{ "table": "products", "actions": ["list", "create", "show", "edit", "delete"], "hiddenFields": ["created_at"] }]
 }
 ```
 
 ```sh
-PIDRANG_SUPABASE_ANON_KEY=<your anon key> npx pidrang init --plan plan.json
+PIDRANG_SUPABASE_SERVICE_ROLE_KEY=<your service role key> npx pidrang init --plan plan.json
 ```
 
 The same answers give the same files as the questions. It exits with `0` when done or when there is nothing to write, `1` on an invalid plan, an unsupported app or a file in the way, and `130` when cancelled.

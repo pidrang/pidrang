@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { select, input, password, confirm } from '@inquirer/prompts';
 import { supabaseSchemaProviderDefinition } from './supabase-schema-provider-definition';
+import { createSupabaseSchemaProvider } from './supabase-schema-provider';
+import { SupabaseConnectionError } from './supabase-connection-error';
 
 vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),
@@ -13,18 +15,89 @@ vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
 }));
 
+vi.mock('./supabase-schema-provider', () => ({
+  createSupabaseSchemaProvider: vi.fn(),
+}));
+
 describe('supabaseSchemaProviderDefinition', () => {
+  const listTables = vi.fn();
+  const URL = 'https://example.supabase.co';
+
   beforeEach(() => {
     vi.mocked(select).mockReset();
     vi.mocked(input).mockReset();
     vi.mocked(password).mockReset();
     vi.mocked(confirm).mockReset();
     vi.mocked(readFile).mockReset();
+    listTables.mockReset().mockResolvedValue(['products']);
+    vi.mocked(createSupabaseSchemaProvider)
+      .mockReset()
+      .mockReturnValue({ listTables, introspectTable: vi.fn() });
+  });
+
+  function messageOf(prompt: typeof input | typeof password, call: number) {
+    return (vi.mocked(prompt).mock.calls[call][0] as { message: string })
+      .message;
+  }
+
+  const rejectedKey = new SupabaseConnectionError(
+    'rejected-key',
+    'Supabase refused the service role key (401: Invalid API key).',
+  );
+  const graphQlDisabled = new SupabaseConnectionError(
+    'graphql-disabled',
+    'The pg_graphql extension is not enabled on this project.',
+  );
+
+  it('asks the project URL first, then offers the service role key by default', async () => {
+    vi.mocked(input).mockResolvedValueOnce(URL);
+    vi.mocked(select).mockResolvedValue('service-role');
+    vi.mocked(password).mockResolvedValueOnce('secret-key');
+
+    await supabaseSchemaProviderDefinition.promptConnection();
+
+    expect(vi.mocked(input).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(select).mock.invocationCallOrder[0],
+    );
+    expect(messageOf(input, 0)).toBe('Supabase project URL:');
+    const strategy = vi.mocked(select).mock.calls[0][0] as {
+      message: string;
+      default: string;
+      choices: { name: string; value: string }[];
+    };
+    expect(strategy.message).not.toMatch(/introspect/i);
+    expect(strategy.default).toBe('service-role');
+    expect(strategy.choices.map((choice) => choice.value)).toEqual([
+      'service-role',
+      'postgres',
+      'graphql',
+    ]);
+    expect(strategy.choices[2].name).toContain('requires pg_graphql');
+  });
+
+  it('prompts service-role-specific questions and says the key is never written', async () => {
+    vi.mocked(input).mockResolvedValueOnce(URL);
+    vi.mocked(select).mockResolvedValue('service-role');
+    vi.mocked(password).mockResolvedValueOnce('secret-key');
+
+    const connection =
+      await supabaseSchemaProviderDefinition.promptConnection();
+
+    expect(messageOf(password, 0)).toContain(
+      'only used to read the schema and is never written to disk or into the app',
+    );
+    expect(connection).toEqual({
+      strategy: 'service-role',
+      url: URL,
+      serviceRoleKey: 'secret-key',
+    });
+    expect(createSupabaseSchemaProvider).toHaveBeenCalledWith(connection);
+    expect(listTables).toHaveBeenCalledTimes(1);
   });
 
   it('prompts graphql-specific questions when that strategy is chosen', async () => {
+    vi.mocked(input).mockResolvedValueOnce(URL);
     vi.mocked(select).mockResolvedValue('graphql');
-    vi.mocked(input).mockResolvedValueOnce('https://example.supabase.co');
     vi.mocked(password).mockResolvedValueOnce('anon-key');
 
     const connection =
@@ -32,29 +105,89 @@ describe('supabaseSchemaProviderDefinition', () => {
 
     expect(connection).toEqual({
       strategy: 'graphql',
-      url: 'https://example.supabase.co',
+      url: URL,
       anonKey: 'anon-key',
     });
   });
 
-  it('prompts service-role-specific questions when that strategy is chosen', async () => {
-    vi.mocked(select).mockResolvedValue('service-role');
-    vi.mocked(input).mockResolvedValueOnce('https://example.supabase.co');
-    vi.mocked(password).mockResolvedValueOnce('secret-key');
+  it.each(['service-role', 'graphql'])(
+    'asks the %s key again with the reason when Supabase refuses it',
+    async (strategy) => {
+      vi.mocked(input).mockResolvedValueOnce(URL);
+      vi.mocked(select).mockResolvedValue(strategy);
+      vi.mocked(password)
+        .mockResolvedValueOnce('wrong-key')
+        .mockResolvedValueOnce('right-key');
+      listTables.mockRejectedValueOnce(rejectedKey).mockResolvedValueOnce([]);
+
+      const connection =
+        await supabaseSchemaProviderDefinition.promptConnection();
+
+      expect(password).toHaveBeenCalledTimes(2);
+      expect(messageOf(password, 1)).toContain(rejectedKey.message);
+      expect(connection).toMatchObject({ url: URL });
+      expect(Object.values(connection)).toContain('right-key');
+      expect(input).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('offers the service role key, keeping the URL, when pg_graphql is not enabled', async () => {
+    vi.mocked(input).mockResolvedValueOnce(URL);
+    vi.mocked(select).mockResolvedValue('graphql');
+    vi.mocked(password)
+      .mockResolvedValueOnce('anon-key')
+      .mockResolvedValueOnce('secret-key');
+    vi.mocked(confirm).mockResolvedValueOnce(true);
+    listTables.mockRejectedValueOnce(graphQlDisabled).mockResolvedValueOnce([]);
 
     const connection =
       await supabaseSchemaProviderDefinition.promptConnection();
 
+    const offer = vi.mocked(confirm).mock.calls[0][0] as {
+      message: string;
+      default: boolean;
+    };
+    expect(offer.message).toContain(graphQlDisabled.message);
+    expect(offer.message).toContain('service role (secret) key instead?');
+    expect(offer.default).toBe(true);
+    expect(input).toHaveBeenCalledTimes(1);
     expect(connection).toEqual({
       strategy: 'service-role',
-      url: 'https://example.supabase.co',
+      url: URL,
       serviceRoleKey: 'secret-key',
     });
+  });
+
+  it('stops with the pg_graphql explanation when the offer is declined', async () => {
+    vi.mocked(input).mockResolvedValueOnce(URL);
+    vi.mocked(select).mockResolvedValue('graphql');
+    vi.mocked(password).mockResolvedValueOnce('anon-key');
+    vi.mocked(confirm).mockResolvedValueOnce(false);
+    listTables.mockRejectedValueOnce(graphQlDisabled);
+
+    await expect(
+      supabaseSchemaProviderDefinition.promptConnection(),
+    ).rejects.toBe(graphQlDisabled);
+    expect(password).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets any other connection failure through unchanged', async () => {
+    const offline = new Error('fetch failed');
+    vi.mocked(input).mockResolvedValueOnce(URL);
+    vi.mocked(select).mockResolvedValue('service-role');
+    vi.mocked(password).mockResolvedValueOnce('secret-key');
+    listTables.mockRejectedValueOnce(offline);
+
+    await expect(
+      supabaseSchemaProviderDefinition.promptConnection(),
+    ).rejects.toBe(offline);
+    expect(password).toHaveBeenCalledTimes(1);
   });
 
   it('defaults TLS to on for a remote host, then reads the CA certificate file', async () => {
     vi.mocked(select).mockResolvedValue('postgres');
     vi.mocked(input)
+      .mockResolvedValueOnce(URL)
       .mockResolvedValueOnce('db.example.com')
       .mockResolvedValueOnce('5433')
       .mockResolvedValueOnce('mydb')
@@ -81,12 +214,15 @@ describe('supabaseSchemaProviderDefinition', () => {
       user: 'myuser',
       password: 'mypassword',
       ssl: { ca: '-----BEGIN CERTIFICATE-----\n...' },
+      url: URL,
     });
+    expect(createSupabaseSchemaProvider).not.toHaveBeenCalled();
   });
 
   it('defaults TLS to off for a local host, and omits ssl when declined', async () => {
     vi.mocked(select).mockResolvedValue('postgres');
     vi.mocked(input)
+      .mockResolvedValueOnce('http://127.0.0.1:54321')
       .mockResolvedValueOnce('localhost')
       .mockResolvedValueOnce('5432')
       .mockResolvedValueOnce('postgres')
@@ -108,12 +244,14 @@ describe('supabaseSchemaProviderDefinition', () => {
       database: 'postgres',
       user: 'postgres',
       password: 'postgres',
+      url: 'http://127.0.0.1:54321',
     });
   });
 
   it('refuses a CA certificate file it cannot read', async () => {
     vi.mocked(select).mockResolvedValue('postgres');
     vi.mocked(input)
+      .mockResolvedValueOnce(URL)
       .mockResolvedValueOnce('db.example.com')
       .mockResolvedValueOnce('5433')
       .mockResolvedValueOnce('mydb')
@@ -131,6 +269,7 @@ describe('supabaseSchemaProviderDefinition', () => {
   it('uses verified TLS with the system certificates when the CA path is left empty', async () => {
     vi.mocked(select).mockResolvedValue('postgres');
     vi.mocked(input)
+      .mockResolvedValueOnce(URL)
       .mockResolvedValueOnce(' db.example.com ')
       .mockResolvedValueOnce(' 6543 ')
       .mockResolvedValueOnce(' mydb ')
@@ -151,6 +290,7 @@ describe('supabaseSchemaProviderDefinition', () => {
       user: 'myuser',
       password: 'mypassword',
       ssl: true,
+      url: URL,
     });
   });
 
@@ -160,8 +300,8 @@ describe('supabaseSchemaProviderDefinition', () => {
   ])(
     'trims a %s key pasted with surrounding whitespace',
     async (strategy, keyName) => {
+      vi.mocked(input).mockResolvedValueOnce(URL);
       vi.mocked(select).mockResolvedValue(strategy);
-      vi.mocked(input).mockResolvedValueOnce('https://example.supabase.co');
       vi.mocked(password).mockResolvedValueOnce('  pasted-key\n');
 
       const connection =
@@ -172,14 +312,14 @@ describe('supabaseSchemaProviderDefinition', () => {
   );
 
   it('drops trailing slashes from the project URL', async () => {
-    vi.mocked(select).mockResolvedValue('service-role');
     vi.mocked(input).mockResolvedValueOnce(' https://example.supabase.co// ');
+    vi.mocked(select).mockResolvedValue('service-role');
     vi.mocked(password).mockResolvedValueOnce('secret-key');
 
     const connection =
       await supabaseSchemaProviderDefinition.promptConnection();
 
-    expect(connection).toMatchObject({ url: 'https://example.supabase.co' });
+    expect(connection).toMatchObject({ url: URL });
   });
 
   function validatorOf(
@@ -196,8 +336,8 @@ describe('supabaseSchemaProviderDefinition', () => {
   }
 
   it('validates the project URL and the key before accepting them', async () => {
+    vi.mocked(input).mockResolvedValueOnce(URL);
     vi.mocked(select).mockResolvedValue('graphql');
-    vi.mocked(input).mockResolvedValueOnce('https://example.supabase.co');
     vi.mocked(password).mockResolvedValueOnce('anon-key');
 
     await supabaseSchemaProviderDefinition.promptConnection();
@@ -222,6 +362,7 @@ describe('supabaseSchemaProviderDefinition', () => {
   it('validates the database host, port, name and user', async () => {
     vi.mocked(select).mockResolvedValue('postgres');
     vi.mocked(input)
+      .mockResolvedValueOnce(URL)
       .mockResolvedValueOnce('localhost')
       .mockResolvedValueOnce('5432')
       .mockResolvedValueOnce('postgres')
@@ -231,15 +372,15 @@ describe('supabaseSchemaProviderDefinition', () => {
 
     await supabaseSchemaProviderDefinition.promptConnection();
 
-    expect(validatorOf(input, 0)('')).toBe('The database host is required');
-    const port = validatorOf(input, 1);
+    expect(validatorOf(input, 1)('')).toBe('The database host is required');
+    const port = validatorOf(input, 2);
     expect(port('5432')).toBe(true);
     expect(port('65535')).toBe(true);
     for (const invalid of ['', 'abc', '0', '65536', '54.3', '-1', '1e3']) {
       expect(port(invalid)).toContain('between 1 and 65535');
     }
-    expect(validatorOf(input, 2)(' ')).toBe('The database name is required');
-    expect(validatorOf(input, 3)('')).toBe('The database user is required');
+    expect(validatorOf(input, 3)(' ')).toBe('The database name is required');
+    expect(validatorOf(input, 4)('')).toBe('The database user is required');
   });
 });
 
@@ -408,6 +549,37 @@ describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
         password,
       ),
     ).not.toHaveProperty('ssl');
+  });
+
+  it('reads an optional project URL and normalizes it like the prompt', async () => {
+    expect(
+      await fromPlan(
+        {
+          strategy: 'postgres',
+          host: 'localhost',
+          url: ' http://127.0.0.1:54321/ ',
+        },
+        password,
+      ),
+    ).toMatchObject({ url: 'http://127.0.0.1:54321' });
+    expect(
+      await fromPlan({ strategy: 'postgres', host: 'localhost' }, password),
+    ).not.toHaveProperty('url');
+  });
+
+  it('refuses a postgres project URL that is not one', async () => {
+    expect(
+      await problemOf(
+        { strategy: 'postgres', host: 'localhost', url: 42 },
+        password,
+      ),
+    ).toContain('url must be a string');
+    expect(
+      await problemOf(
+        { strategy: 'postgres', host: 'localhost', url: 'nope' },
+        password,
+      ),
+    ).toContain('Enter the project URL');
   });
 
   it('turns TLS on for a local host when the plan says so', async () => {

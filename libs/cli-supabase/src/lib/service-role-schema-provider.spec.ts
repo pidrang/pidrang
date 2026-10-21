@@ -1,6 +1,7 @@
 import { createServiceRoleSchemaProvider } from './service-role-schema-provider';
 import { TableIntrospection } from '@pidrang/cli';
 import { ServiceRoleConnection } from './supabase-connection';
+import { SupabaseConnectionError } from './supabase-connection-error';
 
 function createEntries(introspection: TableIntrospection) {
   return introspection.unavailableActions.filter(
@@ -293,20 +294,42 @@ describe('createServiceRoleSchemaProvider', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('never puts the service role key in an error message', async () => {
+  function failWith(status: number, body: unknown) {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: false,
-        status: 401,
-        statusText: 'Unauthorized',
+        status,
+        statusText: status === 401 ? 'Unauthorized' : 'Error',
+        json: () => Promise.resolve(body),
       }),
     );
+  }
+
+  it('never puts the service role key in an error message', async () => {
+    failWith(401, { message: 'Invalid API key' });
     const error = await createServiceRoleSchemaProvider(connection)
       .listTables()
       .catch((err) => err);
     expect(error.message).not.toContain('secret-key');
   });
+
+  it.each([
+    [401, { message: 'Invalid API key' }],
+    [401, { message: 'No API key found in request' }],
+    [401, {}],
+  ])(
+    'reports a %i %j as a rejected key, so the wizard can ask for it again',
+    async (status, body) => {
+      failWith(status, body);
+      const error = await createServiceRoleSchemaProvider(connection)
+        .listTables()
+        .catch((err) => err);
+      expect(error).toBeInstanceOf(SupabaseConnectionError);
+      expect(error.problem).toBe('rejected-key');
+      expect(error.message).toContain('Supabase refused the service role key');
+    },
+  );
 
   it('marks a column that carries a "default" key as hasDefault, even though it is NOT NULL and so still listed in "required"', async () => {
     const provider = createServiceRoleSchemaProvider(connection);
@@ -341,17 +364,13 @@ describe('createServiceRoleSchemaProvider', () => {
     });
   });
 
-  it('throws when the request fails', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        statusText: 'Unauthorized',
-      }),
-    );
-    const provider = createServiceRoleSchemaProvider(connection);
-    await expect(provider.listTables()).rejects.toThrow(/401/);
+  it('throws when the request fails for another reason', async () => {
+    failWith(500, { message: 'boom' });
+    const error = await createServiceRoleSchemaProvider(connection)
+      .listTables()
+      .catch((err) => err);
+    expect(error).not.toBeInstanceOf(SupabaseConnectionError);
+    expect(error.message).toMatch(/Failed to fetch .* 500/);
   });
 
   it('excludes definitions with no columns, such as columnless views', async () => {

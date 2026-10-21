@@ -4,11 +4,13 @@
 
 ## Connection strategies
 
-The wizard asks which one to use, then only prompts for that strategy's credentials:
+The wizard asks for the project URL first, then which strategy to use (in this order, the first one by default), then only prompts for that strategy's credentials:
 
-- **`graphql`** — introspects via `pg_graphql` (`/graphql/v1`), needs only the project URL and an anon/publishable key. Requires the `pg_graphql` extension to be enabled on the project.
-- **`service-role`** — reads the REST OpenAPI schema (`/rest/v1/`), needs the project URL and a secret (`service_role`) key.
-- **`postgres`** — connects directly to Postgres and reads `information_schema` (host/port/database/user/password). No Supabase-specific dependency — the most broadly reliable option.
+- **`service-role`** — reads the REST OpenAPI schema (`/rest/v1/`), needs the project URL and a secret (`service_role`) key. The key is only used to read the schema and is never written to disk or into the app.
+- **`postgres`** — connects directly to Postgres and reads `information_schema` (host/port/database/user/password). No Supabase-specific dependency — the most broadly reliable option. The project URL fills `supabaseUrl` in the app.
+- **`graphql`** — introspects via `pg_graphql` (`/graphql/v1`), needs only the project URL and an anon/publishable key. Requires the `pg_graphql` extension, which is not enabled on a new project (Dashboard, Database, Extensions).
+
+The wizard tries the key before going on. When Supabase refuses it (`401`, "No API key found", "Invalid API key"), it asks for the key again. When `pg_graphql` is not enabled, it says how to enable it and offers to continue with the secret key instead. The direct database connection is not tried until the tables are listed.
 
 All three are verified against a real local Supabase instance (`supabase start`), but they do not see the same things (`docs/design-notes.md` has the details):
 
@@ -22,7 +24,7 @@ With `pidrang init --plan`, the plan's `connection` object picks the strategy an
 
 - `{ "strategy": "graphql", "url": "..." }` with `PIDRANG_SUPABASE_ANON_KEY`
 - `{ "strategy": "service-role", "url": "..." }` with `PIDRANG_SUPABASE_SERVICE_ROLE_KEY`
-- `{ "strategy": "postgres", "host": "...", "port": 5432, "database": "postgres", "user": "postgres", "tls": true, "caCertificatePath": "..." }` with `PIDRANG_DATABASE_PASSWORD` (it may be set to an empty string, like the prompt accepts). Only `host` is required; the other values default like the prompts, `tls` to on except for `localhost`, `127.0.0.1` and `::1`, and a `caCertificatePath` turns it on. A relative `caCertificatePath` is read from the folder `pidrang init` runs in, not from the folder of the plan file.
+- `{ "strategy": "postgres", "host": "...", "port": 5432, "database": "postgres", "user": "postgres", "tls": true, "caCertificatePath": "...", "url": "..." }` with `PIDRANG_DATABASE_PASSWORD` (it may be set to an empty string, like the prompt accepts). Only `host` is required; the other values default like the prompts, `tls` to on except for `localhost`, `127.0.0.1` and `::1`, and a `caCertificatePath` turns it on. `url` is the project URL written into the app; without it, the URL is derived from a `db.<ref>.supabase.co` host or a pooler user, or left as a placeholder. A relative `caCertificatePath` is read from the folder `pidrang init` runs in, not from the folder of the plan file.
 
 The connection settings are checked before any request. TLS for `postgres` always verifies the certificate, against the CA file you give or, if you leave the path empty, the system certificates.
 

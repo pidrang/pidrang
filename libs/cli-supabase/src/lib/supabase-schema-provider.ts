@@ -25,6 +25,9 @@ function normalizeConnection(
     case 'postgres':
       return {
         ...connection,
+        ...(connection.url === undefined
+          ? {}
+          : { url: normalizeProjectUrl(connection.url) }),
         host: connection.host.trim(),
         database: connection.database.trim(),
         user: connection.user.trim(),
