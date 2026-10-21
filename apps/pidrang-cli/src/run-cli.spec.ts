@@ -8,6 +8,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { checkbox } from '@inquirer/prompts';
 import {
   AppSetup,
   SchemaProviderDefinition,
@@ -15,7 +16,13 @@ import {
 } from '@pidrang/cli';
 import * as typescript from 'typescript';
 import { AppTooling } from './app-tooling';
+import { RunCommand } from './install-packages';
 import { CliContext, runCli } from './run-cli';
+
+vi.mock('@inquirer/prompts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@inquirer/prompts')>()),
+  checkbox: vi.fn(),
+}));
 
 const SECRET = 'fake-secret-value';
 
@@ -37,6 +44,7 @@ const SETUP: AppSetup = {
     { name: 'supabasePublishableKey', value: 'YOUR-PUBLISHABLE-KEY' },
   ],
   notes: ['Use the publishable key in the browser, never the secret key.'],
+  packages: ['@pidrang/fake', 'fake-client'],
 };
 
 const STOCK_FILES: Record<string, string> = {
@@ -139,6 +147,8 @@ describe('runCli', () => {
   let err: string[];
   let provider: SchemaProviderDefinition<{ key: string }>;
   let interruptSignal: AbortSignal;
+  let confirmInstall: ReturnType<typeof vi.fn<() => Promise<boolean>>>;
+  let runCommand: ReturnType<typeof vi.fn<RunCommand>>;
 
   function context(
     env: Record<string, string> = { FAKE_KEY: SECRET },
@@ -155,6 +165,10 @@ describe('runCli', () => {
         dispose: () => undefined,
       }),
       interactive: true,
+      nodeVersion: '24.15.0',
+      version: '9.8.7',
+      confirmInstall,
+      runCommand,
       tooling,
     };
   }
@@ -211,6 +225,18 @@ describe('runCli', () => {
     err = [];
     provider = fakeProvider();
     interruptSignal = new AbortController().signal;
+    confirmInstall = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    runCommand = vi.fn<RunCommand>().mockResolvedValue(true);
+    vi.mocked(checkbox).mockImplementation((async ({
+      message,
+    }: {
+      message: string;
+    }) =>
+      message.startsWith('Which tables')
+        ? ['products']
+        : message.startsWith('Any fields')
+          ? []
+          : ['list', 'show']) as unknown as typeof checkbox);
     await put(STOCK_FILES);
   });
 
@@ -224,7 +250,7 @@ describe('runCli', () => {
       async (...argv) => {
         expect(await runCli(argv, context())).toBe(0);
         expect(out.join('\n')).toContain(
-          'Usage: pidrang init [--plan <file>] [--project <name>]',
+          'Usage: pidrang init [--plan <file>] [--project <name>] [--skip-install]',
         );
         expect(out.join('\n')).toContain('Fake plan connection');
         expect(err).toEqual([]);
@@ -817,6 +843,129 @@ describe('runCli', () => {
 
       expect(await runCli(['init'], context())).toBe(1);
       expect(provider.promptConnection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the package install', () => {
+    const MANUAL = [
+      'Install the packages manually, then run ng build:',
+      '  npm install @pidrang/core@9.8.7 @pidrang/fake@9.8.7 fake-client @pidrang/material@9.8.7',
+      '  npx ng add @angular/material',
+    ];
+
+    it('refuses an unsupported Node.js before anything else', async () => {
+      const before = await snapshot();
+
+      expect(
+        await runCli(['init'], { ...context(), nodeVersion: '20.19.0' }),
+      ).toBe(1);
+
+      expect(err).toEqual([
+        'pidrang needs Node.js 22.22.3 or a later 22.x, 24.15.0 or a later 24.x, or 26 and later; this is Node.js 20.19.0. Install a supported Node.js version and run pidrang init again.',
+        'Nothing was written.',
+      ]);
+      expect(provider.promptConnection).not.toHaveBeenCalled();
+      expect(await snapshot()).toEqual(before);
+    });
+
+    it('installs with npm, @pidrang packages pinned to the CLI version, then adds Angular Material', async () => {
+      expect(await runCli(['init'], context())).toBe(0);
+
+      expect(confirmInstall).toHaveBeenCalledTimes(1);
+      expect(runCommand.mock.calls).toEqual([
+        [
+          {
+            command: 'npm',
+            args: [
+              'install',
+              '@pidrang/core@9.8.7',
+              '@pidrang/fake@9.8.7',
+              'fake-client',
+              '@pidrang/material@9.8.7',
+            ],
+          },
+        ],
+        [{ command: 'npx', args: ['ng', 'add', '@angular/material'] }],
+      ]);
+      expect(out.indexOf('Running npx ng add @angular/material')).toBeLessThan(
+        out.indexOf('Installed the packages. Run ng build to check the app.'),
+      );
+      expect(output()).not.toContain('Install the packages manually');
+      expect(err).toEqual([]);
+    });
+
+    it.each([
+      ['pnpm-lock.yaml', 'pnpm', ['add'], 'pnpm', ['exec', 'ng']],
+      ['yarn.lock', 'yarn', ['add'], 'yarn', ['ng']],
+      ['package-lock.json', 'npm', ['install'], 'npx', ['ng']],
+    ])(
+      'uses the package manager of %s',
+      async (lockfile, manager, install, runner, ng) => {
+        await put({ [lockfile]: '' });
+
+        expect(await runCli(['init'], context())).toBe(0);
+
+        const [first] = runCommand.mock.calls[0];
+        expect(first.command).toBe(manager);
+        expect(first.args.slice(0, install.length + 1)).toEqual([
+          ...install,
+          '@pidrang/core@9.8.7',
+        ]);
+        expect(runCommand.mock.calls[1][0]).toEqual({
+          command: runner,
+          args: [...ng, 'add', '@angular/material'],
+        });
+      },
+    );
+
+    it('prints the commands and succeeds when the answer is no', async () => {
+      confirmInstall.mockResolvedValueOnce(false);
+
+      expect(await runCli(['init'], context())).toBe(0);
+
+      expect(runCommand).not.toHaveBeenCalled();
+      expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
+    });
+
+    it('stops at the first failing command, keeps the files and prints the commands', async () => {
+      runCommand.mockResolvedValueOnce(false);
+
+      expect(await runCli(['init'], context())).toBe(1);
+
+      expect(runCommand).toHaveBeenCalledTimes(1);
+      expect(err).toContain(
+        'npm install @pidrang/core@9.8.7 @pidrang/fake@9.8.7 fake-client @pidrang/material@9.8.7 failed: see its output above.',
+      );
+      expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
+      expect(await listFiles()).toEqual(
+        expect.arrayContaining(['src/app/resources.ts']),
+      );
+    });
+
+    it('exits with 130 and prints the commands when the question is cancelled', async () => {
+      const cancelled = new Error('User force closed the prompt with SIGINT');
+      cancelled.name = 'ExitPromptError';
+      confirmInstall.mockRejectedValueOnce(cancelled);
+
+      expect(await runCli(['init'], context())).toBe(130);
+
+      expect(runCommand).not.toHaveBeenCalled();
+      expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
+      expect(output()).not.toContain('nothing was written');
+    });
+
+    it.each([
+      [['init', '--skip-install']],
+      [['init', '--plan', 'plan.json']],
+      [['init', '--plan', 'plan.json', '--skip-install']],
+    ])('asks nothing and prints the commands for %j', async (argv) => {
+      await planFile(PLAN);
+
+      expect(await runCli(argv, context())).toBe(0);
+
+      expect(confirmInstall).not.toHaveBeenCalled();
+      expect(runCommand).not.toHaveBeenCalled();
+      expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
     });
   });
 });

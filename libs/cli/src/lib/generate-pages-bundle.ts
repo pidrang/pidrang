@@ -40,6 +40,16 @@ export const SIGN_IN_PATH_SNIPPET = `import { provideSignInPath } from './pidran
 provideSignInPath('/your-sign-in-route')
 `;
 
+export interface UiLayerPackages {
+  install: string[];
+  ngAdd: string[];
+}
+
+export const PAGES_UI_LAYER_PACKAGES: UiLayerPackages = {
+  install: ['@pidrang/material'],
+  ngAdd: ['@angular/material'],
+};
+
 export const RESOURCE_ROUTES_FILE = 'src/app/resource-routes.ts';
 
 export function generateResourceRoutesFile(): GeneratedFile {

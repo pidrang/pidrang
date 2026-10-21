@@ -1,4 +1,4 @@
-import { checkbox, select } from '@inquirer/prompts';
+import { checkbox, confirm, select } from '@inquirer/prompts';
 import { SchemaProvider } from './schema-provider';
 import {
   PlanEnvironment,
@@ -279,4 +279,8 @@ async function promptTable(
   });
 
   return tablePlan(table, introspection, actions, hiddenFields);
+}
+
+export function confirmPackageInstall(): Promise<boolean> {
+  return confirm({ message: 'Install the required packages?', default: true });
 }

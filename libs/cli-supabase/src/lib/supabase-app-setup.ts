@@ -69,5 +69,6 @@ export function supabaseAppSetup(connection: SupabaseConnection): AppSetup {
     notes: [
       'The app runs in the browser: give it the publishable key, never the secret key or the database password.',
     ],
+    packages: ['@pidrang/supabase', '@supabase/supabase-js'],
   };
 }

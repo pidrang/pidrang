@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 import {
   AppSetup,
   InitResult,
+  PAGES_UI_LAYER_PACKAGES,
   PlanEnvironment,
   SIGN_IN_PATH_SNIPPET,
   SchemaProviderDefinition,
@@ -37,6 +38,15 @@ import {
   environmentPaths,
 } from './edit-environments';
 import { formatDiff } from './line-diff';
+import { nodeVersionProblem } from './node-version';
+import {
+  Command,
+  RunCommand,
+  detectPackageManager,
+  formatCommand,
+  installCommands,
+  packagesToInstall,
+} from './install-packages';
 
 export const EXIT_OK = 0;
 export const EXIT_FAILED = 1;
@@ -50,18 +60,31 @@ export interface CliContext {
   err: (line: string) => void;
   watchInterrupt: () => { signal: AbortSignal; dispose: () => void };
   interactive: boolean;
+  nodeVersion: string;
+  version: string;
+  confirmInstall: () => Promise<boolean>;
+  runCommand: RunCommand;
   tooling?: AppTooling;
 }
 
+interface InitOptions {
+  planPath: string | undefined;
+  project: string | undefined;
+  skipInstall: boolean;
+}
+
+type InstallOutcome = 'installed' | 'skipped' | 'failed' | 'cancelled';
+
 function usage(providers: SchemaProviderDefinition[]): string {
   return [
-    'Usage: pidrang init [--plan <file>] [--project <name>]',
+    'Usage: pidrang init [--plan <file>] [--project <name>] [--skip-install]',
     '',
     'Scaffolds Resource definitions and CRUD pages into an Angular app. Run it from the workspace root.',
     '',
     'Options:',
     '  --plan <file>     Take the answers from a JSON plan file instead of prompts',
     '  --project <name>  The application to set up, when angular.json has several',
+    '  --skip-install    Do not offer to install the packages, print the commands instead',
     '  -h, --help        Show this help',
     '',
     'Plan file:',
@@ -84,8 +107,12 @@ function usage(providers: SchemaProviderDefinition[]): string {
     'any write. When a file cannot be edited safely, init adds a "pidrang:" comment that lists the',
     'exact change to make.',
     '',
-    'Exit status: 0 done or nothing to do, 1 invalid input, unsupported app or conflicting file,',
-    '130 cancelled.',
+    'Once the files are written, it offers to install the packages the generated code imports with',
+    'the package manager of the lockfile (npm when there is none), then runs ng add @angular/material.',
+    'With --plan or --skip-install it prints the commands instead.',
+    '',
+    'Exit status: 0 done or nothing to do, 1 invalid input, unsupported Node.js or app, conflicting',
+    'file or failed install, 130 cancelled.',
   ].join('\n');
 }
 
@@ -285,12 +312,66 @@ function printInstructions(
   context.out(SIGN_IN_PATH_SNIPPET);
 }
 
+async function installPackages(
+  context: CliContext,
+  commands: Command[],
+  skip: boolean,
+): Promise<InstallOutcome> {
+  if (skip) {
+    return 'skipped';
+  }
+  context.out('');
+  let accepted: boolean;
+  try {
+    accepted = await context.confirmInstall();
+  } catch (error) {
+    if (isPromptExit(error)) {
+      return 'cancelled';
+    }
+    throw error;
+  }
+  if (!accepted) {
+    return 'skipped';
+  }
+  for (const command of commands) {
+    context.out('');
+    context.out(`Running ${formatCommand(command)}`);
+    if (!(await context.runCommand(command))) {
+      context.err('');
+      context.err(`${formatCommand(command)} failed: see its output above.`);
+      return 'failed';
+    }
+  }
+  return 'installed';
+}
+
+function printInstallReport(
+  context: CliContext,
+  commands: Command[],
+  outcome: InstallOutcome,
+): void {
+  context.out('');
+  if (outcome === 'installed') {
+    context.out('Installed the packages. Run ng build to check the app.');
+    return;
+  }
+  context.out('Install the packages manually, then run ng build:');
+  commands.forEach((command) => context.out(`  ${formatCommand(command)}`));
+}
+
+const INSTALL_STATUS: Record<InstallOutcome, number> = {
+  installed: EXIT_OK,
+  skipped: EXIT_OK,
+  failed: EXIT_FAILED,
+  cancelled: EXIT_CANCELLED,
+};
+
 async function runInit(
   context: CliContext,
-  planPath: string | undefined,
-  project: string | undefined,
+  options: InitOptions,
 ): Promise<number> {
-  const layout = await preflightApp(context.cwd, project);
+  const { planPath } = options;
+  const layout = await preflightApp(context.cwd, options.project);
   const pages = relocateFiles(
     [...generatePagesBundle(), generateResourceRoutesFile()],
     layout.appDirectory,
@@ -426,17 +507,33 @@ async function runInit(
     return EXIT_FAILED;
   }
   const status = await writeFiles(context, { ...plan, edits: editPlan.edits });
-  if (status === EXIT_OK) {
-    printInstructions(context, layout, {
-      setup: generation.setup,
-      edits: editPlan.edits,
-      environmentPath: environment.default,
-      environmentDevelopmentPath: environment.development,
-      createdEnvironment,
-      environmentLines: environmentLinesToAdd,
-    });
+  if (status !== EXIT_OK) {
+    return status;
   }
-  return status;
+  const commands = installCommands(
+    await detectPackageManager(context.cwd),
+    packagesToInstall(
+      generation.setup.packages,
+      PAGES_UI_LAYER_PACKAGES,
+      context.version,
+    ),
+    PAGES_UI_LAYER_PACKAGES,
+  );
+  const outcome = await installPackages(
+    context,
+    commands,
+    options.skipInstall || planPath !== undefined,
+  );
+  printInstructions(context, layout, {
+    setup: generation.setup,
+    edits: editPlan.edits,
+    environmentPath: environment.default,
+    environmentDevelopmentPath: environment.development,
+    createdEnvironment,
+    environmentLines: environmentLinesToAdd,
+  });
+  printInstallReport(context, commands, outcome);
+  return INSTALL_STATUS[outcome];
 }
 
 export async function runCli(
@@ -451,6 +548,7 @@ export async function runCli(
       options: {
         plan: { type: 'string' },
         project: { type: 'string' },
+        'skip-install': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
     });
@@ -477,8 +575,19 @@ export async function runCli(
     return EXIT_FAILED;
   }
 
+  const nodeProblem = nodeVersionProblem(context.nodeVersion);
+  if (nodeProblem !== null) {
+    context.err(nodeProblem);
+    context.err('Nothing was written.');
+    return EXIT_FAILED;
+  }
+
   try {
-    return await runInit(context, values.plan, values.project);
+    return await runInit(context, {
+      planPath: values.plan,
+      project: values.project,
+      skipInstall: values['skip-install'] === true,
+    });
   } catch (error) {
     if (isPromptExit(error)) {
       context.err('Cancelled: nothing was written.');

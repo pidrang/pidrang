@@ -19,6 +19,7 @@ const SETUP: AppSetup = {
   ],
   environment: [],
   notes: [],
+  packages: [],
 };
 
 const REQUEST: ConfigRequest = {
