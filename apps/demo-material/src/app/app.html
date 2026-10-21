@@ -1,5 +1,5 @@
 @if (hasSupabaseConfig) {
-<router-outlet></router-outlet>
+<app-layout [appName]="appName" />
 } @else {
 <p>
   Missing Supabase configuration. Set <code>supabaseUrl</code> and
