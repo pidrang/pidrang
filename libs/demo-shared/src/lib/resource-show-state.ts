@@ -1,7 +1,10 @@
 import { Signal, computed } from '@angular/core';
 import { isResourceActionEnabled } from '@pidrang/core';
 
-import { injectResourceDefinition } from './resource-definition';
+import {
+  injectResourceDefinition,
+  resourceTitle,
+} from './resource-definition';
 import { injectResourceRecord } from './resource-record';
 
 export function injectResourceShowState(
@@ -12,5 +15,5 @@ export function injectResourceShowState(
   const { record, label } = injectResourceRecord(resource, id);
   const canList = computed(() => isResourceActionEnabled(definition(), 'list'));
   const fields = computed(() => definition()?.fields ?? []);
-  return { record, label, canList, fields };
+  return { title: resourceTitle(definition), record, label, canList, fields };
 }

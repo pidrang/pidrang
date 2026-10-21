@@ -7,7 +7,7 @@ import { injectResourceShowState } from '@pidrang/demo-shared';
   selector: 'app-resource-show-page',
   imports: [RouterLink, MatButtonModule],
   template: `
-    <h1>{{ resource() }} — {{ label() }}</h1>
+    <h1>{{ title() }} — {{ label() }}</h1>
     @if (canList()) {
       <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     }
@@ -34,6 +34,7 @@ export class ResourceShowPage {
   readonly id = input.required<string>();
 
   private readonly state = injectResourceShowState(this.resource, this.id);
+  protected readonly title = this.state.title;
   protected readonly record = this.state.record;
   protected readonly label = this.state.label;
   protected readonly canList = this.state.canList;

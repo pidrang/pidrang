@@ -12,7 +12,10 @@ import { injectDataProvider, isResourceActionEnabled } from '@pidrang/core';
 import { isAuthRequiredError } from './auth-required-error';
 import { injectEarlierSave } from './earlier-save';
 import { navigationFailure } from './navigation-failure';
-import { injectResourceDefinition } from './resource-definition';
+import {
+  injectResourceDefinition,
+  resourceTitle,
+} from './resource-definition';
 import { injectResourceRecord } from './resource-record';
 import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
@@ -142,6 +145,7 @@ export function injectResourceEditState(
   }
 
   return {
+    title: resourceTitle(definition),
     saving,
     savingElsewhere,
     earlierSave,
