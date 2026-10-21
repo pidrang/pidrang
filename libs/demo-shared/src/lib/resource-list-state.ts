@@ -17,7 +17,10 @@ import {
 import { DeleteFailure } from './delete-failure';
 import { deleteFailureOf } from './delete-failure-of';
 import { injectEarlierSave } from './earlier-save';
-import { injectResourceDefinition } from './resource-definition';
+import {
+  injectResourceDefinition,
+  resourceTitle,
+} from './resource-definition';
 import { recordLabel } from './record-label';
 import { ResourceRow } from './resource-row';
 import { injectSaveLock } from './save-lock';
@@ -174,6 +177,7 @@ export function injectResourceListState(resource: Signal<string>) {
   }
 
   return {
+    title: resourceTitle(definition),
     pageSizeOptions: PAGE_SIZE_OPTIONS,
     pageSize,
     page,

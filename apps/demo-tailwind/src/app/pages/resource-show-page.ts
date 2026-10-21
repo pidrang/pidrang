@@ -7,7 +7,7 @@ import { injectResourceShowState } from '@pidrang/demo-shared';
   imports: [RouterLink],
   template: `
     <h1 class="text-2xl font-semibold text-gray-900">
-      {{ resource() }} — {{ label() }}
+      {{ title() }} — {{ label() }}
     </h1>
     @if (canList()) {
       <a [routerLink]="['/', resource()]" class="text-blue-600 hover:underline"
@@ -43,6 +43,7 @@ export class ResourceShowPage {
   readonly id = input.required<string>();
 
   private readonly state = injectResourceShowState(this.resource, this.id);
+  protected readonly title = this.state.title;
   protected readonly record = this.state.record;
   protected readonly label = this.state.label;
   protected readonly canList = this.state.canList;

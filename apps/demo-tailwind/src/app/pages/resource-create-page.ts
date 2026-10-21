@@ -11,7 +11,7 @@ import {
   imports: [RouterLink, ResourceForm],
   template: `
     <h1 class="text-2xl font-semibold text-gray-900">
-      Create {{ resource() }}
+      Create {{ title() }}
     </h1>
     @if (canList()) {
       <a [routerLink]="['/', resource()]" class="text-blue-600 hover:underline"
@@ -89,6 +89,7 @@ export class ResourceCreatePage {
 
   private readonly state = injectResourceCreateState(this.resource);
   protected readonly signInUrl = injectSignInUrl();
+  protected readonly title = this.state.title;
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
   protected readonly stopped = this.state.stopped;

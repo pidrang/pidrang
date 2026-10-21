@@ -57,7 +57,7 @@ test('says a sign-in failed and clears the message on the next try', async ({
 
 test('lists a resource page by page up to row eleven', async ({ page }) => {
   await page.goto('/products');
-  await expect(page.getByRole('heading', { name: 'products' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible();
   const newest = await productIdsNewestFirst(page);
   expect(await rowIds(page)).toEqual(newest.slice(0, 10));
 
@@ -83,7 +83,7 @@ test('creates, shows, edits and deletes a record as the writer', async ({
 
   await page.goto(`/products/${id}`);
   await expect(
-    page.getByRole('heading', { name: 'products — Gate keyboard' }),
+    page.getByRole('heading', { name: 'Products — Gate keyboard' }),
   ).toBeVisible();
   await expect(page.locator('dd').nth(2)).toHaveText('42');
 
@@ -91,7 +91,7 @@ test('creates, shows, edits and deletes a record as the writer', async ({
   await page.getByLabel('name').fill('Gate keyboard renamed');
   await page.getByLabel('name').press('Enter');
   await expect(
-    page.getByRole('heading', { name: 'products — Gate keyboard renamed' }),
+    page.getByRole('heading', { name: 'Products — Gate keyboard renamed' }),
   ).toBeVisible();
 
   await page.goto('/products');
@@ -245,7 +245,7 @@ test('honours the generated action flags', async ({ page }) => {
 
   await page.goto(`/users/create`);
   await expect(
-    page.getByRole('heading', { name: 'Create users' }),
+    page.getByRole('heading', { name: 'Create Users' }),
   ).toBeVisible();
 });
 
@@ -270,7 +270,7 @@ test('renders a record into the show page through route input binding', async ({
 }) => {
   await page.goto(`/fixture_items/${fixture_items.lockedId}`);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'fixture_items — ',
+    'Fixture items — ',
   );
   await expect(page.locator('dd').first()).toHaveText(fixture_items.lockedId);
 });
@@ -366,7 +366,7 @@ test('edits only the changed field and leaves a precise value untouched', async 
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(
     page.getByRole('heading', {
-      name: 'fixture_items — Gate renamed precise row',
+      name: 'Fixture items — Gate renamed precise row',
     }),
   ).toBeVisible();
   expect(body()).toEqual({ name: 'Gate renamed precise row' });

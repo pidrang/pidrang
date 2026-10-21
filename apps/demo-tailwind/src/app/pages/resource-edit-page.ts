@@ -8,7 +8,7 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
   imports: [RouterLink, ResourceForm],
   template: `
     <h1 class="text-2xl font-semibold text-gray-900">
-      Edit {{ resource() }} — {{ label() }}
+      Edit {{ title() }} — {{ label() }}
     </h1>
     @if (canShow()) {
       <a
@@ -99,6 +99,7 @@ export class ResourceEditPage {
 
   private readonly state = injectResourceEditState(this.resource, this.id);
   protected readonly signInUrl = injectSignInUrl();
+  protected readonly title = this.state.title;
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
   protected readonly earlierSave = this.state.earlierSave;

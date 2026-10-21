@@ -26,7 +26,7 @@ test('opens the home page and the products list up to row eleven', async ({
 test('opens the show, edit and create pages of a record', async ({ page }) => {
   await page.goto(`/products/${products.firstId}`);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'products — ',
+    'Products — ',
   );
   await expect(page.locator('dd').first()).toHaveText(products.firstId);
 
@@ -35,7 +35,7 @@ test('opens the show, edit and create pages of a record', async ({ page }) => {
 
   await page.goto('/products/create');
   await expect(
-    page.getByRole('heading', { name: 'Create products' }),
+    page.getByRole('heading', { name: 'Create Products' }),
   ).toBeVisible();
 });
 

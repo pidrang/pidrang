@@ -8,7 +8,7 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
   selector: 'app-resource-edit-page',
   imports: [RouterLink, ResourceForm, MatButtonModule],
   template: `
-    <h1>Edit {{ resource() }} — {{ label() }}</h1>
+    <h1>Edit {{ title() }} — {{ label() }}</h1>
     @if (canShow()) {
       <a mat-button [routerLink]="['/', resource(), id()]">Back to show</a>
     } @else if (canList()) {
@@ -80,6 +80,7 @@ export class ResourceEditPage {
 
   private readonly state = injectResourceEditState(this.resource, this.id);
   protected readonly signInUrl = injectSignInUrl();
+  protected readonly title = this.state.title;
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
   protected readonly earlierSave = this.state.earlierSave;

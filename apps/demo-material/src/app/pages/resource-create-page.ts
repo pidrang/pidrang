@@ -11,7 +11,7 @@ import {
   selector: 'app-resource-create-page',
   imports: [RouterLink, ResourceForm, MatButtonModule],
   template: `
-    <h1>Create {{ resource() }}</h1>
+    <h1>Create {{ title() }}</h1>
     @if (canList()) {
       <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     }
@@ -78,6 +78,7 @@ export class ResourceCreatePage {
 
   private readonly state = injectResourceCreateState(this.resource);
   protected readonly signInUrl = injectSignInUrl();
+  protected readonly title = this.state.title;
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
   protected readonly stopped = this.state.stopped;

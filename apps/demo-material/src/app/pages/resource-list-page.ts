@@ -9,7 +9,7 @@ import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
   selector: 'app-resource-list-page',
   imports: [RouterLink, ResourceTable, MatButtonModule, MatPaginatorModule],
   template: `
-    <h1>{{ resource() }}</h1>
+    <h1>{{ title() }}</h1>
     @if (canCreate()) {
       <a
         mat-flat-button
@@ -122,6 +122,7 @@ export class ResourceListPage {
 
   private readonly state = injectResourceListState(this.resource);
   protected readonly signInUrl = injectSignInUrl();
+  protected readonly title = this.state.title;
   protected readonly pageSizeOptions = this.state.pageSizeOptions;
   protected readonly pageSize = this.state.pageSize;
   protected readonly page = this.state.page;
