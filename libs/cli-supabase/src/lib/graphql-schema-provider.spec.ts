@@ -1,4 +1,5 @@
 import { createGraphQlSchemaProvider } from './graphql-schema-provider';
+import { SupabaseConnectionError } from './supabase-connection-error';
 import { TableIntrospection } from '@pidrang/cli';
 import { GraphQlConnection } from './supabase-connection';
 
@@ -440,36 +441,66 @@ describe('createGraphQlSchemaProvider', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('throws when the GraphQL response has errors', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        json(200, {
-          errors: [{ message: 'pg_graphql extension is not enabled.' }],
-        }),
-      ),
-    );
-    const provider = createGraphQlSchemaProvider(connection);
-    await expect(provider.listTables()).rejects.toThrow(
-      /pg_graphql extension is not enabled/,
-    );
-  });
-
-  it('throws when the response is not ok, without the anon key in the message', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        statusText: 'Unauthorized',
-        json: () => Promise.resolve({ message: 'Invalid API key' }),
-      }),
-    );
-    const error = await createGraphQlSchemaProvider(connection)
+  async function listTablesError(status: number, body: unknown) {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(status, body)));
+    return createGraphQlSchemaProvider(connection)
       .listTables()
       .catch((err) => err);
-    expect(error.message).toMatch(/401 Unauthorized/);
-    expect(error.message).not.toContain('anon-key');
+  }
+
+  it.each([
+    [
+      'Supabase cloud',
+      200,
+      { errors: [{ message: 'pg_graphql extension is not enabled.' }] },
+    ],
+    [
+      'a local stack',
+      200,
+      {
+        code: 'PGRST202',
+        message:
+          'Could not find the function public.graphql without parameters in the schema cache',
+      },
+    ],
+  ])(
+    'explains how to enable pg_graphql when %s answers without it',
+    async (_where, status, body) => {
+      const error = await listTablesError(status, body);
+      expect(error).toBeInstanceOf(SupabaseConnectionError);
+      expect(error.problem).toBe('graphql-disabled');
+      expect(error.message).toContain('Database, Extensions, pg_graphql');
+    },
+  );
+
+  it('throws any other GraphQL error as it is', async () => {
+    const error = await listTablesError(200, {
+      errors: [{ message: 'boom' }],
+    });
+    expect(error).not.toBeInstanceOf(SupabaseConnectionError);
+    expect(error.message).toBe('Supabase GraphQL introspection failed: boom');
+  });
+
+  it.each([
+    [{ message: 'Invalid API key' }],
+    [{ message: 'No API key found in request' }],
+  ])(
+    'reports %j as a rejected key, without the anon key in the message',
+    async (body) => {
+      const error = await listTablesError(401, body);
+      expect(error).toBeInstanceOf(SupabaseConnectionError);
+      expect(error.problem).toBe('rejected-key');
+      expect(error.message).toContain(
+        `Supabase refused the anon key (401: ${body.message})`,
+      );
+      expect(error.message).not.toContain('anon-key');
+    },
+  );
+
+  it('throws when the response is not ok for another reason', async () => {
+    const error = await listTablesError(500, {});
+    expect(error).not.toBeInstanceOf(SupabaseConnectionError);
+    expect(error.message).toMatch(/introspection failed: 500/);
   });
 
   it('throws when the table is not found', async () => {

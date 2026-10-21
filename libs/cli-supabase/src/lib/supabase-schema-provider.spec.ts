@@ -93,6 +93,28 @@ describe('createSupabaseSchemaProvider', () => {
     });
   });
 
+  it('normalizes and checks the project URL a postgres connection carries', () => {
+    const base: SupabaseConnection = {
+      strategy: 'postgres',
+      host: 'localhost',
+      port: 5432,
+      database: 'postgres',
+      user: 'postgres',
+      password: '',
+    };
+    createSupabaseSchemaProvider({
+      ...base,
+      url: ' https://abc.supabase.co/ ',
+    });
+    expect(createPostgresSchemaProvider).toHaveBeenLastCalledWith({
+      ...base,
+      url: 'https://abc.supabase.co',
+    });
+    expect(() =>
+      createSupabaseSchemaProvider({ ...base, url: 'nope' }),
+    ).toThrow('Enter the project URL');
+  });
+
   it.each<[string, SupabaseConnection, string]>([
     [
       'a graphql URL that is not a URL',

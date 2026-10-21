@@ -22,7 +22,7 @@ function projectUrlFromDatabase(connection: PostgresConnection): string | null {
 
 function projectUrl(connection: SupabaseConnection): string | null {
   return connection.strategy === 'postgres'
-    ? projectUrlFromDatabase(connection)
+    ? (connection.url ?? projectUrlFromDatabase(connection))
     : connection.url;
 }
 

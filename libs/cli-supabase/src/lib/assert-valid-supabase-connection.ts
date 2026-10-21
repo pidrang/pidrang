@@ -26,6 +26,7 @@ function connectionProblems(connection: SupabaseConnection): (string | null)[] {
         connection.ssl && connection.ssl !== true
           ? requiredValueProblem('The CA certificate', connection.ssl.ca)
           : null,
+        connection.url === undefined ? null : projectUrlProblem(connection.url),
       ];
     default:
       return [

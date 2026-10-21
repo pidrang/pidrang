@@ -8,6 +8,10 @@ import { GraphQlConnection } from './supabase-connection';
 import { graphqlScalarToFieldType } from './graphql-field-type';
 import { assertPostgrestTableName } from './assert-postgrest-table-name';
 import { postgrestNameProblem } from './postgrest-name-problem';
+import {
+  graphQlDisabledError,
+  rejectedKeyError,
+} from './supabase-connection-error';
 
 interface IntrospectionType {
   kind?: string;
@@ -24,6 +28,8 @@ interface IntrospectionField {
 interface GraphQlResponse<T> {
   data?: T;
   errors?: { message: string }[];
+  code?: string;
+  message?: string;
 }
 
 interface SchemaData {
@@ -98,12 +104,18 @@ async function runGraphQl<T>(
     },
     body: JSON.stringify({ query, variables }),
   });
+  const body = (await response.json().catch(() => ({}))) as GraphQlResponse<T>;
+  const problem =
+    graphQlDisabledError(body) ??
+    rejectedKeyError('anon key', response.status, body);
+  if (problem) {
+    throw problem;
+  }
   if (!response.ok) {
     throw new Error(
       `Supabase GraphQL introspection failed: ${response.status} ${response.statusText}`,
     );
   }
-  const body = (await response.json()) as GraphQlResponse<T>;
   if (body.errors?.length) {
     throw new Error(
       `Supabase GraphQL introspection failed: ${body.errors[0].message}`,

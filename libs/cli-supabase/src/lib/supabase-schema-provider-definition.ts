@@ -4,6 +4,7 @@ import { PlanEnvironment, SchemaProviderDefinition } from '@pidrang/cli';
 import { supabaseAppSetup } from './supabase-app-setup';
 import { PostgresSsl, SupabaseConnection } from './supabase-connection';
 import { createSupabaseSchemaProvider } from './supabase-schema-provider';
+import { SupabaseConnectionError } from './supabase-connection-error';
 import {
   normalizeProjectUrl,
   portProblem,
@@ -33,29 +34,93 @@ async function promptProjectUrl(): Promise<string> {
   return normalizeProjectUrl(url);
 }
 
-async function promptGraphQlConnection(): Promise<SupabaseConnection> {
-  const url = await promptProjectUrl();
-  const anonKey = (
+async function promptKey(
+  message: string,
+  label: string,
+  rejection: SupabaseConnectionError | null,
+): Promise<string> {
+  return (
     await password({
-      message: 'Anon / publishable key:',
-      validate: required('The anon key'),
+      message: rejection ? `${rejection.message}\n${message}` : message,
+      validate: required(label),
     })
   ).trim();
-  return { strategy: 'graphql', url, anonKey };
 }
 
-async function promptServiceRoleConnection(): Promise<SupabaseConnection> {
-  const url = await promptProjectUrl();
-  const serviceRoleKey = (
-    await password({
-      message: 'Service role (secret) key:',
-      validate: required('The service role key'),
-    })
-  ).trim();
-  return { strategy: 'service-role', url, serviceRoleKey };
+async function connectionError(
+  connection: SupabaseConnection,
+): Promise<SupabaseConnectionError | null> {
+  try {
+    await createSupabaseSchemaProvider(connection).listTables();
+    return null;
+  } catch (error) {
+    if (error instanceof SupabaseConnectionError) {
+      return error;
+    }
+    throw error;
+  }
 }
 
-async function promptPostgresConnection(): Promise<SupabaseConnection> {
+const SERVICE_ROLE_KEY_MESSAGE =
+  'Service role (secret) key, from Project Settings, API. It is only used to read the schema and is never written to disk or into the app:';
+
+async function promptServiceRoleConnection(
+  url: string,
+): Promise<SupabaseConnection> {
+  let rejection: SupabaseConnectionError | null = null;
+  for (;;) {
+    const serviceRoleKey = await promptKey(
+      SERVICE_ROLE_KEY_MESSAGE,
+      'The service role key',
+      rejection,
+    );
+    const connection: SupabaseConnection = {
+      strategy: 'service-role',
+      url,
+      serviceRoleKey,
+    };
+    rejection = await connectionError(connection);
+    if (rejection?.problem !== 'rejected-key') {
+      return connection;
+    }
+  }
+}
+
+async function promptGraphQlConnection(
+  url: string,
+): Promise<SupabaseConnection> {
+  let rejection: SupabaseConnectionError | null = null;
+  for (;;) {
+    const anonKey = await promptKey(
+      'Anon / publishable key:',
+      'The anon key',
+      rejection,
+    );
+    const connection: SupabaseConnection = {
+      strategy: 'graphql',
+      url,
+      anonKey,
+    };
+    rejection = await connectionError(connection);
+    if (rejection === null) {
+      return connection;
+    }
+    if (rejection.problem === 'graphql-disabled') {
+      const fallBack = await confirm({
+        message: `${rejection.message}\nContinue with the service role (secret) key instead?`,
+        default: true,
+      });
+      if (!fallBack) {
+        throw rejection;
+      }
+      return promptServiceRoleConnection(url);
+    }
+  }
+}
+
+async function promptPostgresConnection(
+  url: string,
+): Promise<SupabaseConnection> {
   const host = (
     await input({
       message: 'Database host:',
@@ -98,6 +163,7 @@ async function promptPostgresConnection(): Promise<SupabaseConnection> {
       database,
       user,
       password: dbPassword,
+      url,
     };
   }
   const caPath = (
@@ -115,6 +181,7 @@ async function promptPostgresConnection(): Promise<SupabaseConnection> {
     user,
     password: dbPassword,
     ssl,
+    url,
   };
 }
 
@@ -139,6 +206,7 @@ const PLAN_KEYS: Record<SupabaseConnection['strategy'], string[]> = {
     'user',
     'tls',
     'caCertificatePath',
+    'url',
   ],
 };
 
@@ -149,11 +217,12 @@ const PLAN_HELP = `Supabase plan connection, one of:
       key from ${ENV_SERVICE_ROLE_KEY}
   { "strategy": "postgres", "host": "db.<ref>.supabase.co", "port": 5432,
     "database": "postgres", "user": "postgres", "tls": true,
-    "caCertificatePath": "prod-ca.crt" }
-      password from ${ENV_DATABASE_PASSWORD}; port, database, user, tls and
-      caCertificatePath are optional, tls defaults to on for a remote host,
-      and a relative caCertificatePath is read from the current folder, not
-      from the folder of the plan file`;
+    "caCertificatePath": "prod-ca.crt", "url": "https://<ref>.supabase.co" }
+      password from ${ENV_DATABASE_PASSWORD}; port, database, user, tls,
+      caCertificatePath and url are optional, tls defaults to on for a remote
+      host, a relative caCertificatePath is read from the current folder, not
+      from the folder of the plan file, and url fills supabaseUrl in the app
+      when the host does not name the project`;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -307,18 +376,23 @@ async function connectionFromPlan(
         problems.push(`set ${ENV_DATABASE_PASSWORD}`);
       }
       const ssl = await planSsl(connection, host, problems);
+      const url =
+        connection['url'] === undefined
+          ? undefined
+          : planUrl(connection, problems);
       if (problems.length > 0) {
         throw invalidPlanConnection(problems);
       }
-      const base: SupabaseConnection = {
+      return {
         strategy,
         host,
         port,
         database,
         user,
         password: dbPassword ?? '',
+        ...(ssl === undefined ? {} : { ssl }),
+        ...(url === undefined ? {} : { url }),
       };
-      return ssl === undefined ? base : { ...base, ssl };
     }
   }
 }
@@ -330,31 +404,33 @@ export const supabaseSchemaProviderDefinition: SchemaProviderDefinition<Supabase
     planHelp: PLAN_HELP,
 
     async promptConnection() {
+      const url = await promptProjectUrl();
       const strategy = await select<SupabaseConnection['strategy']>({
-        message: 'How should pidrang introspect your Supabase database?',
+        message: 'How should pidrang read your table definitions?',
+        default: 'service-role',
         choices: [
           {
-            name: 'GraphQL introspection (requires pg_graphql to be enabled)',
-            value: 'graphql',
-          },
-          {
-            name: 'Service role key (uses the REST OpenAPI schema)',
+            name: 'Service role (secret) key, from the same dashboard page as the URL',
             value: 'service-role',
           },
           {
-            name: 'Direct database connection (host/user/password)',
+            name: 'Direct database connection (host, user, password)',
             value: 'postgres',
+          },
+          {
+            name: 'GraphQL with the anon key (requires pg_graphql)',
+            value: 'graphql',
           },
         ],
       });
 
       switch (strategy) {
-        case 'graphql':
-          return promptGraphQlConnection();
         case 'service-role':
-          return promptServiceRoleConnection();
+          return promptServiceRoleConnection(url);
         case 'postgres':
-          return promptPostgresConnection();
+          return promptPostgresConnection(url);
+        case 'graphql':
+          return promptGraphQlConnection(url);
         default:
           throw new Error(`Unknown connection strategy: ${strategy}`);
       }

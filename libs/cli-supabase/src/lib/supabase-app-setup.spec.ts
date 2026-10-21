@@ -54,6 +54,27 @@ describe('supabaseAppSetup', () => {
     });
   });
 
+  it.each<[string, SupabaseConnection, string]>([
+    [
+      'a local database',
+      { ...postgres('127.0.0.1'), url: 'http://127.0.0.1:54321' },
+      'http://127.0.0.1:54321',
+    ],
+    [
+      'a direct host of another project',
+      {
+        ...postgres('db.abcdefgh.supabase.co'),
+        url: 'https://other.supabase.co',
+      },
+      'https://other.supabase.co',
+    ],
+  ])('prefers the project URL asked for %s', (_, connection, url) => {
+    expect(supabaseAppSetup(connection).environment[0]).toEqual({
+      name: 'supabaseUrl',
+      value: url,
+    });
+  });
+
   it.each<[string, SupabaseConnection]>([
     ['a local database', postgres('127.0.0.1')],
     ['a self-hosted database', postgres('db.example.com')],
