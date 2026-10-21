@@ -35,7 +35,25 @@ describe('parseInitPlan', () => {
         { table: 'products', actions: ['list', 'edit'], hiddenFields: [] },
         { table: 'orders', actions: ['show'], hiddenFields: ['id'] },
       ],
+      layout: 'none',
     });
+  });
+
+  it.each(['sidebar', 'none'] as const)(
+    'reads the layout choice %s',
+    (layout) => {
+      expect(parseInitPlan(plan({ layout })).layout).toBe(layout);
+    },
+  );
+
+  it('defaults the layout to none', () => {
+    expect(parseInitPlan(plan()).layout).toBe('none');
+  });
+
+  it.each([['top'], [true], [null]])('refuses the layout %j', (layout) => {
+    expect(() => parseInitPlan(plan({ layout }))).toThrow(
+      'layout must be one of "sidebar", "none"',
+    );
   });
 
   it.each([

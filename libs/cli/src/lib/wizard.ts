@@ -6,13 +6,22 @@ import {
 } from './schema-provider-definition';
 import { CRUD_ACTIONS, CrudAction } from './crud-action';
 import { InitResult, TablePlan } from './generation-plan';
-import { InitPlan } from './init-plan';
+import { AppLayoutChoice, InitPlan } from './init-plan';
 import { TableIntrospection } from './table-introspection';
 
 export interface InitOptions {
   takenRoutes?: readonly string[];
   reportLeftOutColumns?: (message: string) => void;
   warn?: (message: string) => void;
+  isNewApp?: boolean;
+}
+
+function promptLayout(): Promise<AppLayoutChoice> {
+  return confirm({
+    message:
+      'Generate a navigation layout? It adds a header with your app name and a sign in/out link, and a side menu of the resources.',
+    default: true,
+  }).then((wanted) => (wanted ? 'sidebar' : 'none'));
 }
 
 const ACTION_CHOICES: { name: string; value: CrudAction }[] = [
@@ -133,11 +142,13 @@ export async function runInitWizard(
   for (const table of selectedTables) {
     tables.push(await promptTable(schemaProvider, table));
   }
+  const layout = options.isNewApp === true ? await promptLayout() : 'none';
 
   return {
     providerId: providerDefinition.id,
     tables,
     setup: providerDefinition.appSetup(connection),
+    layout,
   };
 }
 
@@ -199,6 +210,7 @@ export async function runScriptedInit(
     providerId: providerDefinition.id,
     tables,
     setup: providerDefinition.appSetup(connection),
+    layout: plan.layout,
   };
 }
 

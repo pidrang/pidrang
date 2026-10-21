@@ -102,7 +102,7 @@ function declaresEmptyPath(
   );
 }
 
-function quote(value: string): string {
+export function quote(value: string): string {
   return `'${value
     .replace(/\\/g, '\\\\')
     .replace(/'/g, "\\'")
