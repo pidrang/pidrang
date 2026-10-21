@@ -4,6 +4,16 @@ import { IntrospectedColumn } from './introspected-column';
 import { TableIntrospection } from './table-introspection';
 import { UnavailableAction } from './unavailable-action';
 
+const AUDIT_COLUMNS = ['created_at', 'updated_at'];
+
+function isGeneratedAuditColumn(field: Field): boolean {
+  return (
+    field.type === 'timestamp' &&
+    AUDIT_COLUMNS.includes(field.name) &&
+    field.hasDefault === true
+  );
+}
+
 export function describeTable(
   table: string,
   columns: IntrospectedColumn[],
@@ -14,7 +24,10 @@ export function describeTable(
   const blocked = [...unavailableActions];
   for (const { type, ...column } of columns) {
     if (typeof type === 'string') {
-      fields.push({ ...column, type });
+      const field: Field = { ...column, type };
+      fields.push(
+        isGeneratedAuditColumn(field) ? { ...field, readOnly: true } : field,
+      );
       continue;
     }
     if (column.name === 'id') {

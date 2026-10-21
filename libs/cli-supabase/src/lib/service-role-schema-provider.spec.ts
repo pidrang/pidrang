@@ -189,7 +189,12 @@ describe('createServiceRoleSchemaProvider', () => {
         { name: 'id', type: 'numeric', readOnly: true, hasDefault: true },
         { name: 'name', type: 'text' },
         { name: 'in_stock', type: 'boolean', hasDefault: true },
-        { name: 'created_at', type: 'timestamp', hasDefault: true },
+        {
+          name: 'created_at',
+          type: 'timestamp',
+          readOnly: true,
+          hasDefault: true,
+        },
         { name: 'notes', type: 'text', nullable: true },
       ],
       excludedColumns: [],
