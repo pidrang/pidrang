@@ -283,11 +283,13 @@ It also wires the app itself, so nothing has to be pasted by hand:
 
 The publishable key is always written as a placeholder: put your project URL and publishable key (formerly anon) in the environment file. Init never writes the database password or the secret key into the app, and the app runs in the browser, so it must only ever get the publishable key.
 
-Once the files are written, it asks `Install the required packages? (Y/n)`. On yes, it installs `@pidrang/core`, `@pidrang/supabase`, `@pidrang/material` (all three at the version of the CLI) and `@supabase/supabase-js` with the package manager of the lockfile next to `angular.json` (`pnpm-lock.yaml`, `yarn.lock` or `package-lock.json`; npm when there is none), then runs `ng add @angular/material` through it, which asks its own questions and sets up a theme. On no, when a command fails, with `--skip-install` or with `--plan`, it prints the commands to run instead:
+Once the files are written, it asks `Install the required packages? (Y/n)`. On yes, it installs `@pidrang/core`, `@pidrang/supabase`, `@pidrang/material` (all three at the version of the CLI) and `@supabase/supabase-js`, then runs `ng add @angular/material`, which asks its own questions and sets up a theme. A package already declared in `package.json` and installed is left out, as long as an `@pidrang` one is at the version of the CLI, and `ng add` only runs when `@angular/material` is missing. When nothing is missing, it says so and asks nothing.
+
+The package manager is the one `cli.packageManager` in `angular.json` names, then the `packageManager` field of `package.json`, then the closest lockfile from the app folder up to the git root (`pnpm-lock.yaml`, `yarn.lock`, `bun.lock` or `bun.lockb`, `package-lock.json`), and npm when there is none. A package manager it cannot run, such as `cnpm`, gets the commands printed instead. On no, when a command fails or is interrupted, with `--skip-install` or with `--plan`, it prints the commands still to run, `<version>` being the version of the CLI:
 
 ```text
 Install the packages manually, then run ng build:
-  npm install @pidrang/core@0.1.0 @pidrang/supabase@0.1.0 @supabase/supabase-js @pidrang/material@0.1.0
+  npm install @pidrang/core@<version> @pidrang/supabase@<version> @supabase/supabase-js @pidrang/material@<version>
   npx ng add @angular/material
 ```
 

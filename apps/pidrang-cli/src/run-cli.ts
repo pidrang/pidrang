@@ -45,7 +45,9 @@ import {
   detectPackageManager,
   formatCommand,
   installCommands,
-  packagesToInstall,
+  missingPackages,
+  pinPackages,
+  requiredPackages,
 } from './install-packages';
 
 export const EXIT_OK = 0;
@@ -73,7 +75,13 @@ interface InitOptions {
   skipInstall: boolean;
 }
 
-type InstallOutcome = 'installed' | 'skipped' | 'failed' | 'cancelled';
+type InstallOutcome =
+  | 'installed'
+  | 'present'
+  | 'skipped'
+  | 'unsupported'
+  | 'failed'
+  | 'cancelled';
 
 function usage(providers: SchemaProviderDefinition[]): string {
   return [
@@ -107,9 +115,10 @@ function usage(providers: SchemaProviderDefinition[]): string {
     'any write. When a file cannot be edited safely, init adds a "pidrang:" comment that lists the',
     'exact change to make.',
     '',
-    'Once the files are written, it offers to install the packages the generated code imports with',
-    'the package manager of the lockfile (npm when there is none), then runs ng add @angular/material.',
-    'With --plan or --skip-install it prints the commands instead.',
+    'Once the files are written, it offers to install the packages the generated code imports that the',
+    'app does not have yet, then runs ng add @angular/material when Material is missing. The package',
+    'manager comes from angular.json, then package.json, then the closest lockfile up to the git root',
+    '(npm when there is none). With --plan or --skip-install it prints the commands instead.',
     '',
     'Exit status: 0 done or nothing to do, 1 invalid input, unsupported Node.js or app, conflicting',
     'file or failed install, 130 cancelled.',
@@ -312,13 +321,80 @@ function printInstructions(
   context.out(SIGN_IN_PATH_SNIPPET);
 }
 
-async function installPackages(
+interface InstallPlan {
+  commands: Command[];
+  unsupportedManager: string | null;
+}
+
+interface InstallResult {
+  outcome: InstallOutcome;
+  remaining: Command[];
+}
+
+async function planInstall(
+  context: CliContext,
+  setupPackages: string[],
+): Promise<InstallPlan> {
+  const missing = await missingPackages(
+    context.cwd,
+    requiredPackages(setupPackages, PAGES_UI_LAYER_PACKAGES),
+    context.version,
+  );
+  const ngAdd = await missingPackages(
+    context.cwd,
+    PAGES_UI_LAYER_PACKAGES.ngAdd,
+    context.version,
+  );
+  const choice = await detectPackageManager(context.cwd);
+  return {
+    commands: installCommands(
+      'manager' in choice ? choice.manager : 'npm',
+      pinPackages(missing, context.version),
+      ngAdd,
+    ),
+    unsupportedManager: 'unsupported' in choice ? choice.unsupported : null,
+  };
+}
+
+async function runInstallCommands(
   context: CliContext,
   commands: Command[],
+): Promise<InstallResult> {
+  const interrupt = context.watchInterrupt();
+  try {
+    for (const [index, command] of commands.entries()) {
+      context.out('');
+      context.out(`Running ${formatCommand(command)}`);
+      const succeeded = await context.runCommand(command);
+      if (interrupt.signal.aborted) {
+        return { outcome: 'cancelled', remaining: commands.slice(index) };
+      }
+      if (!succeeded) {
+        context.err('');
+        context.err(`${formatCommand(command)} failed: see its output above.`);
+        return { outcome: 'failed', remaining: commands.slice(index) };
+      }
+    }
+    return { outcome: 'installed', remaining: [] };
+  } finally {
+    interrupt.dispose();
+  }
+}
+
+async function installPackages(
+  context: CliContext,
+  plan: InstallPlan,
   skip: boolean,
-): Promise<InstallOutcome> {
+): Promise<InstallResult> {
+  const { commands } = plan;
+  if (commands.length === 0) {
+    return { outcome: 'present', remaining: [] };
+  }
+  if (plan.unsupportedManager !== null) {
+    return { outcome: 'unsupported', remaining: commands };
+  }
   if (skip) {
-    return 'skipped';
+    return { outcome: 'skipped', remaining: commands };
   }
   context.out('');
   let accepted: boolean;
@@ -326,42 +402,45 @@ async function installPackages(
     accepted = await context.confirmInstall();
   } catch (error) {
     if (isPromptExit(error)) {
-      return 'cancelled';
+      return { outcome: 'cancelled', remaining: commands };
     }
     throw error;
   }
   if (!accepted) {
-    return 'skipped';
+    return { outcome: 'skipped', remaining: commands };
   }
-  for (const command of commands) {
-    context.out('');
-    context.out(`Running ${formatCommand(command)}`);
-    if (!(await context.runCommand(command))) {
-      context.err('');
-      context.err(`${formatCommand(command)} failed: see its output above.`);
-      return 'failed';
-    }
-  }
-  return 'installed';
+  return runInstallCommands(context, commands);
 }
 
 function printInstallReport(
   context: CliContext,
-  commands: Command[],
-  outcome: InstallOutcome,
+  plan: InstallPlan,
+  result: InstallResult,
 ): void {
   context.out('');
-  if (outcome === 'installed') {
+  if (result.outcome === 'present') {
+    context.out('The required packages are already installed.');
+    return;
+  }
+  if (result.outcome === 'installed') {
     context.out('Installed the packages. Run ng build to check the app.');
     return;
   }
-  context.out('Install the packages manually, then run ng build:');
-  commands.forEach((command) => context.out(`  ${formatCommand(command)}`));
+  context.out(
+    result.outcome === 'unsupported'
+      ? `pidrang cannot run ${plan.unsupportedManager}, the package manager this app names. Install the packages with it, then run ng build. With npm, the commands would be:`
+      : 'Install the packages manually, then run ng build:',
+  );
+  result.remaining.forEach((command) =>
+    context.out(`  ${formatCommand(command)}`),
+  );
 }
 
 const INSTALL_STATUS: Record<InstallOutcome, number> = {
   installed: EXIT_OK,
+  present: EXIT_OK,
   skipped: EXIT_OK,
+  unsupported: EXIT_OK,
   failed: EXIT_FAILED,
   cancelled: EXIT_CANCELLED,
 };
@@ -510,18 +589,10 @@ async function runInit(
   if (status !== EXIT_OK) {
     return status;
   }
-  const commands = installCommands(
-    await detectPackageManager(context.cwd),
-    packagesToInstall(
-      generation.setup.packages,
-      PAGES_UI_LAYER_PACKAGES,
-      context.version,
-    ),
-    PAGES_UI_LAYER_PACKAGES,
-  );
-  const outcome = await installPackages(
+  const installPlan = await planInstall(context, generation.setup.packages);
+  const installResult = await installPackages(
     context,
-    commands,
+    installPlan,
     options.skipInstall || planPath !== undefined,
   );
   printInstructions(context, layout, {
@@ -532,8 +603,8 @@ async function runInit(
     createdEnvironment,
     environmentLines: environmentLinesToAdd,
   });
-  printInstallReport(context, commands, outcome);
-  return INSTALL_STATUS[outcome];
+  printInstallReport(context, installPlan, installResult);
+  return INSTALL_STATUS[installResult.outcome];
 }
 
 export async function runCli(
