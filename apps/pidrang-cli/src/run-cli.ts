@@ -266,9 +266,11 @@ function printInstructions(
     context.out(
       `Created ${report.environmentPath} and ${report.environmentDevelopmentPath}. Set the Supabase values there:`,
     );
-    context.out(`  supabaseUrl: your project URL, from Project Settings, API`);
     context.out(
-      `  supabasePublishableKey: the publishable key of the project (sb_publishable_..., or the legacy anon key), from Project Settings, API Keys`,
+      `  supabaseUrl: your project URL, from the Connect button at the top of the Supabase dashboard`,
+    );
+    context.out(
+      `  supabasePublishableKey: the publishable key of the project (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard`,
     );
   } else if (report.environmentLines.length > 0) {
     context.out('');

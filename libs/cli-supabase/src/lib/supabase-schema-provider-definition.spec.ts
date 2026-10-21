@@ -59,7 +59,9 @@ describe('supabaseSchemaProviderDefinition', () => {
     expect(vi.mocked(input).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(select).mock.invocationCallOrder[0],
     );
-    expect(messageOf(input, 0)).toBe('Supabase project URL:');
+    expect(messageOf(input, 0)).toBe(
+      'Supabase project URL, from the Connect button at the top of the Supabase dashboard:',
+    );
     const strategy = vi.mocked(select).mock.calls[0][0] as {
       message: string;
       default: string;
@@ -89,7 +91,7 @@ describe('supabaseSchemaProviderDefinition', () => {
       await supabaseSchemaProviderDefinition.promptConnection();
 
     expect(messageOf(password, 0)).toMatch(
-      /^Secret key \(sb_secret_\.\.\., or legacy service_role key\), from Project Settings, API Keys\./,
+      /^Secret key \(sb_secret_\.\.\., or legacy service_role key\), from Project Settings, API Keys in the Supabase dashboard\./,
     );
     expect(messageOf(password, 0)).toContain(
       'only used to read the schema and is never written to disk or into the app',
@@ -112,7 +114,7 @@ describe('supabaseSchemaProviderDefinition', () => {
       await supabaseSchemaProviderDefinition.promptConnection();
 
     expect(messageOf(password, 0)).toBe(
-      'Publishable key (sb_publishable_..., or legacy anon key):',
+      'Publishable key (sb_publishable_..., or legacy anon key), from the Connect button at the top of the Supabase dashboard:',
     );
     expect(connection).toEqual({
       strategy: 'graphql',
@@ -164,7 +166,7 @@ describe('supabaseSchemaProviderDefinition', () => {
 
       expect(input).toHaveBeenCalledTimes(2);
       expect(vi.mocked(input).mock.calls[1][0]).toMatchObject({
-        message: `${unreachable.message}\nSupabase project URL:`,
+        message: `${unreachable.message}\nSupabase project URL, from the Connect button at the top of the Supabase dashboard:`,
         default: 'https://exmaple.supabase.co',
       });
       expect(select).toHaveBeenCalledTimes(1);
@@ -851,6 +853,16 @@ describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
       'PIDRANG_DATABASE_PASSWORD',
     ]) {
       expect(supabaseSchemaProviderDefinition.planHelp).toContain(name);
+    }
+  });
+
+  it('names the new name of each legacy name in its plan help', () => {
+    for (const pair of [
+      '"service-role" for "secret-key"',
+      'PIDRANG_SUPABASE_ANON_KEY for PIDRANG_SUPABASE_PUBLISHABLE_KEY',
+      'PIDRANG_SUPABASE_SERVICE_ROLE_KEY for PIDRANG_SUPABASE_SECRET_KEY',
+    ]) {
+      expect(supabaseSchemaProviderDefinition.planHelp).toContain(pair);
     }
   });
 });

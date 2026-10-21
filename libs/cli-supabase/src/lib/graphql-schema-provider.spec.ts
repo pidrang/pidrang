@@ -523,7 +523,7 @@ describe('createGraphQlSchemaProvider', () => {
     expect(error).toBeInstanceOf(SupabaseConnectionError);
     expect(error.problem).toBe('rejected-key');
     expect(error.message).toBe(
-      'This looks like the secret (service_role) key. Paste the publishable key (sb_publishable_..., or legacy anon key) from Project Settings, API Keys.',
+      'This looks like the secret (service_role) key. Paste the publishable key (sb_publishable_..., or legacy anon key) from the Connect button at the top of the Supabase dashboard.',
     );
     expect(error.message).not.toContain(key);
     expect(fetch).not.toHaveBeenCalled();

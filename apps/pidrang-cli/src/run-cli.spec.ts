@@ -440,6 +440,47 @@ describe('runCli', () => {
       );
     });
 
+    it('leaves an app wired with supabaseAnonKey as it is and prints the new line', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        'src/app/app.html': NG_HTML,
+      });
+      const plan = await planFile(PLAN);
+      await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL));
+      const wired = [
+        'src/app/app.config.ts',
+        'src/environments/environment.ts',
+        'src/environments/environment.development.ts',
+      ];
+      for (const path of wired) {
+        const text = await readFile(join(root, path), 'utf8');
+        await writeFile(
+          join(root, path),
+          text.replaceAll('supabasePublishableKey', 'supabaseAnonKey'),
+          'utf8',
+        );
+      }
+      const before = await snapshot();
+      out = [];
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      expect(await snapshot()).toEqual(before);
+      expect(before['src/app/app.config.ts']).toContain(
+        'createClient(environment.supabaseUrl, environment.supabaseAnonKey)',
+      );
+      expect(out).toContain(
+        'Add these lines to src/environments/environment.ts:',
+      );
+      expect(out).toContain(
+        "  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY',",
+      );
+      expect(out).not.toContain("  supabaseUrl: 'https://abc.supabase.co',");
+    });
+
     it('adds the development environment file to angular.json when it creates the files', async () => {
       await put({
         'angular.json': JSON.stringify({
@@ -477,7 +518,7 @@ describe('runCli', () => {
       ]);
       expect(configurations.production.fileReplacements).toBeUndefined();
       expect(out).toContain(
-        '  supabasePublishableKey: the publishable key of the project (sb_publishable_..., or the legacy anon key), from Project Settings, API Keys',
+        '  supabasePublishableKey: the publishable key of the project (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard',
       );
     });
 
