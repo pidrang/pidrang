@@ -31,6 +31,33 @@ describe('describeTable', () => {
     });
   });
 
+  it.each(['created_at', 'updated_at'])(
+    'marks %s read-only when it is a timestamp with a default',
+    (name) => {
+      const result = describeTable('products', [
+        id,
+        title,
+        { name, type: 'timestamp', hasDefault: true },
+      ]);
+      expect(result.fields.map((field) => [field.name, field.readOnly])).toEqual([
+        ['id', true],
+        ['title', undefined],
+        [name, true],
+      ]);
+      expect(result.unavailableActions).toEqual([]);
+    },
+  );
+
+  it.each([
+    ['without a default', { name: 'created_at', type: 'timestamp' }],
+    ['as a date', { name: 'created_at', type: 'date', hasDefault: true }],
+    ['as text', { name: 'created_at', type: 'text', hasDefault: true }],
+    ['under another name', { name: 'deleted_at', type: 'timestamp', hasDefault: true }],
+  ] as const)('keeps an audit-like column %s editable', (_, column) => {
+    const result = describeTable('products', [id, { ...column }]);
+    expect(result.fields[1]).toEqual({ ...column });
+  });
+
   const omissibleCells: [string, Partial<IntrospectedColumn>][] = [
     ['nullable', { nullable: true }],
     ['with a default', { hasDefault: true }],

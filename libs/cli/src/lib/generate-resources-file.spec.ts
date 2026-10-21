@@ -25,10 +25,11 @@ describe('generateResourcesFile', () => {
 export const resources: Resource[] = [
   {
     name: 'products',
+    label: 'Products',
     fields: [
-      { name: 'id', type: 'number' },
-      { name: 'name', type: 'text' },
-      { name: 'in_stock', type: 'boolean' },
+      { name: 'id', label: 'Id', type: 'number' },
+      { name: 'name', label: 'Name', type: 'text' },
+      { name: 'in_stock', label: 'In stock', type: 'boolean' },
     ],
     list: true,
     create: true,
@@ -81,9 +82,9 @@ export const resources: Resource[] = [
 
     const output = generateResourcesFile(plan);
 
-    expect(output).toContain(`{ name: 'id', type: 'number' },`);
+    expect(output).toContain(`{ name: 'id', label: 'Id', type: 'number' },`);
     expect(output).toContain(
-      `{ name: 'password_hash', type: 'text', hidden: true },`,
+      `{ name: 'password_hash', label: 'Password hash', type: 'text', hidden: true },`,
     );
   });
 
@@ -107,11 +108,11 @@ export const resources: Resource[] = [
     const output = generateResourcesFile(plan);
 
     expect(output).toContain(
-      `{ name: 'id', type: 'numeric', readOnly: true },`,
+      `{ name: 'id', label: 'Id', type: 'numeric', readOnly: true },`,
     );
-    expect(output).toContain(`{ name: 'name', type: 'text' },`);
+    expect(output).toContain(`{ name: 'name', label: 'Name', type: 'text' },`);
     expect(output).toContain(
-      `{ name: 'status', type: 'text', nullable: true, hasDefault: true },`,
+      `{ name: 'status', label: 'Status', type: 'text', nullable: true, hasDefault: true },`,
     );
   });
 
@@ -162,9 +163,10 @@ export const resources: Resource[] = [
 export const resources: Resource[] = [
   {
     name: 'products',
+    label: 'Products',
     fields: [
-      { name: 'id', type: 'text', readOnly: true },
-      { name: 'created_at', type: 'timestamp', hasDefault: true },
+      { name: 'id', label: 'Id', type: 'text', readOnly: true },
+      { name: 'created_at', label: 'Created at', type: 'timestamp', hasDefault: true },
     ],
     defaultSorters: [
       { field: 'created_at', order: 'desc' },
@@ -231,6 +233,45 @@ export const resources: Resource[] = [
     };
 
     expect(generateResourcesFile(plan)).not.toContain('defaultSorters');
+  });
+
+  it('gives each resource and field a label built from its name', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'order_items',
+          fields: [
+            { name: 'userId', type: 'text' },
+            { name: 'created_at', type: 'timestamp', hasDefault: true },
+          ],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    const output = generateResourcesFile(plan);
+
+    expect(output).toContain(`label: 'Order items',`);
+    expect(output).toContain(`name: 'userId', label: 'User id',`);
+    expect(output).toContain(`name: 'created_at', label: 'Created at',`);
+  });
+
+  it('generates the same file again from the same plan', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'products',
+          fields: [{ name: 'id', type: 'text', readOnly: true }],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    expect(generateResourcesFile(plan)).toBe(generateResourcesFile(plan));
   });
 
   it('decides the default sorters per table', () => {

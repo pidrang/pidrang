@@ -2,6 +2,7 @@ import { Field } from '@pidrang/core';
 import { CRUD_ACTIONS } from './crud-action';
 import { GenerationPlan, TablePlan } from './generation-plan';
 import { quote } from './quote';
+import { readableLabel } from './readable-label';
 
 export function generateResourcesFile(plan: GenerationPlan): string {
   const resources = plan.tables.map(generateResourceLiteral).join('\n');
@@ -26,7 +27,7 @@ function generateResourceLiteral(table: TablePlan): string {
         field.nullable ? ', nullable: true' : '',
         field.hasDefault ? ', hasDefault: true' : '',
       ].join('');
-      return `      { name: ${quote(field.name)}, type: ${quote(field.type)}${flags} },`;
+      return `      { name: ${quote(field.name)}, label: ${quote(readableLabel(field.name))}, type: ${quote(field.type)}${flags} },`;
     })
     .join('\n');
 
@@ -37,6 +38,7 @@ function generateResourceLiteral(table: TablePlan): string {
   return [
     `  {`,
     `    name: ${quote(table.table)},`,
+    `    label: ${quote(readableLabel(table.table))},`,
     `    fields: [`,
     fields,
     `    ],`,

@@ -132,7 +132,12 @@ describe('createPostgresSchemaProvider', () => {
         { name: 'id', type: 'numeric', readOnly: true, hasDefault: true },
         { name: 'name', type: 'text' },
         { name: 'notes', type: 'text', nullable: true },
-        { name: 'created_at', type: 'timestamp', hasDefault: true },
+        {
+          name: 'created_at',
+          type: 'timestamp',
+          readOnly: true,
+          hasDefault: true,
+        },
         { name: 'search_text', type: 'text', readOnly: true },
         {
           name: 'sequence_no',
