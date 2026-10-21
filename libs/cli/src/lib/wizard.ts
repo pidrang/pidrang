@@ -12,6 +12,7 @@ import { TableIntrospection } from './table-introspection';
 export interface InitOptions {
   takenRoutes?: readonly string[];
   reportLeftOutColumns?: (message: string) => void;
+  warn?: (message: string) => void;
 }
 
 const ACTION_CHOICES: { name: string; value: CrudAction }[] = [
@@ -157,6 +158,7 @@ export async function runScriptedInit(
   const connection = await providerDefinition.connectionFromPlan(
     plan.connection,
     env,
+    options.warn,
   );
   const schemaProvider = providerDefinition.createSchemaProvider(connection);
 
