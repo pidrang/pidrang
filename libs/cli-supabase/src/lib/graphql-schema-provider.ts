@@ -113,7 +113,7 @@ async function runGraphQl<T>(
   const body = (await response.json().catch(() => ({}))) as GraphQlResponse<T>;
   const problem =
     graphQlDisabledError(body) ??
-    rejectedKeyError('publishable key', response.status, body);
+    rejectedKeyError('publishable', response.status, body);
   if (problem) {
     throw problem;
   }

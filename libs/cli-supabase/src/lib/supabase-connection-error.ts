@@ -20,8 +20,15 @@ interface ErrorBody {
 
 const REJECTED_KEY_MESSAGES = [/no api key found/i, /invalid api key/i];
 
+export type ApiKeyKind = 'publishable' | 'secret';
+
+const KEY_SOURCES: Record<ApiKeyKind, string> = {
+  publishable: 'the Connect button at the top of the Supabase dashboard',
+  secret: 'Project Settings, API Keys in the Supabase dashboard',
+};
+
 export function rejectedKeyError(
-  keyLabel: string,
+  kind: ApiKeyKind,
   status: number,
   body: ErrorBody,
 ): SupabaseConnectionError | null {
@@ -34,7 +41,7 @@ export function rejectedKeyError(
   }
   return new SupabaseConnectionError(
     'rejected-key',
-    `Supabase refused the ${keyLabel} (${status}${message ? `: ${message}` : ''}). Copy it again from the Supabase dashboard: Project Settings, API Keys.`,
+    `Supabase refused the ${kind} key (${status}${message ? `: ${message}` : ''}). Copy it again from ${KEY_SOURCES[kind]}.`,
   );
 }
 
@@ -80,7 +87,7 @@ export function publishableKeyError(
   return key.startsWith(PUBLISHABLE_KEY_PREFIX) || jwtRole(key) === 'anon'
     ? new SupabaseConnectionError(
         'rejected-key',
-        'This looks like the publishable (anon) key. Paste the secret key (sb_secret_..., or legacy service_role key) from Project Settings, API Keys.',
+        `This looks like the publishable (anon) key. Paste the secret key (sb_secret_..., or legacy service_role key) from ${KEY_SOURCES.secret}.`,
       )
     : null;
 }
@@ -89,7 +96,7 @@ export function secretKeyError(key: string): SupabaseConnectionError | null {
   return key.startsWith(SECRET_KEY_PREFIX) || jwtRole(key) === 'service_role'
     ? new SupabaseConnectionError(
         'rejected-key',
-        'This looks like the secret (service_role) key. Paste the publishable key (sb_publishable_..., or legacy anon key) from Project Settings, API Keys.',
+        `This looks like the secret (service_role) key. Paste the publishable key (sb_publishable_..., or legacy anon key) from ${KEY_SOURCES.publishable}.`,
       )
     : null;
 }
@@ -123,6 +130,6 @@ export function unreachableUrlError(
 ): SupabaseConnectionError {
   return new SupabaseConnectionError(
     'unreachable-url',
-    `Could not reach ${new URL(url).origin} (${networkCause(error)}). Check the project URL in Project Settings, API.`,
+    `Could not reach ${new URL(url).origin} (${networkCause(error)}). Check the project URL under ${KEY_SOURCES.publishable}.`,
   );
 }

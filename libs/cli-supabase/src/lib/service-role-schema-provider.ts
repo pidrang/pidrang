@@ -51,7 +51,7 @@ async function fetchSchema(
     const body = (await response.json().catch(() => ({}))) as {
       message?: string;
     };
-    const problem = rejectedKeyError('secret key', response.status, body);
+    const problem = rejectedKeyError('secret', response.status, body);
     if (problem) {
       throw problem;
     }

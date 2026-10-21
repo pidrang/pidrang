@@ -34,7 +34,8 @@ function required(label: string): (value: string) => string | true {
 async function promptProjectUrl(
   previous: { url: string; rejection: SupabaseConnectionError } | null = null,
 ): Promise<string> {
-  const message = 'Supabase project URL:';
+  const message =
+    'Supabase project URL, from the Connect button at the top of the Supabase dashboard:';
   const url = await input({
     message: previous ? `${previous.rejection.message}\n${message}` : message,
     default: previous?.url,
@@ -96,7 +97,7 @@ async function retryConnection<
 }
 
 const SECRET_KEY_MESSAGE =
-  'Secret key (sb_secret_..., or legacy service_role key), from Project Settings, API Keys. It is only used to read the schema and is never written to disk or into the app:';
+  'Secret key (sb_secret_..., or legacy service_role key), from Project Settings, API Keys in the Supabase dashboard. It is only used to read the schema and is never written to disk or into the app:';
 
 function promptServiceRoleKey(
   rejection: SupabaseConnectionError | null,
@@ -108,7 +109,7 @@ function promptAnonKey(
   rejection: SupabaseConnectionError | null,
 ): Promise<string> {
   return promptKey(
-    'Publishable key (sb_publishable_..., or legacy anon key):',
+    'Publishable key (sb_publishable_..., or legacy anon key), from the Connect button at the top of the Supabase dashboard:',
     'The publishable key',
     rejection,
   );
@@ -268,8 +269,10 @@ const PLAN_HELP = `Supabase plan connection, one of:
       host, a relative caCertificatePath is read from the current folder, not
       from the folder of the plan file, and url fills supabaseUrl in the app
       when the host does not name the project
-  The legacy names still work and print a warning: "service-role" for
-  "secret-key", ${LEGACY_ENV_ANON_KEY} and ${LEGACY_ENV_SERVICE_ROLE_KEY}.`;
+  The legacy names still work and print a warning:
+    "service-role" for "secret-key"
+    ${LEGACY_ENV_ANON_KEY} for ${ENV_PUBLISHABLE_KEY}
+    ${LEGACY_ENV_SERVICE_ROLE_KEY} for ${ENV_SECRET_KEY}`;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -484,7 +487,7 @@ export const supabaseSchemaProviderDefinition: SchemaProviderDefinition<Supabase
         default: 'service-role',
         choices: [
           {
-            name: 'Secret key (sb_secret_..., or legacy service_role key), from Project Settings, API Keys',
+            name: 'Secret key (sb_secret_..., or legacy service_role key), from Project Settings, API Keys in the Supabase dashboard',
             value: 'service-role',
           },
           {

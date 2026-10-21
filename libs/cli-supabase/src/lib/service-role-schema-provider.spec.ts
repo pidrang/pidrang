@@ -386,7 +386,7 @@ describe('createServiceRoleSchemaProvider', () => {
       expect(error).toBeInstanceOf(SupabaseConnectionError);
       expect(error.problem).toBe('rejected-key');
       expect(error.message).toBe(
-        'This looks like the publishable (anon) key. Paste the secret key (sb_secret_..., or legacy service_role key) from Project Settings, API Keys.',
+        'This looks like the publishable (anon) key. Paste the secret key (sb_secret_..., or legacy service_role key) from Project Settings, API Keys in the Supabase dashboard.',
       );
       expect(error.message).not.toContain(key);
       expect(fetch).not.toHaveBeenCalled();

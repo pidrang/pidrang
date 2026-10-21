@@ -6,9 +6,9 @@
 
 The wizard asks for the project URL first, then which strategy to use (in this order, the first one by default), then only prompts for that strategy's credentials:
 
-- **`secret-key`** (called `service-role` in code) — reads the REST OpenAPI schema (`/rest/v1/`), needs the project URL and the secret key (`sb_secret_...`, or the legacy `service_role` key). The key is only used to read the schema and is never written to disk or into the app.
+- **`secret-key`** (called `service-role` in code) — reads the REST OpenAPI schema (`/rest/v1/`), needs the project URL and the secret key (`sb_secret_...`, or the legacy `service_role` key, from Project Settings, API Keys). The key is only used to read the schema and is never written to disk or into the app.
 - **`postgres`** — connects directly to Postgres and reads `information_schema` (host/port/database/user/password). No Supabase-specific dependency — the most broadly reliable option. The project URL fills `supabaseUrl` in the app.
-- **`graphql`** — introspects via `pg_graphql` (`/graphql/v1`), needs only the project URL and the publishable key (`sb_publishable_...`, or the legacy anon key). Requires the `pg_graphql` extension, which is not enabled on a new project (Dashboard, Database, Extensions).
+- **`graphql`** — introspects via `pg_graphql` (`/graphql/v1`), needs only the project URL and the publishable key (`sb_publishable_...`, or the legacy anon key). Both are shown by the Connect button at the top of the Supabase dashboard. Requires the `pg_graphql` extension, which is not enabled on a new project (Dashboard, Database, Extensions).
 
 The wizard tries the key before going on. When Supabase refuses it (`401`, "No API key found", "Invalid API key"), or when a publishable (`sb_publishable_...`) or legacy anon key is pasted as the secret key, or a secret (`sb_secret_...`) or legacy `service_role` key as the publishable key, it asks for the key again. When the project URL cannot be reached (DNS failure, refused connection, no answer after 15 seconds), it asks for the URL again and keeps the strategy and the key. When `pg_graphql` is not enabled, it says how to enable it and offers to continue with the secret key instead. The direct database connection is not tried until the tables are listed. `pidrang init --plan` stops with the same messages instead of asking again.
 
@@ -26,7 +26,7 @@ With `pidrang init --plan`, the plan's `connection` object picks the strategy an
 - `{ "strategy": "secret-key", "url": "..." }` with `PIDRANG_SUPABASE_SECRET_KEY`
 - `{ "strategy": "postgres", "host": "...", "port": 5432, "database": "postgres", "user": "postgres", "tls": true, "caCertificatePath": "...", "url": "..." }` with `PIDRANG_DATABASE_PASSWORD` (it may be set to an empty string, like the prompt accepts). Only `host` is required; the other values default like the prompts, `tls` to on except for `localhost`, `127.0.0.1` and `::1`, and a `caCertificatePath` turns it on. `url` is the project URL written into the app; without it, the URL is derived from a `db.<ref>.supabase.co` host or a pooler user, or left as a placeholder. A relative `caCertificatePath` is read from the folder `pidrang init` runs in, not from the folder of the plan file.
 
-The names of 0.1.0 still work and print a deprecation warning: the `service-role` strategy, `PIDRANG_SUPABASE_ANON_KEY` and `PIDRANG_SUPABASE_SERVICE_ROLE_KEY`. When both names of a key are set, the new one wins.
+The names of 0.1.0 still work and print a deprecation warning: the `service-role` strategy for `secret-key`, `PIDRANG_SUPABASE_ANON_KEY` for `PIDRANG_SUPABASE_PUBLISHABLE_KEY` and `PIDRANG_SUPABASE_SERVICE_ROLE_KEY` for `PIDRANG_SUPABASE_SECRET_KEY`. When both names of a key are set, the new one wins.
 
 The connection settings are checked before any request. TLS for `postgres` always verifies the certificate, against the CA file you give or, if you leave the path empty, the system certificates.
 

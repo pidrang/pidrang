@@ -200,6 +200,10 @@ A plan written for 0.1.0 keeps working: `service-role`, `PIDRANG_SUPABASE_ANON_K
 
 The prefixes guard both directions: the secret-key strategy refuses an `sb_publishable_` key or an anon JWT, and the GraphQL strategy refuses an `sb_secret_` key or a `service_role` JWT, before any request, since a local stack accepts either. The app's environment never receives a key at all, only the `YOUR-SUPABASE-PUBLISHABLE-KEY` placeholder.
 
+The messages point to where each value is: the project URL and the publishable key under the Connect button at the top of the dashboard (whatever framework is picked there, it shows both), the secret key under Project Settings, API Keys. The release gate generates its app with the stack's `sb_secret_` key (`SECRET_KEY` of `supabase status -o env`, printed by the pinned CLI 2.119.0), so CI covers the recommended key, not only the legacy JWT.
+
+An app wired by init before this rename keeps `supabaseAnonKey`: a later run sees `providePidrang` already in `app.config.ts` and leaves it, never edits an existing environment file, and only prints the `supabasePublishableKey` placeholder line. No release wrote `supabaseAnonKey` (0.1.0 did not wire the app), so there is no migration note.
+
 ### `pidrang init` wires the app itself
 
 `apps/pidrang-cli/src/edit-app-config.ts`, `edit-app-routes.ts`, `edit-app-html.ts`, `edit-app-spec.ts`, `edit-environments.ts`, `libs/cli/src/lib/app-setup.ts`, `libs/cli-supabase/src/lib/supabase-app-setup.ts`

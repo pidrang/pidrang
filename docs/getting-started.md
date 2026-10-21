@@ -6,7 +6,7 @@ This guide takes a new Angular app to a working admin panel backed by Supabase: 
 
 - An Angular 22 application using standalone APIs and the router (`ng new my-admin`).
 - A Supabase project with at least one table that has an `id` primary key column. Pidrang assumes `id` on every table; composite or differently named keys are not supported.
-- The project URL and the publishable key (formerly anon, `sb_publishable_...`), found in the Supabase dashboard under Project Settings, API Keys.
+- The project URL and the publishable key (formerly anon, `sb_publishable_...`), shown by the Connect button at the top of the Supabase dashboard.
 
 ## 1. Install
 
@@ -269,7 +269,7 @@ Run `pidrang init` from the root of an Angular 22.1 (or later 22.x) standalone a
 
 When a table has a `created_at` column of type `timestamp` or `date`, even a hidden one, the generated `Resource` gets `defaultSorters` with `created_at` descending, then `id`, so a new row shows on the first page. Other tables are sorted by `id`.
 
-It asks for the project URL first, then how to read your table definitions. The default is the secret key (formerly service role, `sb_secret_...`; the legacy `service_role` key still works), from Project Settings, API Keys: it is only used to read the schema and is never written to disk or into the app. The other choices are a direct database connection and GraphQL with the publishable key (formerly anon), which requires the `pg_graphql` extension (not enabled on a new project). A key Supabase refuses is asked again, and so is a publishable key given where the secret key is expected or the other way round. When `pg_graphql` is off the wizard offers to continue with the secret key.
+It asks for the project URL first, then how to read your table definitions. The default is the secret key (formerly service role, `sb_secret_...`; the legacy `service_role` key still works), from Project Settings, API Keys in the Supabase dashboard: it is only used to read the schema and is never written to disk or into the app. The other choices are a direct database connection and GraphQL with the publishable key (formerly anon), which requires the `pg_graphql` extension (not enabled on a new project). A key Supabase refuses is asked again, and so is a publishable key given where the secret key is expected or the other way round. When `pg_graphql` is off the wizard offers to continue with the secret key.
 
 It also wires the app itself, so nothing has to be pasted by hand:
 
@@ -283,7 +283,7 @@ The publishable key is always written as a placeholder: put your project URL and
 
 It checks everything before writing anything. A folder it does not recognize, a table named like one of your routes, or an invalid answer stops it with nothing written. It never overwrites a file: when one it would write already exists with other content, it lists every such file and writes nothing at all. A file that already matches is left as it is, so running it again with the same answers is harmless. Edits are made on the syntax tree, not by text replacement, and a file that already has what init would add is left untouched. When a file cannot be edited safely (no `typescript` installed next to the app, a `providers` array built at run time, several application configs), init adds a comment that starts with `// pidrang:` (or `<!-- pidrang:` in `app.html`) at the top of the file, listing the exact change to make, and writes nothing else in it. `pidrang --help` lists the options.
 
-To run it without questions, for example in CI, put the answers in a plan file and pass the credentials as environment variables (`PIDRANG_SUPABASE_PUBLISHABLE_KEY`, `PIDRANG_SUPABASE_SECRET_KEY` or `PIDRANG_DATABASE_PASSWORD`, depending on the strategy); a credential written in the file is refused. The names of 0.1.0 still work and print a deprecation warning: `PIDRANG_SUPABASE_ANON_KEY`, `PIDRANG_SUPABASE_SERVICE_ROLE_KEY` and the `service-role` strategy. When both names of a key are set, the new one wins:
+To run it without questions, for example in CI, put the answers in a plan file and pass the credentials as environment variables (`PIDRANG_SUPABASE_PUBLISHABLE_KEY`, `PIDRANG_SUPABASE_SECRET_KEY` or `PIDRANG_DATABASE_PASSWORD`, depending on the strategy); a credential written in the file is refused. The names of 0.1.0 still work and print a deprecation warning: `PIDRANG_SUPABASE_ANON_KEY` for `PIDRANG_SUPABASE_PUBLISHABLE_KEY`, `PIDRANG_SUPABASE_SERVICE_ROLE_KEY` for `PIDRANG_SUPABASE_SECRET_KEY`, and the `service-role` strategy for `secret-key`. When both names of a key are set, the new one wins:
 
 ```json
 {
@@ -321,7 +321,7 @@ The table is empty: the table has no rows, or Row Level Security hides them from
 
 Saving says you may need to sign in, or returns a permission error: writes need an authenticated user. Sign in with a Supabase user of the project; the generated pages say "You may need to sign in" as plain text until you call `provideSignInPath`, above.
 
-Requests fail with an invalid API key or do not reach Supabase: `supabaseUrl` and `supabasePublishableKey` in `src/environments/environment.ts` are still the placeholders, point to another project, or hold a key that was rotated. Both values are in your project's Project Settings; use the publishable key (formerly anon), never the secret key or the database password.
+Requests fail with an invalid API key or do not reach Supabase: `supabaseUrl` and `supabasePublishableKey` in `src/environments/environment.ts` are still the placeholders, point to another project, or hold a key that was rotated. Both values are shown by the Connect button at the top of your project's Supabase dashboard; use the publishable key (formerly anon), never the secret key or the database password.
 
 ## Next steps
 

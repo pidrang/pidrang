@@ -51,7 +51,7 @@ describe('supabaseFetch', () => {
     expect(error).toBeInstanceOf(SupabaseConnectionError);
     expect(error.problem).toBe('unreachable-url');
     expect(error.message).toBe(
-      `Could not reach https://abcd.supabase.co (${reason}). Check the project URL in Project Settings, API.`,
+      `Could not reach https://abcd.supabase.co (${reason}). Check the project URL under the Connect button at the top of the Supabase dashboard.`,
     );
   });
 

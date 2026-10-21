@@ -57,13 +57,13 @@ export function supabaseAppSetup(connection: SupabaseConnection): AppSetup {
         ? {
             name: 'supabaseUrl',
             value: PROJECT_URL_PLACEHOLDER,
-            hint: 'your project URL, from the Supabase dashboard: Project Settings, API',
+            hint: 'your project URL, from the Connect button at the top of the Supabase dashboard',
           }
         : { name: 'supabaseUrl', value: url },
       {
         name: 'supabasePublishableKey',
         value: PUBLISHABLE_KEY_PLACEHOLDER,
-        hint: 'the publishable key (sb_publishable_..., or the legacy anon key), from the Supabase dashboard: Project Settings, API Keys',
+        hint: 'the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard',
       },
     ],
     notes: [

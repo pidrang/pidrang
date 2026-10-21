@@ -63,7 +63,7 @@ function consumer(adapter, keys) {
       ? {
           env: {
             ...process.env,
-            PIDRANG_SUPABASE_SECRET_KEY: keys.serviceRoleKey,
+            PIDRANG_SUPABASE_SECRET_KEY: keys.secretKey,
           },
         }
       : undefined,
@@ -106,6 +106,7 @@ function stackKeys(supabaseDirectory) {
   const keys = {
     apiUrl: read('API_URL'),
     publishableKey: read('PUBLISHABLE_KEY'),
+    secretKey: read('SECRET_KEY'),
     serviceRoleKey: read('SERVICE_ROLE_KEY'),
   };
   if (keys.apiUrl !== LOCAL_API) {
