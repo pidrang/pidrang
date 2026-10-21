@@ -17,6 +17,8 @@ ng add @angular/material
 
 `@pidrang/material` is one of two UI layers. To use Tailwind instead, install `@pidrang/tailwind` and skip `@angular/material`; see [Choosing a UI layer](#choosing-a-ui-layer).
 
+When you generate the app with [`pidrang init`](#generating-resources), it offers to run these commands for you.
+
 ## 2. Describe your resources
 
 A `Resource` names a table and lists its typed fields. UI layers render tables and forms from `fields`, so you never hand-write a column or an input.
@@ -281,6 +283,16 @@ It also wires the app itself, so nothing has to be pasted by hand:
 
 The publishable key is always written as a placeholder: put your project URL and publishable key (formerly anon) in the environment file. Init never writes the database password or the secret key into the app, and the app runs in the browser, so it must only ever get the publishable key.
 
+Once the files are written, it asks `Install the required packages? (Y/n)`. On yes, it installs `@pidrang/core`, `@pidrang/supabase`, `@pidrang/material` (all three at the version of the CLI) and `@supabase/supabase-js` with the package manager of the lockfile next to `angular.json` (`pnpm-lock.yaml`, `yarn.lock` or `package-lock.json`; npm when there is none), then runs `ng add @angular/material` through it, which asks its own questions and sets up a theme. On no, when a command fails, with `--skip-install` or with `--plan`, it prints the commands to run instead:
+
+```text
+Install the packages manually, then run ng build:
+  npm install @pidrang/core@0.1.0 @pidrang/supabase@0.1.0 @supabase/supabase-js @pidrang/material@0.1.0
+  npx ng add @angular/material
+```
+
+Before anything else, it checks Node.js against the versions pidrang supports (22.22.3 or a later 22.x, 24.15.0 or a later 24.x, 26 and later) and Angular against 22.1 or a later 22.x, and stops with a plain message when one does not fit.
+
 It checks everything before writing anything. A folder it does not recognize, a table named like one of your routes, or an invalid answer stops it with nothing written. It never overwrites a file: when one it would write already exists with other content, it lists every such file and writes nothing at all. A file that already matches is left as it is, so running it again with the same answers is harmless. Edits are made on the syntax tree, not by text replacement, and a file that already has what init would add is left untouched. When a file cannot be edited safely (no `typescript` installed next to the app, a `providers` array built at run time, several application configs), init adds a comment that starts with `// pidrang:` (or `<!-- pidrang:` in `app.html`) at the top of the file, listing the exact change to make, and writes nothing else in it. `pidrang --help` lists the options.
 
 To run it without questions, for example in CI, put the answers in a plan file and pass the credentials as environment variables (`PIDRANG_SUPABASE_PUBLISHABLE_KEY`, `PIDRANG_SUPABASE_SECRET_KEY` or `PIDRANG_DATABASE_PASSWORD`, depending on the strategy); a credential written in the file is refused. The names of 0.1.0 still work and print a deprecation warning: `PIDRANG_SUPABASE_ANON_KEY` for `PIDRANG_SUPABASE_PUBLISHABLE_KEY`, `PIDRANG_SUPABASE_SERVICE_ROLE_KEY` for `PIDRANG_SUPABASE_SECRET_KEY`, and the `service-role` strategy for `secret-key`. When both names of a key are set, the new one wins:
@@ -297,7 +309,7 @@ To run it without questions, for example in CI, put the answers in a plan file a
 PIDRANG_SUPABASE_SECRET_KEY=<your secret key> npx pidrang init --plan plan.json
 ```
 
-The same answers give the same files as the questions. It exits with `0` when done or when there is nothing to write, `1` on an invalid plan, an unsupported app or a file in the way, and `130` when cancelled.
+The same answers give the same files as the questions. It exits with `0` when done or when there is nothing to write, `1` on an invalid plan, an unsupported Node.js or app, a file in the way or a failed install (the files are written then), and `130` when cancelled.
 
 When a write fails because the user is not signed in, the generated pages say "You may need to sign in" as plain text, since they cannot know where your sign-in page lives. To make it a link, provide the path once in `app.config.ts` (the CLI prints this snippet too), replacing `/your-sign-in-route` with your sign-in page's path. It must be a route of your Angular app: the link navigates inside the app, so a sign-in handled by the server or another site (an OAuth redirect, `https://…`) cannot be linked and the prompt stays plain text. `provideSignInPath` throws while the app config is built when the path is not a string, is empty, has spaces at either end, uses `.` or `..` segments, is a full URL or is malformed (`/%`), so those stop the app at startup. So is the `/your-sign-in-route` placeholder left as printed. A well-formed path to a route that does not exist cannot be caught there and lands on your not-found route, A path whose first segment is one of your resource names (`/users/sign-in` with a `users` resource) works only if your sign-in route is declared above `resourceRoutes`; below them, the link opens the Show page of a record whose id is `sign-in`. It is resolved from the app root and may carry a query string:
 

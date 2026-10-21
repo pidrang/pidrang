@@ -1,6 +1,10 @@
-import { checkbox, select } from '@inquirer/prompts';
+import { checkbox, confirm, select } from '@inquirer/prompts';
 import { AppSetup } from './app-setup';
-import { runInitWizard, runScriptedInit } from './wizard';
+import {
+  confirmPackageInstall,
+  runInitWizard,
+  runScriptedInit,
+} from './wizard';
 import { InitPlan } from './init-plan';
 import { SchemaProvider } from './schema-provider';
 import { SchemaProviderDefinition } from './schema-provider-definition';
@@ -8,6 +12,7 @@ import { TableIntrospection } from './table-introspection';
 
 vi.mock('@inquirer/prompts', () => ({
   checkbox: vi.fn(),
+  confirm: vi.fn(),
   select: vi.fn(),
 }));
 
@@ -17,6 +22,7 @@ const SETUP: AppSetup = {
   pidrangConfig: [{ name: 'dataProvider', value: 'provideFake()' }],
   environment: [],
   notes: [],
+  packages: [],
 };
 
 function fakeSchemaProvider(
@@ -570,5 +576,17 @@ describe('runScriptedInit', () => {
     );
 
     expect(reported).toEqual([]);
+  });
+});
+
+describe('confirmPackageInstall', () => {
+  it('asks to install the packages with yes as the default', async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(false);
+
+    expect(await confirmPackageInstall()).toBe(false);
+    expect(confirm).toHaveBeenCalledWith({
+      message: 'Install the required packages?',
+      default: true,
+    });
   });
 });

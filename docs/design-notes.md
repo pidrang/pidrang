@@ -228,6 +228,14 @@ Environment files are created only when the app has neither `environment.ts` nor
 
 The plan goes through the same checks as the wizard: the table must be one the connection lists, its name must work as a route, at least one action, no action the table cannot support. A hidden field must be one of the fields that are kept. Actions and hidden fields are sorted the way the wizard returns them, and tables follow the order the provider lists them in. The same choices therefore give the same `resources.ts` in both modes. Actions are required: the wizard checks every available action by default, but a plan that silently gained an action when the schema changed would not be repeatable.
 
+### `pidrang init` offers to install the packages after writing
+
+`apps/pidrang-cli/src/install-packages.ts`, `node-version.ts`, `run-cli.ts`, `AppSetup.packages`
+
+The generated code imports `@pidrang/core`, the provider's packages and the UI layer, so a fresh app does not build until they are installed. The list comes from the provider (`AppSetup.packages`) and from the pages bundle (`PAGES_UI_LAYER_PACKAGES`), never from the bin, so `@pidrang/cli` stays provider-agnostic and a Tailwind bundle can bring its own list. The `@pidrang` packages are pinned to the version of the CLI because the generated pages and helpers are written for that version. Angular Material goes through `ng add`, which picks a version that fits the installed Angular and sets up a theme.
+
+The install runs after the files are written: files that are already in place stay useful when the network or the registry fails, and the exact commands are printed instead. A failed install exits with `1` so CI notices. `--plan` never installs: it asks no question, and installing is a change to the app that a CI run should opt into by running the printed commands. Node.js is checked before anything else against the `engines` range, since npm only warns about it, and a test keeps the two in sync.
+
 ### Route order matters
 
 `apps/demo-material/src/app/app.routes.ts`, `apps/demo-tailwind/src/app/app.routes.ts`, `RESOURCE_ROUTES_SNIPPET` in `libs/cli/src/lib/generate-pages-bundle.ts`

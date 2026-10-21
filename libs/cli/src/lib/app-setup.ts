@@ -25,4 +25,5 @@ export interface AppSetup {
   pidrangConfig: SetupProperty[];
   environment: EnvironmentEntry[];
   notes: string[];
+  packages: string[];
 }

@@ -145,4 +145,16 @@ describe('supabaseAppSetup', () => {
       'createClient',
     ]);
   });
+
+  it('lists a package for every module the app config imports, @pidrang/core aside', () => {
+    const setup = supabaseAppSetup(postgres('127.0.0.1'));
+
+    expect(setup.packages).toEqual([
+      '@pidrang/supabase',
+      '@supabase/supabase-js',
+    ]);
+    const imported = new Set(setup.imports.map((entry) => entry.from));
+    imported.delete('@pidrang/core');
+    expect([...imported].sort()).toEqual([...setup.packages].sort());
+  });
 });

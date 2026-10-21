@@ -13,11 +13,13 @@ Before any question, it reads `angular.json` and picks the single application, o
 
 Every file is checked before the first write. If one already exists with other content (an edited page, files from an older pidrang, a `resources.ts` from other answers), init lists them all and writes nothing. An identical file is left as it is, so a second run with the same answers writes nothing. A file is never overwritten.
 
+Once the files are written, it asks whether to install the packages the generated code imports: `@pidrang/core`, `@pidrang/supabase` and `@pidrang/material` pinned to the version of the CLI, `@supabase/supabase-js`, then `ng add @angular/material`. It uses the package manager of the lockfile (npm, pnpm or yarn; npm without one). On no, on a failed command, with `--skip-install` or with `--plan`, it prints the exact commands instead. An unsupported Node.js stops it before anything else.
+
 `pidrang init --plan plan.json` takes the answers from a JSON file instead of prompts and the credentials from environment variables; see `docs/getting-started.md`. A table named like a route `app.routes.ts` already declares is refused in both modes.
 
 It never edits the app's own `app.routes.ts`/`app.config.ts`. It prints the `resourceRoutes` snippet, how to add `...resourceRoutes` to the routes the app exports (below its own fixed paths, above a `**` route), the `provideRouter(routes, withComponentInputBinding())` line that replaces the existing `provideRouter(routes)`, and the `providePidrang({...})` call, all to paste in manually, and warns when `app.config.ts` does not mention `withComponentInputBinding` yet, since the pages stay blank without it. It also prints the optional `provideSignInPath(...)` provider: without it, the pages ask the user to sign in as plain text; with it, that text links to the app's own sign-in route.
 
-Exit status: `0` when done or when nothing is left to write, `1` on invalid input, an unsupported app or a file in the way, `130` when cancelled. When writing stops half way, it lists what it wrote and what is left; running it again with the same answers finishes.
+Exit status: `0` when done or when nothing is left to write, `1` on invalid input, an unsupported Node.js or app, a file in the way or a failed install, `130` when cancelled. When writing stops half way, it lists what it wrote and what is left; running it again with the same answers finishes.
 
 `preflightApp`, `planWrites`, `applyWritePlan` and `relocateFiles` are exported from the package, for a tool that wants the same checks.
 
