@@ -24,6 +24,10 @@ jobs:
 
       - run: pnpm exec nx run-many -t lint test build
 
+      - run: pnpm run sync:pages -- --check
+
+      - run: pnpm run sync:layout -- --check
+
       - run: pnpm exec eslint tools/release-gate tools/shared.mjs tools/versioned-packages.mjs tools/verify-artifacts.mjs tools/changelog-renderer.mjs tools/changelog-renderer.test.mjs
 
       - run: node --test tools/changelog-renderer.test.mjs

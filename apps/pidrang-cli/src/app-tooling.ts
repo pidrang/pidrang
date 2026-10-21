@@ -4,9 +4,12 @@ import { dirname, join } from 'node:path';
 
 export type TypeScriptApi = typeof import('typescript');
 
+export type LayoutUi = 'material' | 'tailwind';
+
 export interface AppTooling {
   typescript: TypeScriptApi | null;
   welcomeTemplate: string | null;
+  layoutUi: LayoutUi;
 }
 
 const WELCOME_TEMPLATE =
@@ -74,9 +77,62 @@ async function loadWelcomeTemplate(root: string): Promise<string | null> {
   }
 }
 
+function declares(manifest: unknown, name: string): boolean {
+  if (typeof manifest !== 'object' || manifest === null) {
+    return false;
+  }
+  return ['dependencies', 'devDependencies'].some((key) => {
+    const entries = (manifest as Record<string, unknown>)[key];
+    return (
+      typeof entries === 'object' &&
+      entries !== null &&
+      name in (entries as Record<string, unknown>)
+    );
+  });
+}
+
+export function layoutUiOf(manifest: string): LayoutUi {
+  try {
+    return declares(JSON.parse(manifest), '@pidrang/tailwind')
+      ? 'tailwind'
+      : 'material';
+  } catch {
+    return 'material';
+  }
+}
+
+async function detectLayoutUi(root: string): Promise<LayoutUi> {
+  try {
+    if (
+      layoutUiOf(await readFile(join(root, 'package.json'), 'utf8')) ===
+      'tailwind'
+    ) {
+      return 'tailwind';
+    }
+  } catch {
+    return 'material';
+  }
+  try {
+    const installed: unknown = JSON.parse(
+      await readFile(
+        join(root, 'node_modules/@pidrang/tailwind/package.json'),
+        'utf8',
+      ),
+    );
+    const name =
+      typeof installed === 'object' && installed !== null
+        ? (installed as Record<string, unknown>)['name']
+        : undefined;
+    return name === '@pidrang/tailwind' ? 'tailwind' : 'material';
+  } catch {
+    return 'material';
+  }
+}
+
 export async function loadAppTooling(root: string): Promise<AppTooling> {
   return {
     typescript: loadTypeScript(root),
+    layoutUi: await detectLayoutUi(root),
     welcomeTemplate: await loadWelcomeTemplate(root),
   };
 }

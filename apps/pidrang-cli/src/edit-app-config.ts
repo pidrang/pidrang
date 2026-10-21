@@ -1,6 +1,7 @@
 import type * as ts from 'typescript';
 import { AppSetup, SetupImport } from '@pidrang/cli';
 import { TypeScriptApi } from './app-tooling';
+import { quote } from './edit-app-routes';
 import {
   TextInsertion,
   applyInsertions,
@@ -29,6 +30,7 @@ export interface ConfigRequest {
   setup: AppSetup;
   environmentImport: string | null;
   resourcesImport: string;
+  signInPath?: string;
 }
 
 const BINDING_IMPORT: SetupImport = {
@@ -38,6 +40,9 @@ const BINDING_IMPORT: SetupImport = {
 
 function setupImports(request: ConfigRequest): SetupImport[] {
   return [
+    ...(request.signInPath === undefined
+      ? []
+      : [{ name: 'provideSignInPath', from: './pidrang/index' }]),
     ...request.setup.imports,
     ...(request.environmentImport === null
       ? []
@@ -137,7 +142,9 @@ function manualSteps(
 ): string[] {
   const imports = [
     ...(needsBinding ? [BINDING_IMPORT] : []),
-    ...(needsPidrang ? setupImports(request) : []),
+    ...(needsPidrang || request.signInPath !== undefined
+      ? setupImports(request)
+      : []),
   ];
   const steps = [
     'pidrang could not edit this file safely. Make these changes by hand, then delete these pidrang lines.',
@@ -154,6 +161,12 @@ function manualSteps(
     steps.push(
       'Pass withComponentInputBinding() to provideRouter, the pages read :resource and :id as inputs:',
       '  provideRouter(routes, withComponentInputBinding())',
+    );
+  }
+  if (request.signInPath !== undefined) {
+    steps.push(
+      'Add this to the providers of your application config, with the path of your sign-in page:',
+      `  provideSignInPath('${request.signInPath}')`,
     );
   }
   if (needsPidrang) {
@@ -204,7 +217,10 @@ export function editAppConfig(
   const needsBinding =
     callsTo(typescript, file, BINDING_IMPORT.name).length === 0;
   const needsPidrang = callsTo(typescript, file, 'providePidrang').length === 0;
-  if (!needsBinding && !needsPidrang) {
+  const needsSignIn =
+    request.signInPath !== undefined &&
+    callsTo(typescript, file, 'provideSignInPath').length === 0;
+  if (!needsBinding && !needsPidrang && !needsSignIn) {
     return { kind: 'unchanged' };
   }
   const fail = (reason: string) =>
@@ -235,6 +251,17 @@ export function editAppConfig(
       text: `, ${BINDING_IMPORT.name}()`,
     });
     imports.push(BINDING_IMPORT);
+  }
+
+  if (needsSignIn) {
+    const signInPath = request.signInPath ?? '';
+    insertions.push(
+      appendElement(
+        source,
+        found.providers,
+        () => `provideSignInPath(${quote(signInPath)})`,
+      ),
+    );
   }
 
   if (needsPidrang) {

@@ -9,6 +9,7 @@
     "check:install": "node tools/check-install.mjs",
     "verify:artifacts": "node tools/verify-artifacts.mjs",
     "sync:pages": "tsx tools/sync-generated-pages.ts",
+    "sync:layout": "tsx tools/sync-layout.ts",
     "build:docs": "node tools/docs/build.mjs"
   },
   "private": true,

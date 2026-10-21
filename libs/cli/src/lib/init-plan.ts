@@ -6,13 +6,18 @@ export interface TableSelection {
   hiddenFields: string[];
 }
 
+export type AppLayoutChoice = 'sidebar' | 'none';
+
+export const APP_LAYOUT_CHOICES: readonly AppLayoutChoice[] = ['sidebar', 'none'];
+
 export interface InitPlan {
   provider: string;
   connection: unknown;
   tables: TableSelection[];
+  layout: AppLayoutChoice;
 }
 
-const PLAN_KEYS = ['provider', 'connection', 'tables'];
+const PLAN_KEYS = ['provider', 'connection', 'tables', 'layout'];
 const TABLE_KEYS = ['table', 'actions', 'hiddenFields'];
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -101,6 +106,14 @@ function planProblems(value: unknown): string[] {
   if (!isObject(value['connection'])) {
     problems.push('connection must be an object');
   }
+  if (
+    value['layout'] !== undefined &&
+    !APP_LAYOUT_CHOICES.includes(value['layout'] as AppLayoutChoice)
+  ) {
+    problems.push(
+      `layout must be one of ${APP_LAYOUT_CHOICES.map((choice) => JSON.stringify(choice)).join(', ')}`,
+    );
+  }
   const tables = value['tables'];
   if (!Array.isArray(tables) || tables.length === 0) {
     problems.push('tables must list at least one table');
@@ -131,6 +144,7 @@ export function parseInitPlan(value: unknown): InitPlan {
   return {
     provider: plan['provider'] as string,
     connection: plan['connection'],
+    layout: (plan['layout'] as AppLayoutChoice | undefined) ?? 'none',
     tables: (plan['tables'] as Record<string, unknown>[]).map((table) => ({
       table: table['table'] as string,
       actions: table['actions'] as CrudAction[],

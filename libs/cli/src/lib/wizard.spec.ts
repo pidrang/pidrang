@@ -61,6 +61,7 @@ describe('runInitWizard', () => {
   beforeEach(() => {
     vi.mocked(checkbox).mockReset();
     vi.mocked(select).mockReset();
+    vi.mocked(confirm).mockReset();
   });
 
   it('skips the provider prompt when only one provider is registered', async () => {
@@ -91,7 +92,53 @@ describe('runInitWizard', () => {
         },
       ],
       setup: SETUP,
+      layout: 'none',
     });
+  });
+
+  it('asks for a navigation layout on a new app', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(true);
+
+    const plan = await runInitWizard([definition], { isNewApp: true });
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ default: true }),
+    );
+    expect(plan.layout).toBe('sidebar');
+  });
+
+  it('leaves a new app without a layout when declined', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(false);
+
+    const plan = await runInitWizard([definition], { isNewApp: true });
+
+    expect(plan.layout).toBe('none');
+  });
+
+  it('does not ask for a layout in an app that already exists', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+
+    const plan = await runInitWizard([definition]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(plan.layout).toBe('none');
   });
 
   it('prompts for a provider when several are registered', async () => {
@@ -327,12 +374,18 @@ describe('runInitWizard', () => {
 
 describe('runScriptedInit', () => {
   function scripted(tables: InitPlan['tables']): InitPlan {
-    return { provider: 'supabase', connection: { url: 'u' }, tables };
+    return {
+      provider: 'supabase',
+      connection: { url: 'u' },
+      tables,
+      layout: 'none',
+    };
   }
 
   beforeEach(() => {
     vi.mocked(checkbox).mockReset();
     vi.mocked(select).mockReset();
+    vi.mocked(confirm).mockReset();
   });
 
   it('hands the warn option to the provider reading the plan', async () => {
@@ -392,6 +445,7 @@ describe('runScriptedInit', () => {
         },
       ],
       setup: SETUP,
+      layout: 'none',
     });
   });
 

@@ -15,3 +15,4 @@ export * from './lib/generate-resources-file';
 export * from './lib/readable-label';
 export * from './lib/generated-file';
 export * from './lib/generate-pages-bundle';
+export * from './lib/generate-layout-module';
