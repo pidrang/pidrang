@@ -369,9 +369,14 @@ describe('runCli', () => {
       expect(routes).toContain(
         "import { resourceRoutes } from './resource-routes';",
       );
-      expect(routes).toContain(
-        'export const routes: Routes = [\n  ...resourceRoutes,\n];',
-      );
+      expect(routes).toBe(`import { Routes } from '@angular/router';
+import { resourceRoutes } from './resource-routes';
+
+export const routes: Routes = [
+  ...resourceRoutes,
+  { path: '', pathMatch: 'full', redirectTo: '/products' },
+];
+`);
 
       expect(await readFile(join(root, 'src/app/app.html'), 'utf8')).toBe(
         '<router-outlet />\n',
@@ -602,6 +607,78 @@ describe('runCli', () => {
       );
       expect(err.join('\n')).toContain('pidrang never overwrites a file');
       expect(out).toEqual([]);
+    });
+
+    it('opens the redirect init adds on a new app and leaves the route one already has', async () => {
+      await put({
+        'src/app/app.html': NG_HTML,
+        'src/app/app.routes.ts': `import { Routes } from '@angular/router';
+
+export const routes: Routes = [
+  { path: '', component: HomePage },
+];
+`,
+      });
+      const plan = await planFile(PLAN);
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const routes = await readFile(
+        join(root, 'src/app/app.routes.ts'),
+        'utf8',
+      );
+      expect(routes).toContain("  { path: '', component: HomePage },");
+      expect(routes).not.toContain('pathMatch');
+    });
+
+    it('prints the redirect a new app should have when it cannot add one', async () => {
+      await put({
+        'src/app/app.html': NG_HTML,
+        'src/app/app.routes.ts': "const computed = getRoutes();\nexport const routes: Routes = computed;\n",
+      });
+      const plan = await planFile(PLAN);
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      expect(out.join('\n')).toContain(
+        "  { path: '', pathMatch: 'full', redirectTo: '/products' },",
+      );
+    });
+
+    it('prints how to open the first page in an app that already has its own', async () => {
+      const routesBefore = `import { Routes } from '@angular/router';
+
+import { SignInPage } from './sign-in-page';
+
+export const routes: Routes = [
+  { path: 'sign-in', component: SignInPage },
+];
+`;
+      await put({
+        'src/app/app.html': NG_HTML,
+        'src/app/app.routes.ts': routesBefore,
+      });
+      const plan = await planFile(PLAN);
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const routes = await readFile(join(root, 'src/app/app.routes.ts'), 'utf8');
+      expect(routes).not.toContain('redirectTo');
+      expect(routes).toContain(
+        "export const routes: Routes = [\n  ...resourceRoutes,\n  { path: 'sign-in', component: SignInPage },\n];",
+      );
+      expect(output()).toContain(
+        "The app already has its own pages and routes, so pidrang only added the resource routes to src/app/app.routes.ts.",
+      );
+      expect(output()).toContain(
+        "  { path: '', pathMatch: 'full', redirectTo: '/products' },",
+      );
     });
 
     it('lists every conflict at once', async () => {

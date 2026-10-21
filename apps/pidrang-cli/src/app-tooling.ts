@@ -20,16 +20,29 @@ function resolveFrom(directory: string, request: string): string | null {
   }
 }
 
-function loadTypeScript(root: string): TypeScriptApi | null {
-  const path = resolveFrom(root, 'typescript');
-  if (path === null) {
-    return null;
-  }
+function isCompilerApi(value: unknown): value is TypeScriptApi {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as Record<string, unknown>)['isVariableStatement'] ===
+      'function'
+  );
+}
+
+function tryLoad(attempt: () => unknown): TypeScriptApi | null {
   try {
-    return createRequire(join(root, 'package.json'))(path) as TypeScriptApi;
+    const loaded = attempt();
+    return isCompilerApi(loaded) ? loaded : null;
   } catch {
     return null;
   }
+}
+
+function loadTypeScript(root: string): TypeScriptApi | null {
+  const path = resolveFrom(root, 'typescript');
+  return path === null
+    ? null
+    : tryLoad(() => createRequire(join(root, 'package.json'))(path));
 }
 
 function schematicsManifest(root: string): string | null {

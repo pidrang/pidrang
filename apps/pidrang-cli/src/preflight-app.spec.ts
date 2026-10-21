@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   UnsupportedAppError,
+  displayName,
   findTakenRoutes,
   preflightApp,
 } from './preflight-app';
@@ -60,6 +61,7 @@ describe('preflightApp', () => {
 
     expect(await preflightApp(root)).toEqual({
       project: 'shop',
+      projectName: 'Shop',
       sourceRoot: 'src',
       appDirectory: 'src/app',
       routesFile: 'src/app/app.routes.ts',
@@ -183,6 +185,30 @@ describe('preflightApp', () => {
 
     it('uses the one --project names', async () => {
       expect((await preflightApp(root, 'shop')).appDirectory).toBe('src/app');
+    });
+
+    it.each([
+      ['shop', 'Shop'],
+      ['admin', 'Admin'],
+      ['pidrang-admin', 'Pidrang admin'],
+      ['shop_app', 'Shop app'],
+    ])('turns the project name %s into %s', async (project, name) => {
+      expect(displayName(project)).toBe(name);
+    });
+
+    it('reads the display name of the project preflightApp picked', async () => {
+      expect((await preflightApp(root, 'shop')).projectName).toBe('Shop');
+      await write({
+        'angular.json': JSON.stringify({
+          projects: {
+            shop: { projectType: 'application', sourceRoot: 'src' },
+            admin: { projectType: 'application', sourceRoot: 'admin/src' },
+          },
+        }),
+        'admin/src/app/app.config.ts': 'export const appConfig = {};',
+        'admin/src/app/app.routes.ts': 'export const routes: Routes = [];',
+      });
+      expect((await preflightApp(root, 'admin')).projectName).toBe('Admin');
     });
 
     it.each(['blog', 'ui'])('refuses --project %s', async (project) => {

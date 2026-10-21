@@ -7,7 +7,10 @@ function normalize(text: string): string {
   return text.replace(/\r\n/g, '\n').trim();
 }
 
-function isWelcome(source: string, welcomeTemplate: string | null): boolean {
+export function isWelcome(
+  source: string,
+  welcomeTemplate: string | null,
+): boolean {
   const current = normalize(source);
   if (welcomeTemplate !== null) {
     return current === normalize(welcomeTemplate);

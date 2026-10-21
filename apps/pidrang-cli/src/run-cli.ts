@@ -27,9 +27,10 @@ import {
 } from './write-plan';
 import { AppTooling, loadAppTooling } from './app-tooling';
 import { ConfigRequest, FileEdit, editAppConfig } from './edit-app-config';
-import { editAppRoutes } from './edit-app-routes';
+import { editAppRoutes, isNewApp } from './edit-app-routes';
 import { editAppHtml } from './edit-app-html';
 import { editAppSpec } from './edit-app-spec';
+import { entryRedirect } from './entry-redirect';
 import {
   addEnvironmentFileReplacements,
   environmentFiles,
@@ -211,6 +212,23 @@ async function collectPlan(
   }
   const plan = parseInitPlan(await readPlanFile(context.cwd, planPath));
   return runScriptedInit(context.providers, plan, context.env, options);
+}
+
+function printExistingAppNotice(
+  context: CliContext,
+  layout: AppLayout,
+  planned: string | null,
+): void {
+  if (planned === null) {
+    return;
+  }
+  context.out('');
+  context.out(
+    `The app already has its own pages and routes, so pidrang only added the resource routes to ${layout.routesFile}. To open the first generated page, add this route above the others:`,
+  );
+  context.out(
+    `  { path: '', pathMatch: 'full', redirectTo: '${planned}' },`,
+  );
 }
 
 function printDiff(
@@ -520,14 +538,21 @@ async function runInit(
     join(context.cwd, layout.routesFile),
     'utf8',
   );
+  const htmlPath = posix.join(layout.appDirectory, 'app.html');
+  const htmlSource = await readOptional(context.cwd, htmlPath);
+  const newApp = isNewApp(
+    tooling.typescript,
+    routesSource,
+    htmlSource,
+    tooling.welcomeTemplate,
+  );
   const routesEdit = editAppRoutes(
     tooling.typescript,
     layout.routesFile,
     routesSource,
     './resource-routes',
+    newApp ? entryRedirect(generation) : null,
   );
-  const htmlPath = posix.join(layout.appDirectory, 'app.html');
-  const htmlSource = await readOptional(context.cwd, htmlPath);
   const htmlEdit =
     htmlSource === null
       ? { kind: 'unchanged' as const }
@@ -588,6 +613,9 @@ async function runInit(
   const status = await writeFiles(context, { ...plan, edits: editPlan.edits });
   if (status !== EXIT_OK) {
     return status;
+  }
+  if (!newApp) {
+    printExistingAppNotice(context, layout, entryRedirect(generation));
   }
   const installPlan = await planInstall(context, generation.setup.packages);
   const installResult = await installPackages(
