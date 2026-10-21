@@ -71,6 +71,30 @@ export const routes: Routes = [];
 const NG_HTML = `<div class="welcome">Welcome</div>
 <router-outlet />`;
 
+const NG_SPEC_AFTER = `import { TestBed } from '@angular/core/testing';
+import { App } from './app';
+
+describe('App', () => {
+  it('should create the app', () => {
+    expect(TestBed.createComponent(App).componentInstance).toBeTruthy();
+  });
+});
+`;
+
+const NG_SPEC = NG_SPEC_AFTER.replace(
+  '\n});\n',
+  `
+
+  it('should render title', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, admin');
+  });
+});
+`,
+);
+
 const STRUCTURAL: AppTooling = {
   typescript,
   welcomeTemplate: NG_HTML,
@@ -360,6 +384,36 @@ describe('runCli', () => {
       }
       expect(err).toEqual([]);
     });
+
+    it.each([
+      ['replaces the welcome page', NG_HTML, NG_SPEC_AFTER],
+      [
+        'keeps a customized app.html',
+        '<main><router-outlet /></main>\n',
+        NG_SPEC,
+      ],
+    ])(
+      'edits the title test of app.spec.ts only when init %s',
+      async (_, html, expected) => {
+        await put({ 'src/app/app.html': html, 'src/app/app.spec.ts': NG_SPEC });
+        const plan = await planFile(PLAN);
+
+        expect(
+          await runCli(
+            ['init', '--plan', plan],
+            context(undefined, STRUCTURAL),
+          ),
+        ).toBe(0);
+
+        expect(await readFile(join(root, 'src/app/app.spec.ts'), 'utf8')).toBe(
+          expected,
+        );
+        expect(out.includes('Modified src/app/app.spec.ts')).toBe(
+          expected !== NG_SPEC,
+        );
+        expect(err).toEqual([]);
+      },
+    );
 
     it('keeps the environment files it finds and prints the values to add', async () => {
       await put({
