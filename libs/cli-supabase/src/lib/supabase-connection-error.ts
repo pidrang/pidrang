@@ -1,4 +1,7 @@
-export type SupabaseConnectionProblem = 'rejected-key' | 'graphql-disabled';
+export type SupabaseConnectionProblem =
+  | 'rejected-key'
+  | 'graphql-disabled'
+  | 'unreachable-url';
 
 export class SupabaseConnectionError extends Error {
   constructor(
@@ -51,4 +54,65 @@ export function graphQlDisabledError(
         'The pg_graphql extension is not enabled on this project. Enable it in the Supabase dashboard (Database, Extensions, pg_graphql), or use the service role key or the direct database connection.',
       )
     : null;
+}
+
+const PUBLISHABLE_KEY_PREFIX = 'sb_publishable_';
+
+function jwtRole(key: string): string | null {
+  const parts = key.split('.');
+  if (parts.length !== 3) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(
+      Buffer.from(parts[1], 'base64url').toString('utf8'),
+    ) as { role?: unknown };
+    return typeof payload.role === 'string' ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+export function publishableKeyError(
+  key: string,
+): SupabaseConnectionError | null {
+  return key.startsWith(PUBLISHABLE_KEY_PREFIX) || jwtRole(key) === 'anon'
+    ? new SupabaseConnectionError(
+        'rejected-key',
+        'This looks like the publishable (anon) key. Paste the secret (service role) key from Project Settings, API.',
+      )
+    : null;
+}
+
+export const SUPABASE_TIMEOUT_MS = 15000;
+
+interface NetworkFailure {
+  name?: unknown;
+  message?: unknown;
+  code?: unknown;
+  cause?: NetworkFailure;
+}
+
+function networkCause(error: unknown): string {
+  const failure = (error ?? {}) as NetworkFailure;
+  if (failure.name === 'TimeoutError') {
+    return `no answer after ${SUPABASE_TIMEOUT_MS / 1000} seconds`;
+  }
+  const cause = failure.cause ?? {};
+  for (const reason of [cause.code, cause.message, failure.message]) {
+    if (typeof reason === 'string' && reason !== '') {
+      return reason;
+    }
+  }
+  return 'network error';
+}
+
+export function unreachableUrlError(
+  url: string,
+  error: unknown,
+): SupabaseConnectionError {
+  return new SupabaseConnectionError(
+    'unreachable-url',
+    `Could not reach ${new URL(url).origin} (${networkCause(error)}). Check the project URL in Project Settings, API.`,
+  );
 }

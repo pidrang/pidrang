@@ -2,7 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { select, input, password, confirm } from '@inquirer/prompts';
 import { PlanEnvironment, SchemaProviderDefinition } from '@pidrang/cli';
 import { supabaseAppSetup } from './supabase-app-setup';
-import { PostgresSsl, SupabaseConnection } from './supabase-connection';
+import {
+  GraphQlConnection,
+  PostgresSsl,
+  ServiceRoleConnection,
+  SupabaseConnection,
+} from './supabase-connection';
 import { createSupabaseSchemaProvider } from './supabase-schema-provider';
 import { SupabaseConnectionError } from './supabase-connection-error';
 import {
@@ -26,9 +31,13 @@ function required(label: string): (value: string) => string | true {
   return (value) => requiredValueProblem(label, value) ?? true;
 }
 
-async function promptProjectUrl(): Promise<string> {
+async function promptProjectUrl(
+  previous: { url: string; rejection: SupabaseConnectionError } | null = null,
+): Promise<string> {
+  const message = 'Supabase project URL:';
   const url = await input({
-    message: 'Supabase project URL:',
+    message: previous ? `${previous.rejection.message}\n${message}` : message,
+    default: previous?.url,
     validate: (value) => projectUrlProblem(normalizeProjectUrl(value)) ?? true,
   });
   return normalizeProjectUrl(url);
@@ -61,61 +70,84 @@ async function connectionError(
   }
 }
 
+async function retryConnection<
+  T extends GraphQlConnection | ServiceRoleConnection,
+>(
+  first: T,
+  withNewKey: (connection: T, rejection: SupabaseConnectionError) => Promise<T>,
+): Promise<{ connection: T; rejection: SupabaseConnectionError | null }> {
+  let connection = first;
+  for (;;) {
+    const rejection = await connectionError(connection);
+    switch (rejection?.problem) {
+      case 'unreachable-url':
+        connection = {
+          ...connection,
+          url: await promptProjectUrl({ url: connection.url, rejection }),
+        };
+        break;
+      case 'rejected-key':
+        connection = await withNewKey(connection, rejection);
+        break;
+      default:
+        return { connection, rejection };
+    }
+  }
+}
+
 const SERVICE_ROLE_KEY_MESSAGE =
   'Service role (secret) key, from Project Settings, API. It is only used to read the schema and is never written to disk or into the app:';
+
+function promptServiceRoleKey(
+  rejection: SupabaseConnectionError | null,
+): Promise<string> {
+  return promptKey(SERVICE_ROLE_KEY_MESSAGE, 'The service role key', rejection);
+}
+
+function promptAnonKey(
+  rejection: SupabaseConnectionError | null,
+): Promise<string> {
+  return promptKey('Anon / publishable key:', 'The anon key', rejection);
+}
 
 async function promptServiceRoleConnection(
   url: string,
 ): Promise<SupabaseConnection> {
-  let rejection: SupabaseConnectionError | null = null;
-  for (;;) {
-    const serviceRoleKey = await promptKey(
-      SERVICE_ROLE_KEY_MESSAGE,
-      'The service role key',
-      rejection,
-    );
-    const connection: SupabaseConnection = {
+  const { connection } = await retryConnection<ServiceRoleConnection>(
+    {
       strategy: 'service-role',
       url,
-      serviceRoleKey,
-    };
-    rejection = await connectionError(connection);
-    if (rejection?.problem !== 'rejected-key') {
-      return connection;
-    }
-  }
+      serviceRoleKey: await promptServiceRoleKey(null),
+    },
+    async (current, rejection) => ({
+      ...current,
+      serviceRoleKey: await promptServiceRoleKey(rejection),
+    }),
+  );
+  return connection;
 }
 
 async function promptGraphQlConnection(
   url: string,
 ): Promise<SupabaseConnection> {
-  let rejection: SupabaseConnectionError | null = null;
-  for (;;) {
-    const anonKey = await promptKey(
-      'Anon / publishable key:',
-      'The anon key',
-      rejection,
-    );
-    const connection: SupabaseConnection = {
-      strategy: 'graphql',
-      url,
-      anonKey,
-    };
-    rejection = await connectionError(connection);
-    if (rejection === null) {
-      return connection;
-    }
-    if (rejection.problem === 'graphql-disabled') {
-      const fallBack = await confirm({
-        message: `${rejection.message}\nContinue with the service role (secret) key instead?`,
-        default: true,
-      });
-      if (!fallBack) {
-        throw rejection;
-      }
-      return promptServiceRoleConnection(url);
-    }
+  const { connection, rejection } = await retryConnection<GraphQlConnection>(
+    { strategy: 'graphql', url, anonKey: await promptAnonKey(null) },
+    async (current, rejection) => ({
+      ...current,
+      anonKey: await promptAnonKey(rejection),
+    }),
+  );
+  if (rejection === null) {
+    return connection;
   }
+  const fallBack = await confirm({
+    message: `${rejection.message}\nContinue with the service role (secret) key instead?`,
+    default: true,
+  });
+  if (!fallBack) {
+    throw rejection;
+  }
+  return promptServiceRoleConnection(connection.url);
 }
 
 async function promptPostgresConnection(

@@ -12,7 +12,11 @@ import {
 } from './service-role-field-type';
 import { assertPostgrestTableName } from './assert-postgrest-table-name';
 import { postgrestNameProblem } from './postgrest-name-problem';
-import { rejectedKeyError } from './supabase-connection-error';
+import {
+  publishableKeyError,
+  rejectedKeyError,
+} from './supabase-connection-error';
+import { supabaseFetch } from './supabase-fetch';
 
 interface OpenApiDefinition {
   properties?: Record<string, OpenApiProperty>;
@@ -33,7 +37,11 @@ const WRITE_METHODS: { action: CrudAction; method: string }[] = [
 async function fetchSchema(
   connection: ServiceRoleConnection,
 ): Promise<OpenApiSchema> {
-  const response = await fetch(`${connection.url}/rest/v1/`, {
+  const publishable = publishableKeyError(connection.serviceRoleKey);
+  if (publishable) {
+    throw publishable;
+  }
+  const response = await supabaseFetch(`${connection.url}/rest/v1/`, {
     headers: {
       apikey: connection.serviceRoleKey,
       Authorization: `Bearer ${connection.serviceRoleKey}`,

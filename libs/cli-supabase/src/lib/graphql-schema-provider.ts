@@ -12,6 +12,7 @@ import {
   graphQlDisabledError,
   rejectedKeyError,
 } from './supabase-connection-error';
+import { supabaseFetch } from './supabase-fetch';
 
 interface IntrospectionType {
   kind?: string;
@@ -96,7 +97,7 @@ async function runGraphQl<T>(
   query: string,
   variables?: Record<string, string>,
 ): Promise<T | undefined> {
-  const response = await fetch(`${connection.url}/graphql/v1`, {
+  const response = await supabaseFetch(`${connection.url}/graphql/v1`, {
     method: 'POST',
     headers: {
       apikey: connection.anonKey,
@@ -186,7 +187,7 @@ async function assertRestNames(
   columns: string[],
 ): Promise<void> {
   const select = columns.map((column) => `"${column}"`).join(',');
-  const response = await fetch(
+  const response = await supabaseFetch(
     `${connection.url}/rest/v1/${encodeURIComponent(table)}?select=${encodeURIComponent(select)}&limit=0`,
     { headers: { apikey: connection.anonKey } },
   );
