@@ -122,22 +122,22 @@ describe('createSupabaseSchemaProvider', () => {
       'Enter the project URL',
     ],
     [
-      'an empty anon key',
+      'an empty publishable key',
       {
         strategy: 'graphql',
         url: 'https://example.supabase.co',
         anonKey: '',
       },
-      'The anon key is required',
+      'The publishable key is required',
     ],
     [
-      'an empty service role key',
+      'an empty secret key',
       {
         strategy: 'service-role',
         url: 'https://example.supabase.co',
         serviceRoleKey: ' ',
       },
-      'The service role key is required',
+      'The secret key is required',
     ],
     [
       'a port that is not a number',

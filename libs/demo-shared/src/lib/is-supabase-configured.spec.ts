@@ -1,17 +1,17 @@
 import { isSupabaseConfigured } from './is-supabase-configured';
 
 describe('isSupabaseConfigured', () => {
-  it('returns true when both url and anonKey are set', () => {
+  it('returns true when both url and publishableKey are set', () => {
     expect(
-      isSupabaseConfigured('https://project.supabase.co', 'anon-key'),
+      isSupabaseConfigured('https://project.supabase.co', 'publishable-key'),
     ).toBe(true);
   });
 
   it('returns false when url is empty', () => {
-    expect(isSupabaseConfigured('', 'anon-key')).toBe(false);
+    expect(isSupabaseConfigured('', 'publishable-key')).toBe(false);
   });
 
-  it('returns false when anonKey is empty', () => {
+  it('returns false when publishableKey is empty', () => {
     expect(isSupabaseConfigured('https://project.supabase.co', '')).toBe(false);
   });
 

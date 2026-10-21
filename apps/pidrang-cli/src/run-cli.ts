@@ -168,6 +168,7 @@ async function collectPlan(
   const options = {
     takenRoutes: layout.takenRoutes,
     reportLeftOutColumns: context.out,
+    warn: context.err,
   };
   if (planPath === undefined) {
     return runInitWizard(context.providers, options);
@@ -266,7 +267,9 @@ function printInstructions(
       `Created ${report.environmentPath} and ${report.environmentDevelopmentPath}. Set the Supabase values there:`,
     );
     context.out(`  supabaseUrl: your project URL, from Project Settings, API`);
-    context.out(`  supabaseAnonKey: the anon (publishable) key of the project`);
+    context.out(
+      `  supabasePublishableKey: the publishable key of the project (sb_publishable_..., or the legacy anon key), from Project Settings, API Keys`,
+    );
   } else if (report.environmentLines.length > 0) {
     context.out('');
     context.out(`Add these lines to ${report.environmentPath}:`);

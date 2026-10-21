@@ -168,7 +168,7 @@ try {
     expect(
       help.status === 0 &&
         help.output.includes('--plan <file>') &&
-        help.output.includes('PIDRANG_SUPABASE_ANON_KEY'),
+        help.output.includes('PIDRANG_SUPABASE_PUBLISHABLE_KEY'),
       'the installed pidrang binary does not print its help',
       help.output,
     );
@@ -230,6 +230,7 @@ try {
     );
 
     const envWithoutKey = { ...process.env };
+    delete envWithoutKey.PIDRANG_SUPABASE_PUBLISHABLE_KEY;
     delete envWithoutKey.PIDRANG_SUPABASE_ANON_KEY;
     const scripted = execute(
       'init --plan without a key',
@@ -239,7 +240,7 @@ try {
     );
     expect(
       scripted.status === 1 &&
-        scripted.output.includes('set PIDRANG_SUPABASE_ANON_KEY'),
+        scripted.output.includes('set PIDRANG_SUPABASE_PUBLISHABLE_KEY'),
       'the installed pidrang binary does not refuse a plan without its key',
       scripted.output,
     );

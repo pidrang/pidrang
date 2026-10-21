@@ -63,7 +63,7 @@ function consumer(adapter, keys) {
       ? {
           env: {
             ...process.env,
-            PIDRANG_SUPABASE_SERVICE_ROLE_KEY: keys.serviceRoleKey,
+            PIDRANG_SUPABASE_SECRET_KEY: keys.serviceRoleKey,
           },
         }
       : undefined,

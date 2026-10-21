@@ -488,17 +488,46 @@ describe('createGraphQlSchemaProvider', () => {
     [{ message: 'Invalid API key' }],
     [{ message: 'No API key found in request' }],
   ])(
-    'reports %j as a rejected key, without the anon key in the message',
+    'reports %j as a rejected key, without the publishable key in the message',
     async (body) => {
       const error = await listTablesError(401, body);
       expect(error).toBeInstanceOf(SupabaseConnectionError);
       expect(error.problem).toBe('rejected-key');
       expect(error.message).toContain(
-        `Supabase refused the anon key (401: ${body.message})`,
+        `Supabase refused the publishable key (401: ${body.message})`,
       );
       expect(error.message).not.toContain('anon-key');
     },
   );
+
+  function jwt(payload: object): string {
+    const part = (value: object) =>
+      Buffer.from(JSON.stringify(value)).toString('base64url');
+    return `${part({ alg: 'HS256', typ: 'JWT' })}.${part(payload)}.signature`;
+  }
+
+  it.each([
+    ['a secret key', 'sb_secret_abc123'],
+    [
+      'a legacy service_role key',
+      jwt({ role: 'service_role', iss: 'supabase' }),
+    ],
+  ])('refuses %s before any request', async (_, key) => {
+    vi.stubGlobal('fetch', vi.fn());
+    const error = await createGraphQlSchemaProvider({
+      ...connection,
+      anonKey: key,
+    })
+      .listTables()
+      .catch((err) => err);
+    expect(error).toBeInstanceOf(SupabaseConnectionError);
+    expect(error.problem).toBe('rejected-key');
+    expect(error.message).toBe(
+      'This looks like the secret (service_role) key. Paste the publishable key (sb_publishable_..., or legacy anon key) from Project Settings, API Keys.',
+    );
+    expect(error.message).not.toContain(key);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
   it('reports a project URL it cannot reach', async () => {
     vi.stubGlobal(

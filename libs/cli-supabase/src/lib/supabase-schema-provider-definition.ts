@@ -95,19 +95,23 @@ async function retryConnection<
   }
 }
 
-const SERVICE_ROLE_KEY_MESSAGE =
-  'Service role (secret) key, from Project Settings, API. It is only used to read the schema and is never written to disk or into the app:';
+const SECRET_KEY_MESSAGE =
+  'Secret key (sb_secret_..., or legacy service_role key), from Project Settings, API Keys. It is only used to read the schema and is never written to disk or into the app:';
 
 function promptServiceRoleKey(
   rejection: SupabaseConnectionError | null,
 ): Promise<string> {
-  return promptKey(SERVICE_ROLE_KEY_MESSAGE, 'The service role key', rejection);
+  return promptKey(SECRET_KEY_MESSAGE, 'The secret key', rejection);
 }
 
 function promptAnonKey(
   rejection: SupabaseConnectionError | null,
 ): Promise<string> {
-  return promptKey('Anon / publishable key:', 'The anon key', rejection);
+  return promptKey(
+    'Publishable key (sb_publishable_..., or legacy anon key):',
+    'The publishable key',
+    rejection,
+  );
 }
 
 async function promptServiceRoleConnection(
@@ -141,7 +145,7 @@ async function promptGraphQlConnection(
     return connection;
   }
   const fallBack = await confirm({
-    message: `${rejection.message}\nContinue with the service role (secret) key instead?`,
+    message: `${rejection.message}\nContinue with the secret key instead?`,
     default: true,
   });
   if (!fallBack) {
@@ -217,18 +221,27 @@ async function promptPostgresConnection(
   };
 }
 
-const ENV_ANON_KEY = 'PIDRANG_SUPABASE_ANON_KEY';
-const ENV_SERVICE_ROLE_KEY = 'PIDRANG_SUPABASE_SERVICE_ROLE_KEY';
+const ENV_PUBLISHABLE_KEY = 'PIDRANG_SUPABASE_PUBLISHABLE_KEY';
+const ENV_SECRET_KEY = 'PIDRANG_SUPABASE_SECRET_KEY';
+const LEGACY_ENV_ANON_KEY = 'PIDRANG_SUPABASE_ANON_KEY';
+const LEGACY_ENV_SERVICE_ROLE_KEY = 'PIDRANG_SUPABASE_SERVICE_ROLE_KEY';
 const ENV_DATABASE_PASSWORD = 'PIDRANG_DATABASE_PASSWORD';
 
 const SECRETS_IN_ENV: Record<string, string> = {
-  anonKey: ENV_ANON_KEY,
-  serviceRoleKey: ENV_SERVICE_ROLE_KEY,
+  publishableKey: ENV_PUBLISHABLE_KEY,
+  anonKey: ENV_PUBLISHABLE_KEY,
+  secretKey: ENV_SECRET_KEY,
+  serviceRoleKey: ENV_SECRET_KEY,
   password: ENV_DATABASE_PASSWORD,
 };
 
-const PLAN_KEYS: Record<SupabaseConnection['strategy'], string[]> = {
+type PlanStrategy = 'graphql' | 'secret-key' | 'service-role' | 'postgres';
+
+const LEGACY_SECRET_KEY_STRATEGY = 'service-role';
+
+const PLAN_KEYS: Record<PlanStrategy, string[]> = {
   graphql: ['strategy', 'url'],
+  'secret-key': ['strategy', 'url'],
   'service-role': ['strategy', 'url'],
   postgres: [
     'strategy',
@@ -244,9 +257,9 @@ const PLAN_KEYS: Record<SupabaseConnection['strategy'], string[]> = {
 
 const PLAN_HELP = `Supabase plan connection, one of:
   { "strategy": "graphql", "url": "https://<ref>.supabase.co" }
-      key from ${ENV_ANON_KEY}
-  { "strategy": "service-role", "url": "https://<ref>.supabase.co" }
-      key from ${ENV_SERVICE_ROLE_KEY}
+      publishable key from ${ENV_PUBLISHABLE_KEY}
+  { "strategy": "secret-key", "url": "https://<ref>.supabase.co" }
+      secret key from ${ENV_SECRET_KEY}
   { "strategy": "postgres", "host": "db.<ref>.supabase.co", "port": 5432,
     "database": "postgres", "user": "postgres", "tls": true,
     "caCertificatePath": "prod-ca.crt", "url": "https://<ref>.supabase.co" }
@@ -254,7 +267,9 @@ const PLAN_HELP = `Supabase plan connection, one of:
       caCertificatePath and url are optional, tls defaults to on for a remote
       host, a relative caCertificatePath is read from the current folder, not
       from the folder of the plan file, and url fills supabaseUrl in the app
-      when the host does not name the project`;
+      when the host does not name the project
+  The legacy names still work and print a warning: "service-role" for
+  "secret-key", ${LEGACY_ENV_ANON_KEY} and ${LEGACY_ENV_SERVICE_ROLE_KEY}.`;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -264,16 +279,24 @@ function invalidPlanConnection(problems: string[]): Error {
   return new Error(`Invalid connection in the plan: ${problems.join('; ')}.`);
 }
 
-function secretFromEnv(
+function keyFromEnv(
   env: PlanEnvironment,
   name: string,
+  legacyName: string,
   problems: string[],
+  warn: (message: string) => void,
 ): string {
   const value = env[name]?.trim() ?? '';
-  if (value === '') {
-    problems.push(`set ${name}`);
+  if (value !== '') {
+    return value;
   }
-  return value;
+  const legacyValue = env[legacyName]?.trim() ?? '';
+  if (legacyValue === '') {
+    problems.push(`set ${name}`);
+    return '';
+  }
+  warn(`${legacyName} is deprecated, set ${name} instead.`);
+  return legacyValue;
 }
 
 function planUrl(
@@ -356,22 +379,28 @@ async function planSsl(
   return { ca: await readCaCertificate(caPath.trim()) };
 }
 
+function isPlanStrategy(value: unknown): value is PlanStrategy {
+  return typeof value === 'string' && Object.keys(PLAN_KEYS).includes(value);
+}
+
 async function connectionFromPlan(
   connection: unknown,
   env: PlanEnvironment,
+  warn: (message: string) => void = () => undefined,
 ): Promise<SupabaseConnection> {
   if (!isObject(connection)) {
     throw invalidPlanConnection(['connection must be an object']);
   }
   const strategy = connection['strategy'];
-  if (
-    strategy !== 'graphql' &&
-    strategy !== 'service-role' &&
-    strategy !== 'postgres'
-  ) {
+  if (!isPlanStrategy(strategy)) {
     throw invalidPlanConnection([
-      'strategy must be "graphql", "service-role" or "postgres"',
+      'strategy must be "graphql", "secret-key" or "postgres"',
     ]);
+  }
+  if (strategy === LEGACY_SECRET_KEY_STRATEGY) {
+    warn(
+      `The "${LEGACY_SECRET_KEY_STRATEGY}" strategy is deprecated, use "secret-key" instead.`,
+    );
   }
   const problems = Object.keys(connection)
     .filter((key) => !PLAN_KEYS[strategy].includes(key))
@@ -384,19 +413,32 @@ async function connectionFromPlan(
   switch (strategy) {
     case 'graphql': {
       const url = planUrl(connection, problems);
-      const anonKey = secretFromEnv(env, ENV_ANON_KEY, problems);
+      const anonKey = keyFromEnv(
+        env,
+        ENV_PUBLISHABLE_KEY,
+        LEGACY_ENV_ANON_KEY,
+        problems,
+        warn,
+      );
       if (problems.length > 0) {
         throw invalidPlanConnection(problems);
       }
       return { strategy, url, anonKey };
     }
+    case 'secret-key':
     case 'service-role': {
       const url = planUrl(connection, problems);
-      const serviceRoleKey = secretFromEnv(env, ENV_SERVICE_ROLE_KEY, problems);
+      const serviceRoleKey = keyFromEnv(
+        env,
+        ENV_SECRET_KEY,
+        LEGACY_ENV_SERVICE_ROLE_KEY,
+        problems,
+        warn,
+      );
       if (problems.length > 0) {
         throw invalidPlanConnection(problems);
       }
-      return { strategy, url, serviceRoleKey };
+      return { strategy: 'service-role', url, serviceRoleKey };
     }
     case 'postgres': {
       const host = planText(connection, 'host', null, problems);
@@ -442,7 +484,7 @@ export const supabaseSchemaProviderDefinition: SchemaProviderDefinition<Supabase
         default: 'service-role',
         choices: [
           {
-            name: 'Service role (secret) key, from the same dashboard page as the URL',
+            name: 'Secret key (sb_secret_..., or legacy service_role key), from Project Settings, API Keys',
             value: 'service-role',
           },
           {
@@ -450,7 +492,7 @@ export const supabaseSchemaProviderDefinition: SchemaProviderDefinition<Supabase
             value: 'postgres',
           },
           {
-            name: 'GraphQL with the anon key (requires pg_graphql)',
+            name: 'GraphQL with the publishable key (requires pg_graphql)',
             value: 'graphql',
           },
         ],
