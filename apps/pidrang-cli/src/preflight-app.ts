@@ -3,6 +3,7 @@ import { join, posix } from 'node:path';
 
 export interface AppLayout {
   project: string;
+  projectName: string;
   sourceRoot: string;
   appDirectory: string;
   routesFile: string;
@@ -74,6 +75,15 @@ function chooseProject(
     ]);
   }
   return applications[0];
+}
+
+export function displayName(name: string): string {
+  const words = name.split(/[-_]+/).filter((word) => word !== '');
+  return words
+    .map((word, index) =>
+      index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word,
+    )
+    .join(' ');
 }
 
 function sourceRootOf(project: Record<string, unknown>): string | null {
@@ -182,6 +192,7 @@ export async function preflightApp(
 
   return {
     project,
+    projectName: displayName(project),
     sourceRoot,
     appDirectory,
     routesFile,
