@@ -174,7 +174,7 @@ A table named like a route the app declares (`login`) is refused like `resource-
 
 ### `pidrang init` wires the app itself
 
-`apps/pidrang-cli/src/edit-app-config.ts`, `edit-app-routes.ts`, `edit-app-html.ts`, `edit-environments.ts`, `libs/cli/src/lib/app-setup.ts`, `libs/cli-supabase/src/lib/supabase-app-setup.ts`
+`apps/pidrang-cli/src/edit-app-config.ts`, `edit-app-routes.ts`, `edit-app-html.ts`, `edit-app-spec.ts`, `edit-environments.ts`, `libs/cli/src/lib/app-setup.ts`, `libs/cli-supabase/src/lib/supabase-app-setup.ts`
 
 The first version printed the snippets to paste into `app.config.ts`, `app.routes.ts` and `app.html`. #107 sets the acceptance rule at "no manual edit except in `environment.xxx.ts`", and a printed snippet fails that on every app: a missed paste, a `provideRouter(routes)` line left as it was, or `...resourceRoutes` put below a `**` route breaks every generated page without an error of its own. Init now edits the three files.
 
@@ -183,6 +183,8 @@ Each provider returns an `AppSetup` (imports, constants, the properties of `prov
 The edits go through the app's own `typescript`: init resolves it from the app, so the parser matches the app's syntax, and it changes ranges in the syntax tree rather than matching text with regular expressions. Positions are what make the edit idempotent: a second run finds the import, the constant and the provider already there and reports the file unchanged instead of adding a second copy. `withComponentInputBinding()` is added to the single existing `provideRouter(...)` call and keeps its other features.
 
 Some files cannot be edited safely: no `typescript` installed next to the app, a `providers` array built at run time, several configs and none named `appConfig`, a name already used for something else in the file, `app.html` customized with no router outlet. Init then leaves the content alone and prepends a comment (`// pidrang:` in TypeScript, `<!-- pidrang:` in HTML) listing the imports, the constant, the `provideRouter` line and the provider call to write. A later run strips and rebuilds that block, so comments never accumulate.
+
+Replacing the welcome template breaks the `should render title` test of the `app.spec.ts` that `ng new` writes: it reads the welcome `h1`, which is gone, so a fresh app would fail `ng test` right after init. Init therefore removes that test, and only when it has just replaced the welcome template, so a spec is never touched in an app whose `app.html` it left alone. It recognizes the test by its title and by its `querySelector('h1')` call. Another test that reads the `h1` is the user's own: init keeps it and lists it in a `// pidrang:` comment instead of deleting it.
 
 Environment files are created only when the app has neither `environment.ts` nor `environment.development.ts`: an existing file may hold values or exports init must not overwrite, so init prints the missing lines instead. The two created files carry the same content, and the development one is added to `fileReplacements` of every build configuration except the default one, mirroring the Angular environment schematic.
 

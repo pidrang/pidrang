@@ -28,6 +28,7 @@ import { AppTooling, loadAppTooling } from './app-tooling';
 import { ConfigRequest, FileEdit, editAppConfig } from './edit-app-config';
 import { editAppRoutes } from './edit-app-routes';
 import { editAppHtml } from './edit-app-html';
+import { editAppSpec } from './edit-app-spec';
 import {
   addEnvironmentFileReplacements,
   environmentFiles,
@@ -77,8 +78,9 @@ function usage(providers: SchemaProviderDefinition[]): string {
     ...providers.map((provider) => provider.planHelp),
     '',
     'It writes the resources, pages, helpers and resource routes, and it edits app.config.ts,',
-    'app.routes.ts and app.html. It also creates src/environments when the app has none. A file',
-    'it writes is never overwritten: one that already exists with other content stops init before',
+    'app.routes.ts and app.html. When it replaces the welcome page, it also removes the welcome',
+    'title test of app.spec.ts. It creates src/environments when the app has none. A file it',
+    'writes is never overwritten: one that already exists with other content stops init before',
     'any write. When a file cannot be edited safely, init adds a "pidrang:" comment that lists the',
     'exact change to make.',
     '',
@@ -366,12 +368,25 @@ async function runInit(
       ? { kind: 'unchanged' as const }
       : editAppHtml(htmlPath, htmlSource, tooling.welcomeTemplate);
 
+  const specPath = posix.join(layout.appDirectory, 'app.spec.ts');
+  const specSource =
+    htmlEdit.kind === 'edited'
+      ? await readOptional(context.cwd, specPath)
+      : null;
+
   const candidates: FileEditPlan[] = [
     ...editCandidate(layout.configFile, configSource, configEdit),
     ...editCandidate(layout.routesFile, routesSource, routesEdit),
     ...(htmlSource === null
       ? []
       : editCandidate(htmlPath, htmlSource, htmlEdit)),
+    ...(specSource === null
+      ? []
+      : editCandidate(
+          specPath,
+          specSource,
+          editAppSpec(tooling.typescript, specPath, specSource),
+        )),
   ];
 
   if (createdEnvironment) {
