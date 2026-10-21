@@ -6,7 +6,7 @@ This guide takes a new Angular app to a working admin panel backed by Supabase: 
 
 - An Angular 22 application using standalone APIs and the router (`ng new my-admin`).
 - A Supabase project with at least one table that has an `id` primary key column. Pidrang assumes `id` on every table; composite or differently named keys are not supported.
-- The project URL and the anon (publishable) key, found in the Supabase dashboard under Project Settings, API.
+- The project URL and the publishable key (formerly anon, `sb_publishable_...`), found in the Supabase dashboard under Project Settings, API Keys.
 
 ## 1. Install
 
@@ -62,7 +62,7 @@ import { createClient } from '@supabase/supabase-js';
 import { appRoutes } from './app.routes';
 import { resources } from './resources';
 
-const client = createClient('https://YOUR-PROJECT.supabase.co', 'YOUR-ANON-KEY');
+const client = createClient('https://YOUR-PROJECT.supabase.co', 'YOUR-PUBLISHABLE-KEY');
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -269,7 +269,7 @@ Run `pidrang init` from the root of an Angular 22.1 (or later 22.x) standalone a
 
 When a table has a `created_at` column of type `timestamp` or `date`, even a hidden one, the generated `Resource` gets `defaultSorters` with `created_at` descending, then `id`, so a new row shows on the first page. Other tables are sorted by `id`.
 
-It asks for the project URL first, then how to read your table definitions. The default is the service role (secret) key, on the same dashboard page as the URL (Project Settings, API): it is only used to read the schema and is never written to disk or into the app. The other choices are a direct database connection and GraphQL with the anon key, which requires the `pg_graphql` extension (not enabled on a new project). A key Supabase refuses is asked again, and when `pg_graphql` is off the wizard offers to continue with the service role key.
+It asks for the project URL first, then how to read your table definitions. The default is the secret key (formerly service role, `sb_secret_...`; the legacy `service_role` key still works), from Project Settings, API Keys: it is only used to read the schema and is never written to disk or into the app. The other choices are a direct database connection and GraphQL with the publishable key (formerly anon), which requires the `pg_graphql` extension (not enabled on a new project). A key Supabase refuses is asked again, and so is a publishable key given where the secret key is expected or the other way round. When `pg_graphql` is off the wizard offers to continue with the secret key.
 
 It also wires the app itself, so nothing has to be pasted by hand:
 
@@ -277,24 +277,24 @@ It also wires the app itself, so nothing has to be pasted by hand:
 - `app.routes.ts`: adds `import { resourceRoutes } from './resource-routes';` and `...resourceRoutes` at the top of the `routes` array, above any `**` route. Your own fixed paths such as a sign-in page still work: the resource routes skip a name that is not a resource.
 - `app.html`: replaces the welcome template `ng new` writes with `<router-outlet />`, so the routes have somewhere to render. A template you already changed is left alone; if it has no router outlet, init adds the `pidrang` comment described below.
 - `app.spec.ts`: when init replaces the welcome template, it also removes the `should render title` test `ng new` writes, which reads the welcome `h1` and would make `ng test` fail. Another test that reads that `h1` is left in place, and init lists it in a `pidrang` comment.
-- `src/environments/environment.ts` and `environment.development.ts`: created when the app has neither, with a `supabaseUrl` and a `supabaseAnonKey` placeholder, plus the development file replacement in `angular.json`. When an environment file already exists, the missing lines are printed instead and you add them there.
+- `src/environments/environment.ts` and `environment.development.ts`: created when the app has neither, with a `supabaseUrl` and a `supabasePublishableKey` placeholder, plus the development file replacement in `angular.json`. When an environment file already exists, the missing lines are printed instead and you add them there.
 
-The anon key is always written as a placeholder: put your project URL and anon (publishable) key in the environment file. Init never writes the database password or the service role key into the app, and the app runs in the browser, so it must only ever get the anon key.
+The publishable key is always written as a placeholder: put your project URL and publishable key (formerly anon) in the environment file. Init never writes the database password or the secret key into the app, and the app runs in the browser, so it must only ever get the publishable key.
 
 It checks everything before writing anything. A folder it does not recognize, a table named like one of your routes, or an invalid answer stops it with nothing written. It never overwrites a file: when one it would write already exists with other content, it lists every such file and writes nothing at all. A file that already matches is left as it is, so running it again with the same answers is harmless. Edits are made on the syntax tree, not by text replacement, and a file that already has what init would add is left untouched. When a file cannot be edited safely (no `typescript` installed next to the app, a `providers` array built at run time, several application configs), init adds a comment that starts with `// pidrang:` (or `<!-- pidrang:` in `app.html`) at the top of the file, listing the exact change to make, and writes nothing else in it. `pidrang --help` lists the options.
 
-To run it without questions, for example in CI, put the answers in a plan file and pass the credentials as environment variables (`PIDRANG_SUPABASE_ANON_KEY`, `PIDRANG_SUPABASE_SERVICE_ROLE_KEY` or `PIDRANG_DATABASE_PASSWORD`, depending on the strategy); a credential written in the file is refused:
+To run it without questions, for example in CI, put the answers in a plan file and pass the credentials as environment variables (`PIDRANG_SUPABASE_PUBLISHABLE_KEY`, `PIDRANG_SUPABASE_SECRET_KEY` or `PIDRANG_DATABASE_PASSWORD`, depending on the strategy); a credential written in the file is refused. The names of 0.1.0 still work and print a deprecation warning: `PIDRANG_SUPABASE_ANON_KEY`, `PIDRANG_SUPABASE_SERVICE_ROLE_KEY` and the `service-role` strategy. When both names of a key are set, the new one wins:
 
 ```json
 {
   "provider": "supabase",
-  "connection": { "strategy": "service-role", "url": "https://abcdefgh.supabase.co" },
+  "connection": { "strategy": "secret-key", "url": "https://abcdefgh.supabase.co" },
   "tables": [{ "table": "products", "actions": ["list", "create", "show", "edit", "delete"], "hiddenFields": ["created_at"] }]
 }
 ```
 
 ```sh
-PIDRANG_SUPABASE_SERVICE_ROLE_KEY=<your service role key> npx pidrang init --plan plan.json
+PIDRANG_SUPABASE_SECRET_KEY=<your secret key> npx pidrang init --plan plan.json
 ```
 
 The same answers give the same files as the questions. It exits with `0` when done or when there is nothing to write, `1` on an invalid plan, an unsupported app or a file in the way, and `130` when cancelled.
@@ -317,11 +317,11 @@ The URL changes but a page stays blank: `provideRouter` has no `withComponentInp
 
 `/products` opens the not-found route: `...resourceRoutes` is missing from `routes`, or sits below a `**` route, which matches everything. It belongs at the top of the array, with your fixed paths after it.
 
-The table is empty: the table has no rows, or Row Level Security hides them from the anon key. Reads are public on the demo schema, but your own project decides that per table.
+The table is empty: the table has no rows, or Row Level Security hides them from the publishable key. Reads are public on the demo schema, but your own project decides that per table.
 
 Saving says you may need to sign in, or returns a permission error: writes need an authenticated user. Sign in with a Supabase user of the project; the generated pages say "You may need to sign in" as plain text until you call `provideSignInPath`, above.
 
-Requests fail with an invalid API key or do not reach Supabase: `supabaseUrl` and `supabaseAnonKey` in `src/environments/environment.ts` are still the placeholders, point to another project, or hold a key that was rotated. Both values are in your project's Project Settings, API page; use the anon (publishable) key, never the service role key or the database password.
+Requests fail with an invalid API key or do not reach Supabase: `supabaseUrl` and `supabasePublishableKey` in `src/environments/environment.ts` are still the placeholders, point to another project, or hold a key that was rotated. Both values are in your project's Project Settings; use the publishable key (formerly anon), never the secret key or the database password.
 
 ## Next steps
 

@@ -10,9 +10,9 @@ import {
 const ENTRIES = [
   { name: 'supabaseUrl', value: 'https://abc.supabase.co' },
   {
-    name: 'supabaseAnonKey',
-    value: 'YOUR-ANON-KEY',
-    hint: 'the anon key',
+    name: 'supabasePublishableKey',
+    value: 'YOUR-PUBLISHABLE-KEY',
+    hint: 'the publishable key',
   },
 ];
 
@@ -20,7 +20,7 @@ describe('environment files', () => {
   it('writes one typed object with both values', () => {
     expect(environmentFileContent(ENTRIES)).toBe(`export const environment = {
   supabaseUrl: 'https://abc.supabase.co',
-  supabaseAnonKey: 'YOUR-ANON-KEY',
+  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY',
 };
 `);
   });
@@ -66,18 +66,20 @@ describe('environment files', () => {
       environmentLines(ENTRIES, 'export const environment = {};\n'),
     ).toEqual([
       "  supabaseUrl: 'https://abc.supabase.co',",
-      "  supabaseAnonKey: 'YOUR-ANON-KEY', // the anon key",
+      "  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY', // the publishable key",
     ]);
     expect(
       environmentLines(
         ENTRIES,
         "export const environment = { supabaseUrl: 'x' };\n",
       ),
-    ).toEqual(["  supabaseAnonKey: 'YOUR-ANON-KEY', // the anon key"]);
+    ).toEqual([
+      "  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY', // the publishable key",
+    ]);
     expect(
       environmentLines(
         ENTRIES,
-        "export const environment = { supabaseUrl: 'x', supabaseAnonKey: 'y' };\n",
+        "export const environment = { supabaseUrl: 'x', supabasePublishableKey: 'y' };\n",
       ),
     ).toEqual([]);
   });

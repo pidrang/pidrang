@@ -65,7 +65,7 @@ import { providePidrang } from '@pidrang/core';
 import { provideSupabaseDataProvider } from '@pidrang/supabase';
 import { createClient } from '@supabase/supabase-js';
 
-const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 export const appConfig = {
   providers: [

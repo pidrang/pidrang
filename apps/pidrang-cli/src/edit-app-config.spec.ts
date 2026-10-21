@@ -11,7 +11,7 @@ const SETUP: AppSetup = {
     {
       name: 'client',
       initializer:
-        'createClient(environment.supabaseUrl, environment.supabaseAnonKey)',
+        'createClient(environment.supabaseUrl, environment.supabasePublishableKey)',
     },
   ],
   pidrangConfig: [
@@ -62,7 +62,7 @@ import { routes } from './app.routes';
 import { environment } from '../environments/environment';
 import { resources } from './resources';
 
-const client = createClient(environment.supabaseUrl, environment.supabaseAnonKey);
+const client = createClient(environment.supabaseUrl, environment.supabasePublishableKey);
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -175,7 +175,7 @@ const client = 'something else';`,
 
     expect(result).not.toContain('environments/environment');
     expect(result).toContain(
-      'createClient(environment.supabaseUrl, environment.supabaseAnonKey)',
+      'createClient(environment.supabaseUrl, environment.supabasePublishableKey)',
     );
   });
 

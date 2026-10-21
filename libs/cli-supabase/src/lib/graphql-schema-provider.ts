@@ -11,6 +11,7 @@ import { postgrestNameProblem } from './postgrest-name-problem';
 import {
   graphQlDisabledError,
   rejectedKeyError,
+  secretKeyError,
 } from './supabase-connection-error';
 import { supabaseFetch } from './supabase-fetch';
 
@@ -97,6 +98,10 @@ async function runGraphQl<T>(
   query: string,
   variables?: Record<string, string>,
 ): Promise<T | undefined> {
+  const secret = secretKeyError(connection.anonKey);
+  if (secret) {
+    throw secret;
+  }
   const response = await supabaseFetch(`${connection.url}/graphql/v1`, {
     method: 'POST',
     headers: {
@@ -108,7 +113,7 @@ async function runGraphQl<T>(
   const body = (await response.json().catch(() => ({}))) as GraphQlResponse<T>;
   const problem =
     graphQlDisabledError(body) ??
-    rejectedKeyError('anon key', response.status, body);
+    rejectedKeyError('publishable key', response.status, body);
   if (problem) {
     throw problem;
   }

@@ -34,7 +34,7 @@ export function rejectedKeyError(
   }
   return new SupabaseConnectionError(
     'rejected-key',
-    `Supabase refused the ${keyLabel} (${status}${message ? `: ${message}` : ''}). Copy it again from the Supabase dashboard: Project Settings, API.`,
+    `Supabase refused the ${keyLabel} (${status}${message ? `: ${message}` : ''}). Copy it again from the Supabase dashboard: Project Settings, API Keys.`,
   );
 }
 
@@ -51,12 +51,13 @@ export function graphQlDisabledError(
   return disabled
     ? new SupabaseConnectionError(
         'graphql-disabled',
-        'The pg_graphql extension is not enabled on this project. Enable it in the Supabase dashboard (Database, Extensions, pg_graphql), or use the service role key or the direct database connection.',
+        'The pg_graphql extension is not enabled on this project. Enable it in the Supabase dashboard (Database, Extensions, pg_graphql), or use the secret key or the direct database connection.',
       )
     : null;
 }
 
 const PUBLISHABLE_KEY_PREFIX = 'sb_publishable_';
+const SECRET_KEY_PREFIX = 'sb_secret_';
 
 function jwtRole(key: string): string | null {
   const parts = key.split('.');
@@ -79,7 +80,16 @@ export function publishableKeyError(
   return key.startsWith(PUBLISHABLE_KEY_PREFIX) || jwtRole(key) === 'anon'
     ? new SupabaseConnectionError(
         'rejected-key',
-        'This looks like the publishable (anon) key. Paste the secret (service role) key from Project Settings, API.',
+        'This looks like the publishable (anon) key. Paste the secret key (sb_secret_..., or legacy service_role key) from Project Settings, API Keys.',
+      )
+    : null;
+}
+
+export function secretKeyError(key: string): SupabaseConnectionError | null {
+  return key.startsWith(SECRET_KEY_PREFIX) || jwtRole(key) === 'service_role'
+    ? new SupabaseConnectionError(
+        'rejected-key',
+        'This looks like the secret (service_role) key. Paste the publishable key (sb_publishable_..., or legacy anon key) from Project Settings, API Keys.',
       )
     : null;
 }

@@ -35,11 +35,14 @@ export function demoAppConfig(
   ];
 
   if (
-    isSupabaseConfigured(environment.supabaseUrl, environment.supabaseAnonKey)
+    isSupabaseConfigured(
+      environment.supabaseUrl,
+      environment.supabasePublishableKey,
+    )
   ) {
     const supabaseClient = createClient(
       environment.supabaseUrl,
-      environment.supabaseAnonKey,
+      environment.supabasePublishableKey,
     );
 
     providers.push(

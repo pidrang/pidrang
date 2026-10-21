@@ -1,5 +1,5 @@
 import {
-  ANON_KEY_PLACEHOLDER,
+  PUBLISHABLE_KEY_PLACEHOLDER,
   PROJECT_URL_PLACEHOLDER,
   supabaseAppSetup,
 } from './supabase-app-setup';
@@ -105,16 +105,16 @@ describe('supabaseAppSetup', () => {
     },
     postgres('db.abc.supabase.co'),
   ])(
-    'leaves the anon key as a placeholder and writes no credential for $strategy',
+    'leaves the publishable key as a placeholder and writes no credential for $strategy',
     (connection) => {
       const setup = supabaseAppSetup(connection);
 
       expect(setup.environment[1]).toMatchObject({
-        name: 'supabaseAnonKey',
-        value: ANON_KEY_PLACEHOLDER,
+        name: 'supabasePublishableKey',
+        value: PUBLISHABLE_KEY_PLACEHOLDER,
       });
       expect(JSON.stringify(setup)).not.toContain(SECRET);
-      expect(setup.notes.join(' ')).toContain('never the service role key');
+      expect(setup.notes.join(' ')).toContain('never the secret key');
     },
   );
 
@@ -125,7 +125,7 @@ describe('supabaseAppSetup', () => {
       {
         name: 'client',
         initializer:
-          'createClient(environment.supabaseUrl, environment.supabaseAnonKey)',
+          'createClient(environment.supabaseUrl, environment.supabasePublishableKey)',
       },
     ]);
     expect(setup.pidrangConfig).toEqual([

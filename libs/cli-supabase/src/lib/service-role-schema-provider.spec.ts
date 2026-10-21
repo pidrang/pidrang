@@ -327,7 +327,7 @@ describe('createServiceRoleSchemaProvider', () => {
         .catch((err) => err);
       expect(error).toBeInstanceOf(SupabaseConnectionError);
       expect(error.problem).toBe('rejected-key');
-      expect(error.message).toContain('Supabase refused the service role key');
+      expect(error.message).toContain('Supabase refused the secret key');
     },
   );
 
@@ -386,7 +386,7 @@ describe('createServiceRoleSchemaProvider', () => {
       expect(error).toBeInstanceOf(SupabaseConnectionError);
       expect(error.problem).toBe('rejected-key');
       expect(error.message).toBe(
-        'This looks like the publishable (anon) key. Paste the secret (service role) key from Project Settings, API.',
+        'This looks like the publishable (anon) key. Paste the secret key (sb_secret_..., or legacy service_role key) from Project Settings, API Keys.',
       );
       expect(error.message).not.toContain(key);
       expect(fetch).not.toHaveBeenCalled();

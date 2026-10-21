@@ -42,14 +42,14 @@ describe('supabaseSchemaProviderDefinition', () => {
 
   const rejectedKey = new SupabaseConnectionError(
     'rejected-key',
-    'Supabase refused the service role key (401: Invalid API key).',
+    'Supabase refused the secret key (401: Invalid API key).',
   );
   const graphQlDisabled = new SupabaseConnectionError(
     'graphql-disabled',
     'The pg_graphql extension is not enabled on this project.',
   );
 
-  it('asks the project URL first, then offers the service role key by default', async () => {
+  it('asks the project URL first, then offers the secret key by default', async () => {
     vi.mocked(input).mockResolvedValueOnce(URL);
     vi.mocked(select).mockResolvedValue('service-role');
     vi.mocked(password).mockResolvedValueOnce('secret-key');
@@ -72,7 +72,12 @@ describe('supabaseSchemaProviderDefinition', () => {
       'postgres',
       'graphql',
     ]);
-    expect(strategy.choices[2].name).toContain('requires pg_graphql');
+    expect(strategy.choices[0].name).toContain(
+      'Secret key (sb_secret_..., or legacy service_role key)',
+    );
+    expect(strategy.choices[2].name).toBe(
+      'GraphQL with the publishable key (requires pg_graphql)',
+    );
   });
 
   it('prompts service-role-specific questions and says the key is never written', async () => {
@@ -83,6 +88,9 @@ describe('supabaseSchemaProviderDefinition', () => {
     const connection =
       await supabaseSchemaProviderDefinition.promptConnection();
 
+    expect(messageOf(password, 0)).toMatch(
+      /^Secret key \(sb_secret_\.\.\., or legacy service_role key\), from Project Settings, API Keys\./,
+    );
     expect(messageOf(password, 0)).toContain(
       'only used to read the schema and is never written to disk or into the app',
     );
@@ -103,6 +111,9 @@ describe('supabaseSchemaProviderDefinition', () => {
     const connection =
       await supabaseSchemaProviderDefinition.promptConnection();
 
+    expect(messageOf(password, 0)).toBe(
+      'Publishable key (sb_publishable_..., or legacy anon key):',
+    );
     expect(connection).toEqual({
       strategy: 'graphql',
       url: URL,
@@ -163,7 +174,7 @@ describe('supabaseSchemaProviderDefinition', () => {
     },
   );
 
-  it('offers the service role key, keeping the URL, when pg_graphql is not enabled', async () => {
+  it('offers the secret key, keeping the URL, when pg_graphql is not enabled', async () => {
     vi.mocked(input).mockResolvedValueOnce(URL);
     vi.mocked(select).mockResolvedValue('graphql');
     vi.mocked(password)
@@ -180,7 +191,7 @@ describe('supabaseSchemaProviderDefinition', () => {
       default: boolean;
     };
     expect(offer.message).toContain(graphQlDisabled.message);
-    expect(offer.message).toContain('service role (secret) key instead?');
+    expect(offer.message).toContain('Continue with the secret key instead?');
     expect(offer.default).toBe(true);
     expect(input).toHaveBeenCalledTimes(1);
     expect(connection).toEqual({
@@ -388,7 +399,7 @@ describe('supabaseSchemaProviderDefinition', () => {
     expect(url('https://user:pw@example.supabase.co')).toContain('credentials');
     const key = validatorOf(password, 0);
     expect(key('anon-key')).toBe(true);
-    expect(key('  ')).toBe('The anon key is required');
+    expect(key('  ')).toBe('The publishable key is required');
   });
 
   it('validates the database host, port, name and user', async () => {
@@ -439,27 +450,120 @@ describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
   });
 
   it.each([
-    ['graphql', 'PIDRANG_SUPABASE_ANON_KEY', 'anonKey'],
-    ['service-role', 'PIDRANG_SUPABASE_SERVICE_ROLE_KEY', 'serviceRoleKey'],
+    ['graphql', 'PIDRANG_SUPABASE_PUBLISHABLE_KEY', 'graphql', 'anonKey'],
+    [
+      'secret-key',
+      'PIDRANG_SUPABASE_SECRET_KEY',
+      'service-role',
+      'serviceRoleKey',
+    ],
   ])(
-    'reads a %s key from %s and normalizes the URL like the prompt',
-    async (strategy, envName, keyName) => {
+    'reads a %s key from %s and normalizes the URL like the prompt, without a warning',
+    async (strategy, envName, connectionStrategy, keyName) => {
+      const warn = vi.fn();
       expect(
-        await fromPlan(
+        await supabaseSchemaProviderDefinition.connectionFromPlan(
           { strategy, url: ' https://example.supabase.co// ' },
           { [envName]: '  pasted-key\n' },
+          warn,
         ),
       ).toEqual({
-        strategy,
+        strategy: connectionStrategy,
         url: 'https://example.supabase.co',
         [keyName]: 'pasted-key',
       });
+      expect(warn).not.toHaveBeenCalled();
     },
   );
 
   it.each([
-    ['graphql', 'PIDRANG_SUPABASE_ANON_KEY'],
-    ['service-role', 'PIDRANG_SUPABASE_SERVICE_ROLE_KEY'],
+    [
+      'graphql',
+      'PIDRANG_SUPABASE_ANON_KEY',
+      'PIDRANG_SUPABASE_PUBLISHABLE_KEY',
+      'anonKey',
+    ],
+    [
+      'secret-key',
+      'PIDRANG_SUPABASE_SERVICE_ROLE_KEY',
+      'PIDRANG_SUPABASE_SECRET_KEY',
+      'serviceRoleKey',
+    ],
+  ])(
+    'still reads a %s key from the legacy %s, with a warning naming %s',
+    async (strategy, legacyName, name, keyName) => {
+      const warn = vi.fn();
+      const connection =
+        await supabaseSchemaProviderDefinition.connectionFromPlan(
+          { strategy, url: 'https://example.supabase.co' },
+          { [legacyName]: 'legacy-key' },
+          warn,
+        );
+      expect(connection).toMatchObject({ [keyName]: 'legacy-key' });
+      expect(warn).toHaveBeenCalledExactlyOnceWith(
+        `${legacyName} is deprecated, set ${name} instead.`,
+      );
+    },
+  );
+
+  it.each([
+    [
+      'graphql',
+      'PIDRANG_SUPABASE_ANON_KEY',
+      'PIDRANG_SUPABASE_PUBLISHABLE_KEY',
+      'anonKey',
+    ],
+    [
+      'secret-key',
+      'PIDRANG_SUPABASE_SERVICE_ROLE_KEY',
+      'PIDRANG_SUPABASE_SECRET_KEY',
+      'serviceRoleKey',
+    ],
+  ])(
+    'prefers the new name over the legacy %s one when both are set',
+    async (strategy, legacyName, name, keyName) => {
+      const warn = vi.fn();
+      const connection =
+        await supabaseSchemaProviderDefinition.connectionFromPlan(
+          { strategy, url: 'https://example.supabase.co' },
+          { [legacyName]: 'legacy-key', [name]: 'new-key' },
+          warn,
+        );
+      expect(connection).toMatchObject({ [keyName]: 'new-key' });
+      expect(warn).not.toHaveBeenCalled();
+    },
+  );
+
+  it('still reads the legacy "service-role" strategy, with a warning', async () => {
+    const warn = vi.fn();
+    expect(
+      await supabaseSchemaProviderDefinition.connectionFromPlan(
+        { strategy: 'service-role', url: 'https://example.supabase.co' },
+        { PIDRANG_SUPABASE_SECRET_KEY: 'key' },
+        warn,
+      ),
+    ).toEqual({
+      strategy: 'service-role',
+      url: 'https://example.supabase.co',
+      serviceRoleKey: 'key',
+    });
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      'The "service-role" strategy is deprecated, use "secret-key" instead.',
+    );
+  });
+
+  it('reads a plan without a warn callback', async () => {
+    expect(
+      await fromPlan(
+        { strategy: 'service-role', url: 'https://example.supabase.co' },
+        { PIDRANG_SUPABASE_SERVICE_ROLE_KEY: 'key' },
+      ),
+    ).toMatchObject({ serviceRoleKey: 'key' });
+  });
+
+  it.each([
+    ['graphql', 'PIDRANG_SUPABASE_PUBLISHABLE_KEY'],
+    ['secret-key', 'PIDRANG_SUPABASE_SECRET_KEY'],
   ])(
     'asks for %s key in %s when it is missing or blank',
     async (strategy, envName) => {
@@ -472,8 +576,11 @@ describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
   );
 
   it.each([
-    ['graphql', 'anonKey', 'PIDRANG_SUPABASE_ANON_KEY'],
-    ['service-role', 'serviceRoleKey', 'PIDRANG_SUPABASE_SERVICE_ROLE_KEY'],
+    ['graphql', 'publishableKey', 'PIDRANG_SUPABASE_PUBLISHABLE_KEY'],
+    ['graphql', 'anonKey', 'PIDRANG_SUPABASE_PUBLISHABLE_KEY'],
+    ['secret-key', 'secretKey', 'PIDRANG_SUPABASE_SECRET_KEY'],
+    ['secret-key', 'serviceRoleKey', 'PIDRANG_SUPABASE_SECRET_KEY'],
+    ['service-role', 'serviceRoleKey', 'PIDRANG_SUPABASE_SECRET_KEY'],
     ['postgres', 'password', 'PIDRANG_DATABASE_PASSWORD'],
   ])(
     'refuses a %s %s written in the plan file without repeating it',
@@ -500,7 +607,7 @@ describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
     ['an unknown strategy', { strategy: 'rest' }],
   ])('refuses a connection with %s', async (_, connection) => {
     expect(await problemOf(connection)).toContain(
-      'strategy must be "graphql", "service-role" or "postgres"',
+      'strategy must be "graphql", "secret-key" or "postgres"',
     );
   });
 
@@ -527,7 +634,7 @@ describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
     expect(
       await problemOf(
         { strategy: 'graphql', url },
-        { PIDRANG_SUPABASE_ANON_KEY: 'key' },
+        { PIDRANG_SUPABASE_PUBLISHABLE_KEY: 'key' },
       ),
     ).toContain(message);
   });
@@ -536,7 +643,7 @@ describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
     expect(
       await problemOf(
         { strategy: 'graphql', url: 'https://example.supabase.co', host: 'x' },
-        { PIDRANG_SUPABASE_ANON_KEY: 'key' },
+        { PIDRANG_SUPABASE_PUBLISHABLE_KEY: 'key' },
       ),
     ).toContain('"host" is not a graphql connection property');
   });
@@ -737,6 +844,8 @@ describe('supabaseSchemaProviderDefinition.connectionFromPlan', () => {
 
   it('documents every variable it reads in its plan help', () => {
     for (const name of [
+      'PIDRANG_SUPABASE_PUBLISHABLE_KEY',
+      'PIDRANG_SUPABASE_SECRET_KEY',
       'PIDRANG_SUPABASE_ANON_KEY',
       'PIDRANG_SUPABASE_SERVICE_ROLE_KEY',
       'PIDRANG_DATABASE_PASSWORD',

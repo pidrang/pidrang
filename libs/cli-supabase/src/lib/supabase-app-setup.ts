@@ -2,7 +2,7 @@ import { AppSetup } from '@pidrang/cli';
 import { PostgresConnection, SupabaseConnection } from './supabase-connection';
 
 export const PROJECT_URL_PLACEHOLDER = 'https://YOUR-PROJECT-REF.supabase.co';
-export const ANON_KEY_PLACEHOLDER = 'YOUR-SUPABASE-ANON-KEY';
+export const PUBLISHABLE_KEY_PLACEHOLDER = 'YOUR-SUPABASE-PUBLISHABLE-KEY';
 
 const DIRECT_HOST = /^db\.([a-z0-9]+)\.supabase\.co$/i;
 const POOLER_HOST = /\.pooler\.supabase\.com$/i;
@@ -39,7 +39,7 @@ export function supabaseAppSetup(connection: SupabaseConnection): AppSetup {
       {
         name: 'client',
         initializer:
-          'createClient(environment.supabaseUrl, environment.supabaseAnonKey)',
+          'createClient(environment.supabaseUrl, environment.supabasePublishableKey)',
       },
     ],
     pidrangConfig: [
@@ -61,13 +61,13 @@ export function supabaseAppSetup(connection: SupabaseConnection): AppSetup {
           }
         : { name: 'supabaseUrl', value: url },
       {
-        name: 'supabaseAnonKey',
-        value: ANON_KEY_PLACEHOLDER,
-        hint: 'the anon (publishable) key, from the Supabase dashboard: Project Settings, API',
+        name: 'supabasePublishableKey',
+        value: PUBLISHABLE_KEY_PLACEHOLDER,
+        hint: 'the publishable key (sb_publishable_..., or the legacy anon key), from the Supabase dashboard: Project Settings, API Keys',
       },
     ],
     notes: [
-      'The app runs in the browser: give it the anon (publishable) key, never the service role key or the database password.',
+      'The app runs in the browser: give it the publishable key, never the secret key or the database password.',
     ],
   };
 }

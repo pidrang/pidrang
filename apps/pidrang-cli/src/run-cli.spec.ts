@@ -28,15 +28,15 @@ const SETUP: AppSetup = {
     {
       name: 'client',
       initializer:
-        'createClient(environment.supabaseUrl, environment.supabaseAnonKey)',
+        'createClient(environment.supabaseUrl, environment.supabasePublishableKey)',
     },
   ],
   pidrangConfig: [{ name: 'dataProvider', value: 'provideFake({ client })' }],
   environment: [
     { name: 'supabaseUrl', value: 'https://abc.supabase.co' },
-    { name: 'supabaseAnonKey', value: 'YOUR-ANON-KEY' },
+    { name: 'supabasePublishableKey', value: 'YOUR-PUBLISHABLE-KEY' },
   ],
-  notes: ['Use the anon key in the browser, never the service role key.'],
+  notes: ['Use the publishable key in the browser, never the secret key.'],
 };
 
 const STOCK_FILES: Record<string, string> = {
@@ -327,7 +327,7 @@ describe('runCli', () => {
       );
       expect(config).toContain("import { resources } from './resources';");
       expect(config).toContain(
-        'const client = createClient(environment.supabaseUrl, environment.supabaseAnonKey);',
+        'const client = createClient(environment.supabaseUrl, environment.supabasePublishableKey);',
       );
       expect(config).toContain(
         'provideRouter(routes, withComponentInputBinding()),',
@@ -432,9 +432,11 @@ describe('runCli', () => {
         'Add these lines to src/environments/environment.ts:',
       );
       expect(out).toContain("  supabaseUrl: 'https://abc.supabase.co',");
-      expect(out).toContain("  supabaseAnonKey: 'YOUR-ANON-KEY',");
+      expect(out).toContain(
+        "  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY',",
+      );
       expect(out.join('\n')).toContain(
-        'Use the anon key in the browser, never the service role key.',
+        'Use the publishable key in the browser, never the secret key.',
       );
     });
 
@@ -474,6 +476,9 @@ describe('runCli', () => {
         },
       ]);
       expect(configurations.production.fileReplacements).toBeUndefined();
+      expect(out).toContain(
+        '  supabasePublishableKey: the publishable key of the project (sb_publishable_..., or the legacy anon key), from Project Settings, API Keys',
+      );
     });
 
     it('leaves everything as it is on a second identical run', async () => {
@@ -688,6 +693,19 @@ describe('runCli', () => {
       expect(await runCli(['init', '--plan', plan], context({}))).toBe(1);
       expect(err).toContain('Invalid connection in the plan: set FAKE_KEY.');
       expect(provider.createSchemaProvider).not.toHaveBeenCalled();
+    });
+
+    it('prints the warnings of the provider reading the plan on stderr', async () => {
+      const plan = await planFile(PLAN);
+      vi.mocked(provider.connectionFromPlan).mockImplementationOnce(
+        async (_connection, _env, warn) => {
+          warn?.('OLD_KEY is deprecated, set FAKE_KEY instead.');
+          return { key: SECRET };
+        },
+      );
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+      expect(err).toEqual(['OLD_KEY is deprecated, set FAKE_KEY instead.']);
     });
 
     it('never prints the credential it was given', async () => {

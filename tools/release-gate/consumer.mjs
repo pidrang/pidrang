@@ -92,12 +92,9 @@ if (values.generator === 'bin' && !values.backend) {
   process.exit(1);
 }
 
-if (
-  values.generator === 'bin' &&
-  !process.env['PIDRANG_SUPABASE_SERVICE_ROLE_KEY']
-) {
+if (values.generator === 'bin' && !process.env['PIDRANG_SUPABASE_SECRET_KEY']) {
   console.error(
-    '--generator bin needs PIDRANG_SUPABASE_SERVICE_ROLE_KEY for the local stack',
+    '--generator bin needs PIDRANG_SUPABASE_SECRET_KEY for the local stack',
   );
   process.exit(1);
 }
@@ -204,7 +201,7 @@ function initPlanFrom(planPath, url) {
   const plan = JSON.parse(readFileSync(planPath, 'utf8'));
   return {
     provider: plan.providerId,
-    connection: { strategy: 'service-role', url },
+    connection: { strategy: 'secret-key', url },
     tables: plan.tables.map(({ table, actions, hiddenFields }) => ({
       table,
       actions,

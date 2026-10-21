@@ -13,6 +13,6 @@ import { isSupabaseConfigured } from '@pidrang/demo-shared';
 export class App {
   protected hasSupabaseConfig = isSupabaseConfigured(
     environment.supabaseUrl,
-    environment.supabaseAnonKey,
+    environment.supabasePublishableKey,
   );
 }

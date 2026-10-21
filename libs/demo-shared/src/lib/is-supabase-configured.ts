@@ -1,3 +1,6 @@
-export function isSupabaseConfigured(url: string, anonKey: string): boolean {
-  return !!url && !!anonKey;
+export function isSupabaseConfigured(
+  url: string,
+  publishableKey: string,
+): boolean {
+  return !!url && !!publishableKey;
 }

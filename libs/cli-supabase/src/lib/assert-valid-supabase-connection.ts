@@ -10,12 +10,12 @@ function connectionProblems(connection: SupabaseConnection): (string | null)[] {
     case 'graphql':
       return [
         projectUrlProblem(connection.url),
-        requiredValueProblem('The anon key', connection.anonKey),
+        requiredValueProblem('The publishable key', connection.anonKey),
       ];
     case 'service-role':
       return [
         projectUrlProblem(connection.url),
-        requiredValueProblem('The service role key', connection.serviceRoleKey),
+        requiredValueProblem('The secret key', connection.serviceRoleKey),
       ];
     case 'postgres':
       return [
