@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { packages, root, run } from './shared.mjs';
@@ -51,6 +51,5 @@ export function withVersionedPackages(version, work) {
     for (const [path, content] of snapshot) {
       writeFileSync(resolve(root, path), content);
     }
-    rmSync(resolve(root, 'dist'), { recursive: true, force: true });
   }
 }

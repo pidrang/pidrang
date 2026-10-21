@@ -44,6 +44,10 @@ function pack() {
   ]);
 }
 
+function build() {
+  run('pnpm', ['exec', 'nx', 'run-many', '-t', 'build']);
+}
+
 function consumer(adapter, keys) {
   const backend = keys
     ? { url: keys.apiUrl, publishableKey: keys.publishableKey }
@@ -233,6 +237,7 @@ function recordFixtures(commit) {
 rmSync(gateDirectory, { recursive: true, force: true });
 
 if (values.mode === 'build') {
+  build();
   pack();
   consumer('material');
   consumer('tailwind');
@@ -253,6 +258,7 @@ if (values.mode === 'build') {
   checkDemoEnvironments(keys.publishableKey);
   run(join(supabaseDirectory, 'scripts/load-fixtures.sh'), ['--conformance']);
 
+  build();
   pack();
   consumer('material', keys);
   consumer('tailwind', keys);

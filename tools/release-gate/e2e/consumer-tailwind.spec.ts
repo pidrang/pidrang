@@ -1,9 +1,17 @@
+import { Page } from '@playwright/test';
+
 import { expect, expectations, rowIds, test } from './support';
+
+async function openProducts(page: Page): Promise<void> {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Products', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible();
+}
 
 test('renders installed Tailwind components with their utility styles', async ({
   page,
 }) => {
-  await page.goto('/');
+  await openProducts(page);
   const ids = await rowIds(page);
   expect(ids).toHaveLength(10);
   expect(ids[0]).toBe(expectations.resources.products.firstId);
@@ -38,7 +46,7 @@ test('shows a failed list request and loads it again on retry', async ({
   await page.route('**/rest/v1/products?*', (route) =>
     failing ? route.abort('failed') : route.fallback(),
   );
-  await page.goto('/');
+  await openProducts(page);
   await expect(page.getByRole('alert')).toBeVisible({ timeout: 20_000 });
   failing = false;
   await page.getByRole('button', { name: 'Retry' }).click();
