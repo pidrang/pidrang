@@ -220,7 +220,7 @@ try {
       timeout: 30_000,
     });
     expect(
-      /How should pidrang introspect|Which data source/.test(init.output),
+      /Supabase project URL|Which data source/.test(init.output),
       'the installed pidrang binary does not start the init wizard',
       init.output,
     );
