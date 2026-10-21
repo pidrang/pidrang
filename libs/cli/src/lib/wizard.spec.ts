@@ -329,6 +329,24 @@ describe('runScriptedInit', () => {
     vi.mocked(select).mockReset();
   });
 
+  it('hands the warn option to the provider reading the plan', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+    const warn = vi.fn();
+
+    await runScriptedInit(
+      [definition],
+      scripted([{ table: 'products', actions: ['list'], hiddenFields: [] }]),
+      {},
+      { warn },
+    );
+
+    expect(definition.connectionFromPlan).toHaveBeenCalledWith(
+      { url: 'u' },
+      {},
+      warn,
+    );
+  });
+
   it('builds the plan without any prompt, from the connection the provider reads', async () => {
     const schemaProvider = fakeSchemaProvider();
     const definition = fakeDefinition('supabase', schemaProvider);
@@ -345,6 +363,7 @@ describe('runScriptedInit', () => {
     expect(definition.connectionFromPlan).toHaveBeenCalledWith(
       { url: 'u' },
       env,
+      undefined,
     );
     expect(definition.createSchemaProvider).toHaveBeenCalledWith({
       from: 'plan',

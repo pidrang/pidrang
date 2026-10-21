@@ -13,6 +13,7 @@ export interface SchemaProviderDefinition<TConnection = unknown> {
   connectionFromPlan(
     connection: unknown,
     env: PlanEnvironment,
+    warn?: (message: string) => void,
   ): Promise<TConnection>;
 
   createSchemaProvider(connection: TConnection): SchemaProvider;
