@@ -36,8 +36,8 @@ layout: home
 
 hero:
   name: Pidrang
-  text: Build Angular admin applications faster.
-  tagline: The headless admin framework for Angular. One resource contract, any data provider, any UI layer.
+  text: Generate an Angular admin from your Supabase schema.
+  tagline: Build Angular admin applications faster. One resource contract, any data provider, any UI layer.
   actions:
     - theme: brand
       text: Get started

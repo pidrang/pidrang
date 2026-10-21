@@ -7,6 +7,8 @@
   </a>
 </p>
 
+<p align="center"><strong>Generate an Angular admin from your Supabase schema.</strong></p>
+
 <br>
 
 <div align="center">
