@@ -5,8 +5,10 @@ import * as ts from 'typescript';
 import { buildPagesBundle } from './build-pages-bundle';
 import {
   generatePagesBundle,
+  generateResourceRoutesFile,
   RESOURCE_ROUTES_SNIPPET,
   SIGN_IN_PATH_SNIPPET,
+  SIGN_IN_ROUTE_SNIPPET,
 } from './generate-pages-bundle';
 
 const WORKSPACE_ROOT = join(__dirname, '../../../..');
@@ -344,6 +346,23 @@ describe('RESOURCE_ROUTES_SNIPPET', () => {
     }
     expect(RESOURCE_ROUTES_SNIPPET).not.toMatch(/^import .*\/pages\//m);
     expect(RESOURCE_ROUTES_SNIPPET).not.toContain('component:');
+  });
+
+  it('opens with the sign-in route, before the resource routes', () => {
+    expect(RESOURCE_ROUTES_SNIPPET).toContain(SIGN_IN_ROUTE_SNIPPET);
+    expect(RESOURCE_ROUTES_SNIPPET.indexOf("path: 'sign-in'")).toBeLessThan(
+      RESOURCE_ROUTES_SNIPPET.indexOf("':resource/create'"),
+    );
+  });
+
+  it('leaves the sign-in route out when the app keeps its own page', () => {
+    const routes = generateResourceRoutesFile(false).content;
+
+    expect(generateResourceRoutesFile().content).toBe(RESOURCE_ROUTES_SNIPPET);
+    expect(routes).not.toContain('sign-in-page');
+    expect(routes).not.toContain("path: 'sign-in'");
+    expect(routes).toContain('path: RESOURCE_UNAVAILABLE_PATH');
+    expect(routes.match(/loadComponent/g)).toHaveLength(5);
   });
 });
 

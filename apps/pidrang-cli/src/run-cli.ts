@@ -573,7 +573,7 @@ async function runInit(
   const pages = relocateFiles(
     generatePagesBundle().filter((file) => file.path !== SIGN_IN_PAGE_FILE),
     layout.appDirectory,
-  ).concat(generateResourceRoutesFile());
+  ).concat(generateResourceRoutesFile(!layout.signInRoute));
   const pagesPlan = await planWrites(context.cwd, pages);
   if (pagesPlan.conflicts.length > 0) {
     const resourcesExist = await access(
