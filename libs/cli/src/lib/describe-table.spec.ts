@@ -39,7 +39,9 @@ describe('describeTable', () => {
         title,
         { name, type: 'timestamp', hasDefault: true },
       ]);
-      expect(result.fields.map((field) => [field.name, field.readOnly])).toEqual([
+      expect(
+        result.fields.map((field) => [field.name, field.readOnly]),
+      ).toEqual([
         ['id', true],
         ['title', undefined],
         [name, true],
@@ -52,7 +54,10 @@ describe('describeTable', () => {
     ['without a default', { name: 'created_at', type: 'timestamp' }],
     ['as a date', { name: 'created_at', type: 'date', hasDefault: true }],
     ['as text', { name: 'created_at', type: 'text', hasDefault: true }],
-    ['under another name', { name: 'deleted_at', type: 'timestamp', hasDefault: true }],
+    [
+      'under another name',
+      { name: 'deleted_at', type: 'timestamp', hasDefault: true },
+    ],
   ] as const)('keeps an audit-like column %s editable', (_, column) => {
     const result = describeTable('products', [id, { ...column }]);
     expect(result.fields[1]).toEqual({ ...column });

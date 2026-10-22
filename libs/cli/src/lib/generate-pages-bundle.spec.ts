@@ -133,6 +133,7 @@ describe('generatePagesBundle', () => {
       'src/app/pages/resource-create-page.ts',
       'src/app/pages/resource-show-page.ts',
       'src/app/pages/resource-edit-page.ts',
+      'src/app/pages/sign-in-page.ts',
     ]);
     expect(paths).toContain('src/app/pidrang/index.ts');
     expect(
@@ -328,6 +329,7 @@ describe('RESOURCE_ROUTES_SNIPPET', () => {
 
     expect(loaded.map(({ name }) => name)).toEqual([
       'NotFoundPage',
+      'SignInPage',
       'ResourceCreatePage',
       'ResourceEditPage',
       'ResourceShowPage',

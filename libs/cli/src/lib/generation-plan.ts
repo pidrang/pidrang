@@ -18,4 +18,5 @@ export interface GenerationPlan {
 export interface InitResult extends GenerationPlan {
   setup: AppSetup;
   layout: AppLayoutChoice;
+  signIn: boolean;
 }

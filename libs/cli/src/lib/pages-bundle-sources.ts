@@ -1,3 +1,4 @@
+import { generatedSignInPage } from './build-sign-in-page';
 import { PagesBundleSource } from './pages-bundle-source';
 
 const DEMO_PAGES = 'apps/demo-material/src/app/pages';
@@ -29,7 +30,9 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
     'save-store.ts',
     'save-timeout-error.ts',
     'sign-in-path.ts',
+    'sign-in-state.ts',
     'sign-in-url.ts',
+    'sign-in.ts',
   ].map((file) => ({
     target: `src/app/pidrang/${file}`,
     source: `${DEMO_SHARED}/${file}`,
@@ -44,4 +47,9 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
     target: `src/app/pages/${file}`,
     source: `${DEMO_PAGES}/${file}`,
   })),
+  {
+    target: 'src/app/pages/sign-in-page.ts',
+    source: `${DEMO_PAGES}/sign-in-page.ts`,
+    format: generatedSignInPage,
+  },
 ];
