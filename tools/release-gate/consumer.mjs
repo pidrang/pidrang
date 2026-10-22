@@ -237,6 +237,7 @@ function initPlanFrom(planPath, url, layout) {
       hiddenFields,
     })),
     layout,
+    signIn: true,
   };
 }
 
@@ -331,6 +332,7 @@ function initStarter(consumer, planPath) {
   initWithBin(consumer, planPath, backend.url, 'sidebar');
   for (const file of [
     'src/app/layout/app-layout.ts',
+    'src/app/pages/sign-in-page.ts',
     'src/app/pidrang/index.ts',
   ]) {
     if (!existsSync(join(consumer, file))) {

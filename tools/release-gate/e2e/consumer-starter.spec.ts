@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 
-import { expect, rowIds, test } from './support';
+import { expect, expectations, publishableKey, rowIds, test } from './support';
 
 function pageErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -48,4 +48,54 @@ test('points the header to the sign-in path init wrote', async ({ page }) => {
   await expect(
     page.locator('mat-toolbar').getByRole('link', { name: 'Sign in' }),
   ).toHaveAttribute('href', '/sign-in');
+});
+
+test('signs in from the generated page, then creates, edits and deletes', async ({
+  page,
+}) => {
+  const errors = pageErrors(page);
+  await page.goto('/');
+  await page
+    .locator('mat-toolbar')
+    .getByRole('link', { name: 'Sign in' })
+    .click();
+  await expect(page).toHaveURL(/\/sign-in$/);
+
+  await page.getByLabel('Email').fill(expectations.writer.email);
+  await page.getByLabel('Password').fill(expectations.writer.password);
+  await page.getByLabel('Password').press('Enter');
+  await expect(page.locator('mat-card')).toContainText(
+    expectations.writer.email,
+  );
+
+  const name = `Starter sign-in ${Date.now()}`;
+  await page.goto('/fixture_items/create');
+  await page.getByLabel('name').fill(name);
+  await page.getByLabel('name').press('Enter');
+  await expect(page).toHaveURL(/\/fixture_items$/);
+
+  const created = await page.request.get(
+    `http://127.0.0.1:54321/rest/v1/fixture_items?name=eq.${encodeURIComponent(name)}&select=id`,
+    { headers: { apikey: publishableKey } },
+  );
+  const [{ id }] = (await created.json()) as { id: string }[];
+
+  await page.goto(`/fixture_items/${id}/edit`);
+  await page.getByLabel('name').fill(`${name} edited`);
+  await page.getByLabel('name').press('Enter');
+  await expect(page).toHaveURL(/\/fixture_items$/);
+
+  await page.goto(`/fixture_items/${id}`);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect
+    .poll(async () => {
+      const answer = await page.request.get(
+        `http://127.0.0.1:54321/rest/v1/fixture_items?id=eq.${id}&select=id`,
+        { headers: { apikey: publishableKey } },
+      );
+      return answer.json();
+    })
+    .toEqual([]);
+  expect(errors).toEqual([]);
 });
