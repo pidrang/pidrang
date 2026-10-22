@@ -6,7 +6,7 @@ import {
 } from './schema-provider-definition';
 import { CRUD_ACTIONS, CrudAction } from './crud-action';
 import { InitResult, TablePlan } from './generation-plan';
-import { AppLayoutChoice, InitPlan } from './init-plan';
+import { AppLayoutChoice, DEFAULT_SIGN_IN_PATH, InitPlan } from './init-plan';
 import { TableIntrospection } from './table-introspection';
 
 export interface InitOptions {
@@ -22,6 +22,13 @@ function promptLayout(): Promise<AppLayoutChoice> {
       'Generate a navigation layout? It adds a header with your app name and a sign in/out link, and a side menu of the resources.',
     default: true,
   }).then((wanted) => (wanted ? 'sidebar' : 'none'));
+}
+
+function promptSignIn(): Promise<boolean> {
+  return confirm({
+    message: `Generate a sign-in page at ${DEFAULT_SIGN_IN_PATH}? The app needs one to sign in and write data.`,
+    default: true,
+  });
 }
 
 const ACTION_CHOICES: { name: string; value: CrudAction }[] = [
@@ -143,12 +150,14 @@ export async function runInitWizard(
     tables.push(await promptTable(schemaProvider, table));
   }
   const layout = options.isNewApp === true ? await promptLayout() : 'none';
+  const wantsSignIn = options.isNewApp === true ? await promptSignIn() : true;
 
   return {
     providerId: providerDefinition.id,
     tables,
     setup: providerDefinition.appSetup(connection),
     layout,
+    signIn: wantsSignIn,
   };
 }
 
@@ -211,6 +220,7 @@ export async function runScriptedInit(
     tables,
     setup: providerDefinition.appSetup(connection),
     layout: plan.layout,
+    signIn: plan.signIn === true,
   };
 }
 

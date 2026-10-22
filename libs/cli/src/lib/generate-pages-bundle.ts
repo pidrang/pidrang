@@ -15,6 +15,11 @@ export const resourceRoutes: Route[] = [
       import('./pages/not-found-page').then((page) => page.NotFoundPage),
   },
   {
+    path: 'sign-in',
+    loadComponent: () =>
+      import('./pages/sign-in-page').then((page) => page.SignInPage),
+  },
+  {
     path: ':resource/create',
     loadComponent: () =>
       import('./pages/resource-create-page').then(

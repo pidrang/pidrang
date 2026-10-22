@@ -93,6 +93,7 @@ describe('runInitWizard', () => {
       ],
       setup: SETUP,
       layout: 'none',
+      signIn: true,
     });
   });
 
@@ -107,8 +108,9 @@ describe('runInitWizard', () => {
 
     const plan = await runInitWizard([definition], { isNewApp: true });
 
-    expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ default: true }),
+    expect(confirm).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ message: expect.stringContaining('layout') }),
     );
     expect(plan.layout).toBe('sidebar');
   });
@@ -125,6 +127,55 @@ describe('runInitWizard', () => {
     const plan = await runInitWizard([definition], { isNewApp: true });
 
     expect(plan.layout).toBe('none');
+  });
+
+  it('asks for a sign-in page on a new app and generates it by default', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    const plan = await runInitWizard([definition], { isNewApp: true });
+
+    expect(confirm).toHaveBeenLastCalledWith({
+      message: expect.stringContaining('/sign-in'),
+      default: true,
+    });
+    expect(plan.signIn).toBe(true);
+  });
+
+  it('counts a declined sign-in question as false', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+    vi.mocked(confirm)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false);
+
+    const plan = await runInitWizard([definition], { isNewApp: true });
+
+    expect(plan.layout).toBe('none');
+    expect(plan.signIn).toBe(false);
+  });
+
+  it('generates the sign-in page without asking in an app that already exists', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+
+    const plan = await runInitWizard([definition]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(plan.signIn).toBe(true);
   });
 
   it('does not ask for a layout in an app that already exists', async () => {
@@ -379,6 +430,7 @@ describe('runScriptedInit', () => {
       connection: { url: 'u' },
       tables,
       layout: 'none',
+      signIn: false,
     };
   }
 
@@ -406,6 +458,21 @@ describe('runScriptedInit', () => {
     );
   });
 
+  it('generates the sign-in page only when the plan asks for it', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider());
+    const tables = [{ table: 'products', actions: ['list'], hiddenFields: [] }];
+
+    const wanted = await runScriptedInit(
+      [definition],
+      { ...scripted(tables), signIn: true },
+      {},
+    );
+    const notWanted = await runScriptedInit([definition], scripted(tables), {});
+
+    expect(wanted.signIn).toBe(true);
+    expect(notWanted.signIn).toBe(false);
+  });
+
   it('builds the plan without any prompt, from the connection the provider reads', async () => {
     const schemaProvider = fakeSchemaProvider();
     const definition = fakeDefinition('supabase', schemaProvider);
@@ -413,9 +480,12 @@ describe('runScriptedInit', () => {
 
     const plan = await runScriptedInit(
       [definition],
-      scripted([
-        { table: 'products', actions: ['list', 'create'], hiddenFields: [] },
-      ]),
+      {
+        ...scripted([
+          { table: 'products', actions: ['list', 'create'], hiddenFields: [] },
+        ]),
+        signIn: true,
+      },
       env,
     );
 
@@ -446,6 +516,7 @@ describe('runScriptedInit', () => {
       ],
       setup: SETUP,
       layout: 'none',
+      signIn: true,
     });
   });
 
@@ -463,14 +534,17 @@ describe('runScriptedInit', () => {
 
     const fromPlan = await runScriptedInit(
       [definition],
-      scripted([
-        { table: 'orders', actions: ['create'], hiddenFields: [] },
-        {
-          table: 'products',
-          actions: ['delete', 'list', 'show'],
-          hiddenFields: ['name', 'id'],
-        },
-      ]),
+      {
+        ...scripted([
+          { table: 'orders', actions: ['create'], hiddenFields: [] },
+          {
+            table: 'products',
+            actions: ['delete', 'list', 'show'],
+            hiddenFields: ['name', 'id'],
+          },
+        ]),
+        signIn: true,
+      },
       {},
     );
 

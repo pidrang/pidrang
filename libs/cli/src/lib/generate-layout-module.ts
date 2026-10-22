@@ -3,6 +3,7 @@ import {
   MATERIAL_LAYOUT_MODULE,
   TAILWIND_LAYOUT_MODULE,
 } from './generated-layout';
+import { LayoutUi } from './layout-ui';
 
 export const LAYOUT_FILE = 'src/app/layout/app-layout.ts';
 
@@ -15,6 +16,6 @@ const LAYOUTS = {
   tailwind: TAILWIND_LAYOUT_MODULE,
 };
 
-export function generateLayoutFile(ui: 'material' | 'tailwind'): GeneratedFile {
+export function generateLayoutFile(ui: LayoutUi): GeneratedFile {
   return { path: LAYOUT_FILE, content: LAYOUTS[ui] };
 }

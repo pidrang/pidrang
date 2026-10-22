@@ -36,6 +36,7 @@ describe('parseInitPlan', () => {
         { table: 'orders', actions: ['show'], hiddenFields: ['id'] },
       ],
       layout: 'none',
+      signIn: false,
     });
   });
 
@@ -48,6 +49,20 @@ describe('parseInitPlan', () => {
 
   it('defaults the layout to none', () => {
     expect(parseInitPlan(plan()).layout).toBe('none');
+  });
+
+  it('defaults signIn to false', () => {
+    expect(parseInitPlan(plan()).signIn).toBe(false);
+  });
+
+  it('reads signIn true', () => {
+    expect(parseInitPlan(plan({ signIn: true })).signIn).toBe(true);
+  });
+
+  it.each([['yes'], [1], [null]])('refuses the signIn %j', (signIn) => {
+    expect(() => parseInitPlan(plan({ signIn }))).toThrow(
+      'signIn must be true or false',
+    );
   });
 
   it.each([['top'], [true], [null]])('refuses the layout %j', (layout) => {
