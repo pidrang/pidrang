@@ -31,6 +31,7 @@ export interface ConfigRequest {
   environmentImport: string | null;
   resourcesImport: string;
   signInPath?: string;
+  signInOnly?: boolean;
 }
 
 const BINDING_IMPORT: SetupImport = {
@@ -50,16 +51,22 @@ function setupImports(request: ConfigRequest): SetupImport[] {
     ...(request.environmentImport === null
       ? []
       : [{ name: 'environment', from: request.environmentImport }]),
-    { name: 'resources', from: request.resourcesImport },
+    ...(request.signInOnly
+      ? []
+      : [{ name: 'resources', from: request.resourcesImport }]),
   ];
 }
 
-function pidrangCall(setup: AppSetup, indent: string): string {
+function pidrangCall(
+  setup: AppSetup,
+  indent: string,
+  includesResources: boolean,
+): string {
   const properties = [
     ...setup.pidrangConfig.map(
       (property) => `${property.name}: ${property.value}`,
     ),
-    'resources',
+    ...(includesResources ? ['resources'] : []),
   ];
   return [
     'providePidrang({',
@@ -138,44 +145,49 @@ export function appendElement(
     : { at: last.end, text: `,\n${indent}${element(indent)}` };
 }
 
-function manualSteps(
-  request: ConfigRequest,
-  needsBinding: boolean,
-  needsPidrang: boolean,
-): string[] {
-  const imports = [
-    ...(needsBinding ? [BINDING_IMPORT] : []),
-    ...(needsPidrang || request.signInPath !== undefined
-      ? setupImports(request)
-      : []),
-  ];
+interface ManualNeeds {
+  binding: boolean;
+  setup: boolean;
+  signIn: boolean;
+}
+
+function manualSteps(request: ConfigRequest, needs: ManualNeeds): string[] {
   const steps = [
     'pidrang could not edit this file safely. Make these changes by hand, then delete these pidrang lines.',
-    'Add these imports:',
-    ...imports.map(
-      (entry) => `  import { ${entry.name} } from '${entry.from}';`,
-    ),
   ];
-  if (needsPidrang && request.setup.constants.length > 0) {
+  const imports = [
+    ...(needs.binding ? [BINDING_IMPORT] : []),
+    ...(needs.signIn && !needs.setup ? [SIGN_IN_IMPORT] : []),
+    ...(needs.setup ? setupImports(request) : []),
+  ];
+  if (imports.length > 0) {
+    steps.push(
+      'Add these imports:',
+      ...imports.map(
+        (entry) => `  import { ${entry.name} } from '${entry.from}';`,
+      ),
+    );
+  }
+  if (needs.setup && request.setup.constants.length > 0) {
     steps.push('Add this after the imports:');
     steps.push(...constantLines(request.setup).map((line) => `  ${line}`));
   }
-  if (needsBinding) {
+  if (needs.binding) {
     steps.push(
       'Pass withComponentInputBinding() to provideRouter, the pages read :resource and :id as inputs:',
       '  provideRouter(routes, withComponentInputBinding())',
     );
   }
-  if (request.signInPath !== undefined) {
+  if (needs.signIn) {
     steps.push(
       'Add this to the providers of your application config, with the path of your sign-in page:',
-      `  provideSignInPath(${quote(request.signInPath)})`,
+      `  provideSignInPath(${quote(request.signInPath ?? '')})`,
     );
   }
-  if (needsPidrang) {
+  if (needs.setup) {
     steps.push('Add this to the providers of your application config:');
     steps.push(
-      ...pidrangCall(request.setup, '')
+      ...pidrangCall(request.setup, '', !needs.binding)
         .split('\n')
         .map((line) => `  ${line}`),
     );
@@ -190,12 +202,11 @@ export function commentBlock(marker: string, steps: string[]): string {
 function manual(
   source: string,
   request: ConfigRequest,
-  needsBinding: boolean,
-  needsPidrang: boolean,
+  needs: ManualNeeds,
   reason: string,
 ): FileEdit {
   const rest = stripLeadingLines(source, PIDRANG_COMMENT);
-  const content = `${commentBlock(PIDRANG_COMMENT, manualSteps(request, needsBinding, needsPidrang))}\n${rest}`;
+  const content = `${commentBlock(PIDRANG_COMMENT, manualSteps(request, needs))}\n${rest}`;
   return content === source
     ? { kind: 'unchanged' }
     : { kind: 'manual', content, reason };
@@ -211,23 +222,35 @@ export function editAppConfig(
     return manual(
       source,
       request,
-      true,
-      true,
+      {
+        binding: !request.signInOnly,
+        setup: !request.signInOnly,
+        signIn: request.signInPath !== undefined,
+      },
       'TypeScript is not installed in this app',
     );
   }
   const file = parseSource(typescript, path, source);
   const needsBinding =
+    !request.signInOnly &&
     callsTo(typescript, file, BINDING_IMPORT.name).length === 0;
-  const needsPidrang = callsTo(typescript, file, 'providePidrang').length === 0;
-  const needsSignIn =
+  const needsPidrang =
+    !request.signInOnly &&
+    callsTo(typescript, file, 'providePidrang').length === 0;
+  const needsPidrangSignIn =
     request.signInPath !== undefined &&
     callsTo(typescript, file, 'provideSignInPath').length === 0;
-  if (!needsBinding && !needsPidrang && !needsSignIn) {
+  const needsSignIn =
+    callsTo(typescript, file, 'provideSignInPath').length === 0;
+  if (!needsBinding && !needsPidrang && !needsPidrangSignIn) {
     return { kind: 'unchanged' };
   }
-  const fail = (reason: string) =>
-    manual(source, request, needsBinding, needsPidrang, reason);
+  const needs: ManualNeeds = {
+    binding: !request.signInOnly,
+    setup: !request.signInOnly,
+    signIn: needsSignIn,
+  };
+  const fail = (reason: string) => manual(source, request, needs, reason);
 
   const found = findProviders(typescript, file);
   if (found === null) {
@@ -256,7 +279,7 @@ export function editAppConfig(
     imports.push(BINDING_IMPORT);
   }
 
-  if (needsSignIn) {
+  if (needsPidrangSignIn) {
     const signInPath = request.signInPath ?? '';
     insertions.push(
       appendElement(
@@ -292,7 +315,7 @@ export function editAppConfig(
     }
     insertions.push(
       appendElement(source, found.providers, (indent) =>
-        pidrangCall(request.setup, indent),
+        pidrangCall(request.setup, indent, !request.signInOnly),
       ),
     );
   }

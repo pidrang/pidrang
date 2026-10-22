@@ -3,15 +3,18 @@ import { join, posix, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   AppSetup,
+  GeneratedFile,
   InitResult,
   PAGES_UI_LAYER_PACKAGES,
   PlanEnvironment,
+  SIGN_IN_PAGE_FILE,
   SIGN_IN_PATH_SNIPPET,
   SchemaProviderDefinition,
   generateLayoutFile,
   generatePagesBundle,
   generateResourceRoutesFile,
   generateResourcesFile,
+  generateSignInFile,
   layoutAppHtml,
   parseInitPlan,
   runInitWizard,
@@ -19,10 +22,12 @@ import {
 } from '@pidrang/cli';
 import { AppLayout, UnsupportedAppError, preflightApp } from './preflight-app';
 import {
+  WriteConflict,
   WriteInterruptedError,
   WritePlan,
   FileEditPlan,
   applyWritePlan,
+  conflictReason,
   planEdits,
   planWrites,
   relocateFiles,
@@ -95,13 +100,15 @@ type InstallOutcome =
 function usage(providers: SchemaProviderDefinition[]): string {
   return [
     'Usage: pidrang init [--plan <file>] [--project <name>] [--skip-install]',
+    '       pidrang generate auth [--project <name>]',
     '',
-    'Scaffolds Resource definitions and CRUD pages into an Angular app. Run it from the workspace root.',
+    'init scaffolds Resource definitions and CRUD pages into an Angular app. Run it from the workspace root.',
+    'generate auth writes the sign-in page the pages and the layout link to, when the app has none.',
     '',
     'Options:',
-    '  --plan <file>     Take the answers from a JSON plan file instead of prompts',
+    '  --plan <file>     Take the answers from a JSON plan file instead of prompts (init)',
     '  --project <name>  The application to set up, when angular.json has several',
-    '  --skip-install    Do not offer to install the packages, print the commands instead',
+    '  --skip-install    Do not offer to install the packages, print the commands instead (init)',
     '  -h, --help        Show this help',
     '',
     'Plan file:',
@@ -111,11 +118,14 @@ function usage(providers: SchemaProviderDefinition[]): string {
     '    "tables": [',
     '      { "table": "products", "actions": ["list", "create", "show", "edit", "delete"], "hiddenFields": ["created_at"] }',
     '    ],',
-    '    "layout": "sidebar"',
+    '    "layout": "sidebar",',
+    '    "signIn": true',
     '  }',
     '  actions lists at least one of list, create, show, edit, delete. hiddenFields is optional.',
     '  layout is "sidebar" to add a header and a side menu of the resources to a new app, or',
     '  "none" to leave the pages bare. It defaults to "none" and an existing app never gets one.',
+    '  signIn is true to generate the sign-in page that the pages and the layout link to. It',
+    '  defaults to false and init asks for it on a new app.',
     '  Credentials never go in the plan file: they come from environment variables.',
     '',
     ...providers.map((provider) => provider.planHelp),
@@ -136,6 +146,11 @@ function usage(providers: SchemaProviderDefinition[]): string {
     'file or failed install, 130 cancelled.',
   ].join('\n');
 }
+
+const COMMANDS: Record<string, 'init' | 'generate auth' | undefined> = {
+  init: 'init',
+  'generate auth': 'generate auth',
+};
 
 function isPromptExit(error: unknown): boolean {
   return error instanceof Error && error.name === 'ExitPromptError';
@@ -227,7 +242,59 @@ async function collectPlan(
   return runScriptedInit(context.providers, plan, context.env, options);
 }
 
-const LAYOUT_SIGN_IN_PATH = '/sign-in';
+interface SignInPlan {
+  path: string;
+  file: GeneratedFile | null;
+  written: boolean;
+  reason: string;
+}
+
+function signInFile(layout: AppLayout, tooling: AppTooling): GeneratedFile {
+  return relocateFiles(
+    [generateSignInFile(tooling.layoutUi)],
+    layout.appDirectory,
+  )[0];
+}
+
+async function planSignIn(
+  context: CliContext,
+  layout: AppLayout,
+  tooling: AppTooling,
+  wanted: boolean,
+): Promise<SignInPlan> {
+  if (!wanted) {
+    return {
+      path: layout.signInPath,
+      file: null,
+      written: false,
+      reason: 'You declined the sign-in page, so pidrang did not generate one',
+    };
+  }
+  if (layout.signInRoute) {
+    return {
+      path: layout.signInPath,
+      file: null,
+      written: false,
+      reason: `app.routes.ts already declares its own ${layout.signInPath} route, so pidrang left the sign-in page to it`,
+    };
+  }
+  const file = signInFile(layout, tooling);
+  const problem = await conflictReason(context.cwd, file);
+  if (problem === null || problem === 'unchanged') {
+    return {
+      path: layout.signInPath,
+      file: problem === null ? file : null,
+      written: true,
+      reason: '',
+    };
+  }
+  return {
+    path: layout.signInPath,
+    file: null,
+    written: true,
+    reason: `${file.path} is already there and ${problem}, so pidrang left it as it is`,
+  };
+}
 
 function printExistingAppNotice(
   context: CliContext,
@@ -308,7 +375,7 @@ async function writeFiles(
 
 interface SetupReport {
   setup: AppSetup;
-  signInPath: string | null;
+  signIn: { path: string | null; file: boolean; reason: string };
   edits: FileEditPlan[];
   environmentPath: string;
   environmentDevelopmentPath: string;
@@ -349,11 +416,23 @@ function printInstructions(
   }
   report.setup.notes.forEach((note) => context.out(`\n${note}`));
   context.out('');
-  if (report.signInPath !== null) {
-    context.out(
-      `The Sign in link of the layout and the sign-in prompts of the pages open ${report.signInPath}, set by provideSignInPath(${quote(report.signInPath)}) in ${layout.configFile}. The app has no page there yet: add your sign-in page at that route, or change the path to the one of your sign-in page.`,
-    );
+  if (report.signIn.path !== null) {
+    const route = `provideSignInPath(${quote(report.signIn.path)}) in ${layout.configFile}`;
+    if (report.signIn.file) {
+      context.out(
+        `The Sign in link of the layout and the sign-in prompts of the pages open ${report.signIn.path}, set by ${route}. pidrang generated the sign-in page at ${join(layout.appDirectory, 'pages', 'sign-in-page.ts')}.`,
+      );
+    } else {
+      context.out(
+        `The Sign in link of the layout and the sign-in prompts of the pages open ${report.signIn.path}, set by ${route}. pidrang did not generate the page there: ${report.signIn.reason}.`,
+      );
+    }
     return;
+  }
+  if (report.signIn.reason !== '') {
+    context.out(
+      `pidrang did not generate the sign-in page the pages and the layout link to: ${report.signIn.reason}.`,
+    );
   }
   context.out(
     `When a write needs a signed-in user, the pages say so in plain text. To turn that into a link to your sign-in page, add this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of that page inside your app:\n`,
@@ -492,9 +571,9 @@ async function runInit(
   const { planPath } = options;
   const layout = await preflightApp(context.cwd, options.project);
   const pages = relocateFiles(
-    [...generatePagesBundle(), generateResourceRoutesFile()],
+    generatePagesBundle().filter((file) => file.path !== SIGN_IN_PAGE_FILE),
     layout.appDirectory,
-  );
+  ).concat(generateResourceRoutesFile());
   const pagesPlan = await planWrites(context.cwd, pages);
   if (pagesPlan.conflicts.length > 0) {
     const resourcesExist = await access(
@@ -520,6 +599,7 @@ async function runInit(
     tooling.welcomeTemplate,
   );
   const generation = await collectPlan(context, layout, planPath, newApp);
+  const signIn = await planSignIn(context, layout, tooling, generation.signIn);
   if (!newApp && generation.layout === 'sidebar') {
     context.err(
       `${htmlPath} or ${layout.routesFile} is no longer the one ng new writes, so pidrang did not add the navigation layout.`,
@@ -536,7 +616,7 @@ async function runInit(
     );
   }
   const withLayout = componentSource !== null;
-  const signInPath = withLayout ? LAYOUT_SIGN_IN_PATH : undefined;
+  const signInPath = signIn.written ? layout.signInPath : undefined;
   const [resources] = relocateFiles(
     [
       {
@@ -659,6 +739,7 @@ async function runInit(
     ...pages,
     ...environmentFilesToWrite,
     ...layoutFiles,
+    ...(signIn.file === null ? [] : [signIn.file]),
   ]);
   const editPlan = await planEdits(context.cwd, candidates);
   const conflicts = [...plan.conflicts, ...editPlan.conflicts];
@@ -686,10 +767,154 @@ async function runInit(
     environmentDevelopmentPath: environment.development,
     createdEnvironment,
     environmentLines: environmentLinesToAdd,
-    signInPath: signInPath ?? null,
+    signIn: {
+      path: signInPath ?? null,
+      file: signIn.file !== null,
+      reason: signIn.reason,
+    },
   });
   printInstallReport(context, installPlan, installResult);
   return INSTALL_STATUS[installResult.outcome];
+}
+
+const SIGN_IN_ONLY_SETUP: AppSetup = {
+  imports: [],
+  constants: [],
+  pidrangConfig: [],
+  environment: [],
+  notes: [],
+  packages: [],
+};
+
+const SIGN_IN_PROVIDER_CALL = /provideSignInPath\(\s*(['"`])([^'"`]*)\1\s*\)/;
+
+function withSignInPath(
+  typescript: AppTooling['typescript'],
+  path: string,
+  source: string,
+  signInPath: string,
+): string | null {
+  const call = SIGN_IN_PROVIDER_CALL.exec(source);
+  if (call !== null) {
+    return call[2] === signInPath ? source : null;
+  }
+  const edit = editAppConfig(typescript, path, source, {
+    setup: { ...SIGN_IN_ONLY_SETUP, packages: [] },
+    environmentImport: null,
+    resourcesImport: './resources',
+    signInPath,
+    signInOnly: true,
+  });
+  return edit.kind === 'unchanged' ? source : edit.content;
+}
+
+function reportGenerateConflicts(
+  context: CliContext,
+  conflicts: WriteConflict[],
+): void {
+  context.err(
+    'pidrang generate auth stopped before writing anything: these files cannot be kept as they are:',
+  );
+  conflicts.forEach((item) => context.err(`  ${item.path}: ${item.reason}`));
+}
+
+function printGeneratedSignIn(
+  context: CliContext,
+  layout: AppLayout,
+  edits: FileEditPlan[],
+): void {
+  const manual = edits.filter((edit) => edit.manual);
+  if (manual.length > 0) {
+    context.out('');
+    context.out(
+      'pidrang could not edit these files safely. Each one now starts with a pidrang comment that lists the exact change to make:',
+    );
+    manual.forEach((edit) =>
+      context.out(`  ${edit.path}: ${edit.reason ?? 'see the comment'}`),
+    );
+  }
+  context.out('');
+  context.out(
+    `The Sign in link of the layout and the sign-in prompts of the pages open ${layout.signInPath}, set by provideSignInPath(${quote(layout.signInPath)}) in ${layout.configFile}.`,
+  );
+}
+
+async function runGenerateAuth(
+  context: CliContext,
+  options: { project?: string },
+): Promise<number> {
+  const layout = await preflightApp(context.cwd, options.project);
+  if (layout.signInRoute) {
+    context.out(
+      `app.routes.ts already declares its own ${layout.signInPath} route, so pidrang left the sign-in page to it and wrote nothing.`,
+    );
+    return EXIT_OK;
+  }
+  const tooling = context.tooling ?? (await loadAppTooling(context.cwd));
+  const file = signInFile(layout, tooling);
+  const problem = await conflictReason(context.cwd, file);
+  if (problem === 'unchanged') {
+    context.out(
+      `${file.path} is already the sign-in page pidrang generates for this app, so pidrang wrote nothing.`,
+    );
+    return EXIT_OK;
+  }
+  if (problem !== null) {
+    context.err(
+      `${file.path} is already there and ${problem}, so pidrang left it as it is and wrote nothing.`,
+    );
+    return EXIT_FAILED;
+  }
+  const routesSource = await readFile(
+    join(context.cwd, layout.routesFile),
+    'utf8',
+  );
+  const routesEdit = editAppRoutes(
+    tooling.typescript,
+    layout.routesFile,
+    routesSource,
+    './resource-routes',
+    null,
+  );
+  const configSource = await readFile(
+    join(context.cwd, layout.configFile),
+    'utf8',
+  );
+  const configAfter = withSignInPath(
+    tooling.typescript,
+    layout.configFile,
+    configSource,
+    layout.signInPath,
+  );
+  if (configAfter === null) {
+    context.err(
+      `${layout.configFile} already calls provideSignInPath with another path, so pidrang wrote nothing. Change that path to ${quote(layout.signInPath)} to use the generated page, or keep your own sign-in page.`,
+    );
+    return EXIT_FAILED;
+  }
+  const candidates: FileEditPlan[] = [
+    ...editCandidate(layout.routesFile, routesSource, routesEdit),
+    ...editCandidate(
+      layout.configFile,
+      configSource,
+      configAfter === configSource
+        ? { kind: 'unchanged' }
+        : { kind: 'edited', content: configAfter },
+    ),
+  ];
+  const plan = await planWrites(context.cwd, [file]);
+  const editPlan = await planEdits(context.cwd, candidates);
+  const conflicts = [...plan.conflicts, ...editPlan.conflicts];
+  if (conflicts.length > 0) {
+    reportGenerateConflicts(context, conflicts);
+    return EXIT_FAILED;
+  }
+  const status = await writeFiles(context, { ...plan, edits: editPlan.edits });
+  if (status !== EXIT_OK) {
+    return status;
+  }
+  printGeneratedSignIn(context, layout, editPlan.edits);
+  return EXIT_OK;
 }
 
 export async function runCli(
@@ -714,10 +939,12 @@ export async function runCli(
     return EXIT_FAILED;
   }
   const { values, positionals } = parsed;
-  const unknownCommand =
-    positionals.length > 1 ||
-    (positionals.length === 1 && positionals[0] !== 'init');
-  if (unknownCommand) {
+  if (values.help && positionals.length === 0) {
+    context.out(usage(context.providers));
+    return EXIT_OK;
+  }
+  const command = COMMANDS[positionals.join(' ')];
+  if (command === undefined) {
     context.err(`Unknown command: ${positionals.join(' ')}`);
     context.err(usage(context.providers));
     return EXIT_FAILED;
@@ -725,10 +952,6 @@ export async function runCli(
   if (values.help) {
     context.out(usage(context.providers));
     return EXIT_OK;
-  }
-  if (positionals.length === 0) {
-    context.err(usage(context.providers));
-    return EXIT_FAILED;
   }
 
   const nodeProblem = nodeVersionProblem(context.nodeVersion);
@@ -739,6 +962,9 @@ export async function runCli(
   }
 
   try {
+    if (command === 'generate auth') {
+      return await runGenerateAuth(context, { project: values.project });
+    }
     return await runInit(context, {
       planPath: values.plan,
       project: values.project,
