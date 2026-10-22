@@ -15,7 +15,7 @@ test('opens the home page and the products list up to row eleven', async ({
   await expect(
     page.getByRole('heading', { name: 'Pidrang demo' }),
   ).toBeVisible();
-  await page.getByRole('link', { name: 'products' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'products' }).click();
 
   const newest = await productIdsNewestFirst(page);
   expect(await rowIds(page)).toEqual(newest.slice(0, 10));
@@ -26,7 +26,7 @@ test('opens the home page and the products list up to row eleven', async ({
 test('opens the show, edit and create pages of a record', async ({ page }) => {
   await page.goto(`/products/${products.firstId}`);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Products — ',
+    'products — ',
   );
   await expect(page.locator('dd').first()).toHaveText(products.firstId);
 
@@ -35,7 +35,7 @@ test('opens the show, edit and create pages of a record', async ({ page }) => {
 
   await page.goto('/products/create');
   await expect(
-    page.getByRole('heading', { name: 'Create Products' }),
+    page.getByRole('heading', { name: 'Create products' }),
   ).toBeVisible();
 });
 
