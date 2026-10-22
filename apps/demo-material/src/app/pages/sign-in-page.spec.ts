@@ -1,6 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { AuthProvider, DataProvider, providePidrang } from '@pidrang/core';
+import {
+  AuthIdentity,
+  AuthProvider,
+  DataProvider,
+  providePidrang,
+} from '@pidrang/core';
 
 import { DEMO_ACCOUNT, DemoAccount } from '@pidrang/demo-shared';
 import { SignInPage } from './sign-in-page';
@@ -18,11 +23,13 @@ const account: DemoAccount = {
   password: 'shared-demo-password',
 };
 
+let logout: AuthProvider['logout'] = () => Promise.resolve();
+
 function authProvider(login: AuthProvider['login']): AuthProvider {
   return {
     login,
-    logout: () => Promise.resolve(),
-    getIdentity: () => Promise.resolve(null),
+    logout: () => logout(),
+    getIdentity: () => Promise.resolve(identity),
     onSessionChange: (listener) => {
       sessionChanged = listener;
       return () => undefined;
@@ -31,11 +38,14 @@ function authProvider(login: AuthProvider['login']): AuthProvider {
 }
 
 let sessionChanged: () => void = () => undefined;
+let identity: AuthIdentity | null = null;
 
 function configure(
   login: AuthProvider['login'],
   demoAccount: DemoAccount | null,
+  signedIn: AuthIdentity | null = null,
 ): void {
+  identity = signedIn;
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
@@ -48,6 +58,8 @@ function configure(
     ],
   });
 }
+
+const signedIn: AuthIdentity = { id: '1', email: 'writer@example.test' };
 
 function demoButton(element: HTMLElement): HTMLButtonElement | undefined {
   return Array.from(element.querySelectorAll('button')).find((button) =>
@@ -453,5 +465,64 @@ describe('SignInPage failure and session changes', () => {
     expect(fixture.nativeElement.textContent).not.toContain(
       'Invalid login credentials',
     );
+  });
+});
+
+function signOutButton(element: HTMLElement): HTMLButtonElement | undefined {
+  return Array.from(element.querySelectorAll('button')).find(
+    (button) => button.textContent?.trim() === 'Sign out',
+  );
+}
+
+describe('SignInPage sign-out', () => {
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    logout = () => Promise.resolve();
+    sessionChanged = () => undefined;
+  });
+
+  it('shows no sign-out when no one is signed in', async () => {
+    configure(() => Promise.resolve(), null);
+
+    const fixture = TestBed.createComponent(SignInPage);
+    await fixture.whenStable();
+
+    expect(signOutButton(fixture.nativeElement)).toBeUndefined();
+    expect(fixture.nativeElement.textContent).not.toContain('Signed in as');
+  });
+
+  it('says who is signed in and signs out through the provider', async () => {
+    const signOut = vi.fn().mockResolvedValue(undefined);
+    logout = signOut;
+    configure(() => Promise.resolve(), null, signedIn);
+    const fixture = TestBed.createComponent(SignInPage);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Signed in as');
+    expect(fixture.nativeElement.textContent).toContain(signedIn.email);
+
+    signOutButton(fixture.nativeElement)?.click();
+    await fixture.whenStable();
+
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Sign out while a sign-in runs', async () => {
+    const running = pending();
+    configure(() => running.promise, null, signedIn);
+    const fixture = TestBed.createComponent(SignInPage);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(signOutButton(fixture.nativeElement)?.disabled).toBe(false);
+
+    fill(fixture.nativeElement, 'writer@example.test', 'secret');
+    form(fixture.nativeElement).requestSubmit();
+    fixture.detectChanges();
+
+    expect(signOutButton(fixture.nativeElement)?.disabled).toBe(true);
+
+    running.resolve();
+    await fixture.whenStable();
   });
 });
