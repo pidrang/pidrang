@@ -242,6 +242,66 @@ export const appConfig = {
       expect(edit(source, SIGN_IN)).toEqual({ kind: 'unchanged' });
     });
 
+    it('writes a comment when the app already declares provideSignInPath', () => {
+      const source = STOCK.replace(
+        "import { routes } from './app.routes';",
+        `import { routes } from './app.routes';
+
+const provideSignInPath = (path: string) => ({ provide: path });`,
+      );
+      const result = edit(source, SIGN_IN);
+
+      expect(result.kind).toBe('manual');
+      if (result.kind === 'manual') {
+        expect(result.reason).toBe(
+          'provideSignInPath is already declared in this file',
+        );
+        expect(result.content).toContain(
+          "// pidrang:   import { provideSignInPath } from './pidrang/index';",
+        );
+      }
+    });
+
+    it('writes a comment when provideSignInPath already means something else', () => {
+      const source = STOCK.replace(
+        "import { routes } from './app.routes';",
+        `import { routes } from './app.routes';
+
+const provideSignInPath = 'something else';`,
+      );
+      const result = edit(source, SIGN_IN);
+
+      expect(result.kind).toBe('manual');
+      if (result.kind === 'manual') {
+        expect(result.reason).toBe(
+          'provideSignInPath is already declared in this file',
+        );
+        expect(result.content).toContain(
+          "// pidrang:   import { provideSignInPath } from './pidrang/index';",
+        );
+        expect(result.content).toContain(
+          "// pidrang:   provideSignInPath('/sign-in')",
+        );
+        expect(result.content.endsWith(source)).toBe(true);
+      }
+    });
+
+    it('writes a comment when the app imports provideSignInPath from elsewhere', () => {
+      const source = STOCK.replace(
+        "import { routes } from './app.routes';",
+        `import { provideSignInPath } from './sign-in';
+import { routes } from './app.routes';`,
+      );
+      const result = edit(source, SIGN_IN);
+
+      expect(result.kind).toBe('manual');
+      if (result.kind === 'manual') {
+        expect(result.reason).toBe(
+          'the file already uses provideSignInPath for something else',
+        );
+      }
+    });
+
     describe('alone, without the pidrang setup', () => {
       const SIGN_IN_ONLY: ConfigRequest = {
         setup: { ...SETUP, imports: [], constants: [], pidrangConfig: [] },
