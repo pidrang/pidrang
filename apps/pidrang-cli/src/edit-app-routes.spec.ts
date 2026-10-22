@@ -104,28 +104,31 @@ export const routes: Routes = [
   it.each([
     ["{ path: '', redirectTo: 'login', pathMatch: 'full' }"],
     ['{ path: "", component: HomePage }'],
-  ])('keeps a routes array that already declares the empty path (%s)', (route) => {
-    const result = editAppRoutes(
-      typescript,
-      'src/app/app.routes.ts',
-      `export const routes: Routes = [
+  ])(
+    'keeps a routes array that already declares the empty path (%s)',
+    (route) => {
+      const result = editAppRoutes(
+        typescript,
+        'src/app/app.routes.ts',
+        `export const routes: Routes = [
   ${route},
 ];
 `,
-      './resource-routes',
-      'products',
-    );
+        './resource-routes',
+        'products',
+      );
 
-    expect(result).toEqual({
-      kind: 'edited',
-      content: `import { resourceRoutes } from './resource-routes';
+      expect(result).toEqual({
+        kind: 'edited',
+        content: `import { resourceRoutes } from './resource-routes';
 export const routes: Routes = [
   ...resourceRoutes,
   ${route},
 ];
 `,
-    });
-  });
+      });
+    },
+  );
 
   it('lists the redirect to add by hand when it cannot edit the routes', () => {
     const result = editAppRoutes(
@@ -211,7 +214,12 @@ export const routes2: Routes = [];
 
     it('recognizes the welcome page of ng new with an empty routes array', () => {
       expect(
-        isNewApp(typescript, 'export const routes: Routes = [];\n', WELCOME, WELCOME),
+        isNewApp(
+          typescript,
+          'export const routes: Routes = [];\n',
+          WELCOME,
+          WELCOME,
+        ),
       ).toBe(true);
     });
 
@@ -223,7 +231,7 @@ export const routes2: Routes = [];
       ],
       [
         'the app has routes without the welcome template',
-        'export const routes = [\n  { path: \'sign-in\', component: SignInPage },\n];\n',
+        "export const routes = [\n  { path: 'sign-in', component: SignInPage },\n];\n",
         null,
       ],
       [
@@ -247,11 +255,16 @@ export const routes2: Routes = [];
     });
 
     it('recognizes an empty routes array without TypeScript', () => {
-      expect(isNewApp(null, 'export const routes = [];\n', WELCOME, WELCOME)).toBe(
-        true,
-      );
       expect(
-        isNewApp(null, 'export const routes = [{ path: "a" }];\n', WELCOME, WELCOME),
+        isNewApp(null, 'export const routes = [];\n', WELCOME, WELCOME),
+      ).toBe(true);
+      expect(
+        isNewApp(
+          null,
+          'export const routes = [{ path: "a" }];\n',
+          WELCOME,
+          WELCOME,
+        ),
       ).toBe(false);
     });
   });

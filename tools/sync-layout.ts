@@ -14,63 +14,24 @@ export type BuildLayoutModule = (
 ) => string[];
 
 const SHARED_IMPORT = "import { injectSignInUrl } from '@pidrang/demo-shared';";
-const CORE_IMPORT = /^import \{[^}]*\} from '@angular\/core';$/m;
-const SIGN_IN_TOKEN_IMPORT = "import { InjectionToken } from '@angular/core';";
-const SIGN_IN_URL_IMPORT = "import { UrlTree } from '@angular/router';";
-const SIGN_IN_PATH_IMPORT_SOURCE = "export * from './sign-in-path';";
-const SIGN_IN_PATH_MODULE = "import { SIGN_IN_PATH } from './sign-in-path';";
-const SIGN_IN_PATH_IMPORT = "import { SIGN_IN_PATH } from '../pidrang/index';";
-const LAYOUT_DOC_COMMENT =
-  "/** @type {import('@angular/router').UrlTree | null} */";
-const SIGN_IN_URL = `function injectSignInUrl(): UrlTree | null {
-  return inject(SIGN_IN_PATH);
-}
-`;
+const PAGE_HELPERS_IMPORT =
+  "import { injectSignInUrl } from '../pidrang/index';";
+const SIGN_IN_URL_EXPORT = "export * from './sign-in-url';";
 
-function withCoreInject(imports: string): string {
-  const core = imports.match(CORE_IMPORT)?.[0];
-  if (core === undefined) {
-    throw new Error('The demo layout does not import @angular/core');
-  }
-  if (/(^|[\s,{])inject([\s,}]|$)/.test(core)) {
-    return imports;
-  }
-  return imports.replace(CORE_IMPORT, () =>
-    core.replace('Component,', 'Component, inject,'),
-  );
-}
-
-function withSharedImports(imports: string, modules: string[]): string[] {
+function withPageHelpers(imports: string): string[] {
   if (
-    !generatePagesBundle().some((file) =>
-      file.content.includes(SIGN_IN_PATH_IMPORT_SOURCE),
+    !generatePagesBundle().some(
+      (file) =>
+        file.path === 'src/app/pidrang/index.ts' &&
+        file.content.includes(SIGN_IN_URL_EXPORT),
     )
   ) {
-    throw new Error('The pages bundle exports no sign-in path module');
+    throw new Error('The page helpers export no injectSignInUrl');
   }
-  const lines = imports.split('\n');
-  const index = lines.indexOf(SHARED_IMPORT);
-  if (index < 0) {
+  if (!imports.split('\n').includes(SHARED_IMPORT)) {
     throw new Error('The demo layout does not import @pidrang/demo-shared');
   }
-  lines.splice(
-    index,
-    1,
-    LAYOUT_DOC_COMMENT,
-    '',
-    SIGN_IN_TOKEN_IMPORT,
-    SIGN_IN_URL_IMPORT,
-  );
-  return [
-    lines.filter((line) => !modules.includes(line)).join('\n'),
-    ...modules,
-  ];
-}
-
-function materialModules(imports: string): string[] {
-  return imports
-    .split('\n')
-    .filter((line) => line.includes(" from '@angular/material/"));
+  return [imports.replace(SHARED_IMPORT, () => PAGE_HELPERS_IMPORT)];
 }
 
 const demoLayout = (app: string): string =>
@@ -80,8 +41,9 @@ function demoLayoutParts(
   buildLayoutModule: BuildLayoutModule,
   app: string,
 ): string[] {
-  return buildLayoutModule(readFileSync(demoLayout(app), 'utf8'), (imports) =>
-    withSharedImports(withCoreInject(imports), materialModules(imports)),
+  return buildLayoutModule(
+    readFileSync(demoLayout(app), 'utf8'),
+    withPageHelpers,
   );
 }
 
@@ -94,16 +56,7 @@ export function tailwindLayout(buildLayoutModule: BuildLayoutModule): string[] {
 }
 
 function generatedLayout(parts: string[]): string {
-  const [imports, component] = parts;
-  const header = [
-    imports.replace(LAYOUT_DOC_COMMENT, SIGN_IN_PATH_IMPORT),
-    '',
-    SIGN_IN_URL,
-    ...parts.slice(2),
-  ]
-    .filter((group) => group.trim() !== '')
-    .join('\n\n');
-  return `${header}\n\n${component}`;
+  return parts.join('\n');
 }
 
 async function render(): Promise<string> {

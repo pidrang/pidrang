@@ -44,7 +44,8 @@ function routesArray(
   file: ts.SourceFile,
 ): ts.ArrayLiteralExpression | null {
   const initializer = declaredInitializer(typescript, file);
-  return initializer !== null && typescript.isArrayLiteralExpression(initializer)
+  return initializer !== null &&
+    typescript.isArrayLiteralExpression(initializer)
     ? initializer
     : null;
 }
@@ -71,7 +72,10 @@ export function isNewApp(
   );
 }
 
-function isEmptyArray(typescript: TypeScriptApi, routesSource: string): boolean {
+function isEmptyArray(
+  typescript: TypeScriptApi,
+  routesSource: string,
+): boolean {
   const file = parseSource(typescript, 'app.routes.ts', routesSource);
   const routes = routesArray(typescript, file);
   return routes !== null && routes.elements.length === 0;
@@ -99,6 +103,23 @@ function declaresEmptyPath(
       property.name.text === 'path' &&
       typescript.isStringLiteralLike(property.initializer) &&
       property.initializer.text === '',
+  );
+}
+
+const EMPTY_PATH = /\bpath\s*:\s*(''|""|``)/;
+
+export function declaresEntryRoute(
+  typescript: TypeScriptApi | null,
+  routesSource: string,
+): boolean {
+  if (typescript === null) {
+    return EMPTY_PATH.test(routesSource);
+  }
+  const file = parseSource(typescript, 'app.routes.ts', routesSource);
+  const routes = routesArray(typescript, file);
+  return (
+    routes !== null &&
+    routes.elements.some((element) => declaresEmptyPath(typescript, element))
   );
 }
 
@@ -157,9 +178,8 @@ export function editAppRoutes(
     return manual('no single routes array was found');
   }
   const redirect =
-    redirectTo !== null && !array.elements.some((element) =>
-      declaresEmptyPath(typescript, element),
-    )
+    redirectTo !== null &&
+    !array.elements.some((element) => declaresEmptyPath(typescript, element))
       ? redirectLine(redirectTo)
       : null;
   if (
@@ -190,6 +210,9 @@ export function editAppRoutes(
   ]);
   return {
     kind: 'edited',
-    content: applyInsertions(source, [{ at: open + 1, text: additions }, ...imports]),
+    content: applyInsertions(source, [
+      { at: open + 1, text: additions },
+      ...imports,
+    ]),
   };
 }

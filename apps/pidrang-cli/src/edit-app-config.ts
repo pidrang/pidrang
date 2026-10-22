@@ -38,11 +38,14 @@ const BINDING_IMPORT: SetupImport = {
   from: '@angular/router',
 };
 
+const SIGN_IN_IMPORT: SetupImport = {
+  name: 'provideSignInPath',
+  from: './pidrang/index',
+};
+
 function setupImports(request: ConfigRequest): SetupImport[] {
   return [
-    ...(request.signInPath === undefined
-      ? []
-      : [{ name: 'provideSignInPath', from: './pidrang/index' }]),
+    ...(request.signInPath === undefined ? [] : [SIGN_IN_IMPORT]),
     ...request.setup.imports,
     ...(request.environmentImport === null
       ? []
@@ -112,7 +115,7 @@ function findProviders(
   return chosen.length === 1 ? chosen[0] : null;
 }
 
-function appendElement(
+export function appendElement(
   source: string,
   array: ts.ArrayLiteralExpression,
   element: (indent: string) => string,
@@ -262,6 +265,7 @@ export function editAppConfig(
         () => `provideSignInPath(${quote(signInPath)})`,
       ),
     );
+    imports.push(SIGN_IN_IMPORT);
   }
 
   if (needsPidrang) {

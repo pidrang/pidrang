@@ -1,14 +1,10 @@
 import { layoutParts } from './build-layout-module';
 import { generatePagesBundle } from './generate-pages-bundle';
-import {
-  generateLayoutFile,
-  layoutAppHtml,
-  layoutImport,
-} from './generate-layout-module';
+import { generateLayoutFile, layoutAppHtml } from './generate-layout-module';
 
 const SHARED_IMPORT = "import { injectSignInUrl } from '@pidrang/demo-shared';";
-const SIGN_IN_PATH_BARREL = "import { SIGN_IN_PATH } from '../pidrang/index';";
-const SIGN_IN_PATH_MODULE = "import { SIGN_IN_PATH } from './sign-in-path';";
+const PAGE_HELPERS_IMPORT =
+  "import { injectSignInUrl } from '../pidrang/index';";
 
 const SOURCE = `import { Component, input } from '@angular/core';
 import { injectSignInUrl } from '@pidrang/demo-shared';
@@ -43,7 +39,7 @@ describe('layoutParts', () => {
     const [imports, component] = layoutParts(SOURCE, (given) => [
       given.replace(SHARED_IMPORT, ''),
       "import { MatButtonModule } from '@angular/material/button';",
-      SIGN_IN_PATH_BARREL,
+      PAGE_HELPERS_IMPORT,
     ]);
 
     expect(imports).toContain(
@@ -52,7 +48,7 @@ describe('layoutParts', () => {
     expect(imports).toContain(
       "import { MatButtonModule } from '@angular/material/button';",
     );
-    expect(imports.trimEnd().endsWith(SIGN_IN_PATH_BARREL)).toBe(true);
+    expect(imports.trimEnd().endsWith(PAGE_HELPERS_IMPORT)).toBe(true);
     expect(imports).not.toContain('@pidrang/demo-shared');
     expect(component).toContain('template: "<div>\\n  @if (open()) {');
     expect(component).toContain('styles: ".menu {\\n  width: 14rem;\\n}\\n",');
@@ -77,24 +73,24 @@ describe('generateLayoutFile', () => {
 
       expect(file.path).toBe('src/app/layout/app-layout.ts');
       expect(file.content).toContain("selector: 'app-layout'");
-      expect(file.content).toContain('injectSignInUrl');
-      expect(file.content).toContain(SIGN_IN_PATH_BARREL);
-      expect(file.content).not.toContain(SIGN_IN_PATH_MODULE);
+      expect(file.content).toContain(PAGE_HELPERS_IMPORT);
+      expect(file.content).not.toContain('InjectionToken');
       expect(file.content).not.toContain('@pidrang/demo-shared');
       expect(file.content.trimEnd().endsWith('}')).toBe(true);
     },
   );
 
-  it('reads the sign-in path from the page helpers', () => {
-    const signInModule = generatePagesBundle().find((file) =>
-      file.content.includes("export * from './sign-in-path';"),
+  it('reads the sign-in link from the page helpers barrel', () => {
+    const barrel = generatePagesBundle().find(
+      (file) => file.path === 'src/app/pidrang/index.ts',
     );
-    expect(signInModule?.path).toBe('src/app/pidrang/index.ts');
+    expect(barrel?.content).toContain("export * from './sign-in-url';");
     for (const ui of ['material', 'tailwind'] as const) {
       const content = generateLayoutFile(ui).content;
-      expect(content).toContain(SIGN_IN_PATH_BARREL);
-      expect(content).toContain('function injectSignInUrl(): UrlTree | null');
-      expect(content).toContain('return inject(SIGN_IN_PATH);');
+      expect(
+        content.match(/^import .* from '\.\.\/pidrang\/index';$/gm),
+      ).toEqual([PAGE_HELPERS_IMPORT]);
+      expect(content).toContain('injectSignInUrl();');
     }
   });
 
@@ -108,10 +104,7 @@ describe('generateLayoutFile', () => {
     expect(tailwind).toContain('flex min-h-svh');
   });
 
-  it('renders the layout with the app name and imports it', () => {
-    expect(layoutImport()).toBe(
-      "import { AppLayout } from './layout/app-layout';\n",
-    );
+  it('renders the layout with the app name', () => {
     expect(layoutAppHtml('Shop')).toBe('<app-layout appName="Shop" />\n');
   });
 });

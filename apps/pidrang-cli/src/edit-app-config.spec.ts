@@ -214,4 +214,32 @@ export const appConfig = {
       expect(result.content.startsWith('// pidrang:')).toBe(true);
     }
   });
+
+  describe('with a sign-in path', () => {
+    const SIGN_IN: ConfigRequest = { ...REQUEST, signInPath: '/sign-in' };
+    const SIGN_IN_IMPORT =
+      "import { provideSignInPath } from './pidrang/index';";
+
+    it('adds the provider and its import once to a stock app', () => {
+      const result = edited(STOCK, SIGN_IN);
+
+      expect(result.match(/provideSignInPath\('\/sign-in'\)/g)).toHaveLength(1);
+      expect(result.split(SIGN_IN_IMPORT)).toHaveLength(2);
+      expect(edit(result, SIGN_IN)).toEqual({ kind: 'unchanged' });
+    });
+
+    it('adds the provider and its import when pidrang is already registered', () => {
+      const result = edited(edited(STOCK), SIGN_IN);
+
+      expect(result).toContain("provideSignInPath('/sign-in')");
+      expect(result).toContain(SIGN_IN_IMPORT);
+      expect(result.match(/providePidrang\(/g)).toHaveLength(1);
+    });
+
+    it('leaves a provider the app already passes alone', () => {
+      const source = edited(STOCK, { ...REQUEST, signInPath: '/login' });
+
+      expect(edit(source, SIGN_IN)).toEqual({ kind: 'unchanged' });
+    });
+  });
 });
