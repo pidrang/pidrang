@@ -128,6 +128,8 @@ This is why `postgres-schema-provider.spec.ts`'s fixture for a `bigint` `id` col
 
 Nothing publishes to npm yet, so no running consumer was affected by these gaps; the Postgres strategy is the one that sees everything.
 
+On top of what the strategy sees, `describe-table.ts` marks `created_at` and `updated_at` read-only when they are a `timestamp` with a default (#125). Postgres accepts a value for them, so no strategy reports them as read-only, but the database or a trigger owns them, and a form field for them only invites a wrong date. The rule needs `hasDefault`, so it does not apply with GraphQL, which cannot see defaults. Labels are generated the same way for every strategy: `readable-label.ts` splits a name on `_`, `-`, `.` and lower-to-upper case changes, capitalizes the first word and lowercases the others (`fixture_items` gives `Fixture items`), and `generate-resources-file.ts` writes it on the `Resource` and on each `Field`.
+
 ### The default list order is chosen when `resources.ts` is generated
 
 `libs/demo-shared/src/lib/resource-list-state.ts`, `libs/cli/src/lib/generate-resources-file.ts`
@@ -157,6 +159,24 @@ The prompts validate as the user types (a project URL with `http(s)://` and no p
 `libs/cli/src/lib/pages-bundle-sources.ts`, `libs/cli/src/lib/build-pages-bundle.ts`, `libs/cli/src/lib/generated-pages.ts`, `tools/sync-generated-pages.ts`
 
 The pages written by `pidrang init` are the generic pages of `apps/demo-material`. They are resource-agnostic and shared by every table, so they are generated once, not per table. `pages-bundle-sources.ts` lists which source file becomes which generated file, and `pnpm run sync:pages` rewrites `generated-pages.ts` from those sources. The published CLI only ships `generated-pages.ts`, so it never reads a repository file at run time. After changing a source page, run `pnpm run sync:pages`: the parity test in `generate-pages-bundle.spec.ts` (and `pnpm run sync:pages --check`) fails while the generated file is out of date.
+
+### Generated pages load lazily
+
+`RESOURCE_ROUTES_SNIPPET` in `libs/cli/src/lib/generate-pages-bundle.ts`
+
+`resource-routes.ts` used to import the four pages, so Angular Material's table and form code went into the initial bundle. An `ng new` app with the Supabase client, the pages and the layout came to 1.00 MB, above the 1 MB error budget `ng new` sets, so `ng build` failed right after `pidrang init` (found by the release gate's `starter` consumer). Each route now uses `loadComponent`, which brings the initial bundle of that app to 691 kB. It is still above the 500 kB warning budget: what stays is Angular, `@supabase/supabase-js` and the layout's Material modules, which the first screen needs anyway. Init does not change the app's budgets, which are the app's call.
+
+### The navigation layout is generated from the demos
+
+`apps/demo-material/src/app/layout/app-layout.ts`, `apps/demo-tailwind/src/app/layout/app-layout.ts`, `tools/sync-layout.ts`, `libs/cli/src/lib/generated-layout.ts`, `build-layout-module.ts`, `generate-layout-module.ts`
+
+Like the pages, the layout `pidrang init` writes is the demos' own: `pnpm run sync:layout` reads both demo layouts, inlines their `TEMPLATE` and `STYLES` constants into the `@Component` decorator, and writes them as two strings into `generated-layout.ts`. CI runs `pnpm run sync:layout -- --check`. The only change is the import of `injectSignInUrl`: the demos take it from `@pidrang/demo-shared`, the generated layout from `'../pidrang/index'`, the page helpers barrel init writes with the pages, so the layout needs no file of its own besides `src/app/layout/app-layout.ts`. There is one variant per UI layer, chosen from the app's `package.json` (`@pidrang/tailwind` gives the Tailwind one), so a Tailwind app does not get Angular Material just for its shell.
+
+The layout is written only on a new app (see [A new app opens on its first list](#a-new-app-opens-on-its-first-list)): an app with its own pages already has a shell, and a second header and menu around it would be wrong more often than right. Writing it takes four more edits, because a layout that is only written breaks the app:
+
+- `app.html` gets `<app-layout appName="..." />`, and `app.ts` gets `AppLayout` in its `imports`, edited on the syntax tree by `edit-app-component.ts`. `RouterOutlet` is replaced when nothing else in the file uses it, since Angular warns about an unused standalone import (`NG8113`), and kept otherwise.
+- `app.spec.ts`: the `should create the app` test of `ng new` creates `App`, which now creates `AppLayout`, which calls `injectAuthProvider()` and throws without `providePidrang`. Init adds `TestBed.overrideComponent(App, { remove: { imports: [AppLayout] }, add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] } })` to the `beforeEach`: the test still checks `App`, without the layout. The demos' own `app.spec.ts` do the same.
+- `app.config.ts` gets `provideSignInPath('/sign-in')`. Writing the printed `/your-sign-in-route` placeholder instead would stop the app at startup, since `provideSignInPath` refuses it (see [The sign-in link points only to a path the app provides](#the-sign-in-link-points-only-to-a-path-the-app-provides)). Init generates no page there yet (#112, #129), so the link leads nowhere until the app adds one, and init says so.
 
 ## Routing
 
@@ -206,15 +226,15 @@ An app wired by init before this rename keeps `supabaseAnonKey`: a later run see
 
 ### `pidrang init` wires the app itself
 
-`apps/pidrang-cli/src/edit-app-config.ts`, `edit-app-routes.ts`, `edit-app-html.ts`, `edit-app-spec.ts`, `edit-environments.ts`, `libs/cli/src/lib/app-setup.ts`, `libs/cli-supabase/src/lib/supabase-app-setup.ts`
+`apps/pidrang-cli/src/edit-app-config.ts`, `edit-app-routes.ts`, `edit-app-html.ts`, `edit-app-component.ts`, `edit-app-spec.ts`, `edit-environments.ts`, `libs/cli/src/lib/app-setup.ts`, `libs/cli-supabase/src/lib/supabase-app-setup.ts`
 
-The first version printed the snippets to paste into `app.config.ts`, `app.routes.ts` and `app.html`. #107 sets the acceptance rule at "no manual edit except in `environment.xxx.ts`", and a printed snippet fails that on every app: a missed paste, a `provideRouter(routes)` line left as it was, or `...resourceRoutes` put below a `**` route breaks every generated page without an error of its own. Init now edits the three files.
+The first version printed the snippets to paste into `app.config.ts`, `app.routes.ts` and `app.html`. #107 sets the acceptance rule at "no manual edit except in `environment.xxx.ts`", and a printed snippet fails that on every app: a missed paste, a `provideRouter(routes)` line left as it was, or `...resourceRoutes` put below a `**` route breaks every generated page without an error of its own. Init now edits the three files, and `app.ts` and `app.spec.ts` too when it adds the navigation layout.
 
 Each provider returns an `AppSetup` (imports, constants, the properties of `providePidrang`, environment entries, notes) and the CLI writes the file from it, so `@pidrang/cli` still never imports a concrete provider and `@pidrang/cli-supabase` decides what a Supabase app needs: the client, the data provider, the auth provider, and the note that a browser app takes the anon key only. The anon key is always written as a placeholder. The service role strategy has that key in memory, and writing it into a bundle would hand every visitor full database access; the url is the project URL of the connection, derived from the database host or user when a direct connection has none and that names the project ref, and left as a placeholder with a note otherwise.
 
 The edits go through the app's own `typescript`: init resolves it from the app, so the parser matches the app's syntax, and it changes ranges in the syntax tree rather than matching text with regular expressions. Positions are what make the edit idempotent: a second run finds the import, the constant and the provider already there and reports the file unchanged instead of adding a second copy. `withComponentInputBinding()` is added to the single existing `provideRouter(...)` call and keeps its other features.
 
-Some files cannot be edited safely: no `typescript` installed next to the app, a `providers` array built at run time, several configs and none named `appConfig`, a name already used for something else in the file, `app.html` customized with no router outlet. Init then leaves the content alone and prepends a comment (`// pidrang:` in TypeScript, `<!-- pidrang:` in HTML) listing the imports, the constant, the `provideRouter` line and the provider call to write. A later run strips and rebuilds that block, so comments never accumulate.
+Some files cannot be edited safely: no `typescript` installed next to the app, a `providers` array built at run time, several configs and none named `appConfig`, a name already used for something else in the file, `app.html` customized with no router outlet. Init then leaves the content alone and prepends a comment (`// pidrang:` in TypeScript, one `<!-- pidrang: ... -->` per line in HTML) listing the imports, the constant, the `provideRouter` line and the provider call to write. A later run strips and rebuilds that block, so comments never accumulate. The HTML lines used to be left open, so the rest of the template became a comment and `ng build` failed with `NG5002`; a block left that way by an older init is replaced too, and an outlet inside a comment does not count as one.
 
 Replacing the welcome template breaks the `should render title` test of the `app.spec.ts` that `ng new` writes: it reads the welcome `h1`, which is gone, so a fresh app would fail `ng test` right after init. Init therefore removes that test, and only when it has just replaced the welcome template, so a spec is never touched in an app whose `app.html` it left alone. It recognizes the test by its title and by its `querySelector('h1')` call. Another test that reads the `h1` is the user's own: init keeps it and lists it in a `// pidrang:` comment instead of deleting it.
 
@@ -237,6 +257,14 @@ The generated code imports `@pidrang/core`, the provider's packages and the UI l
 The install runs after the files are written: files that are already in place stay useful when the network or the registry fails, and the exact commands are printed instead. A failed install exits with `1` so CI notices. `--plan` never installs: it asks no question, and installing is a change to the app that a CI run should opt into by running the printed commands. Node.js is checked before anything else against the `engines` range, since npm only warns about it, and a test keeps the two in sync.
 
 A second run must not undo what the app already set up: running the Material schematic again would ask its questions again and may add a theme next to the app's own. A package counts as present when `package.json` declares it and `node_modules` holds it, and an `@pidrang` one only at the version of the CLI. The package manager follows what the Angular CLI itself reads (`cli.packageManager`), then `packageManager`, then lockfiles up to the git root, so an app inside a pnpm or yarn workspace is not installed with npm. Outside a git repository only the app folder is searched, so a stray lockfile in a home directory does not decide. With Yarn Plug'n'Play there is no `node_modules`, so every package counts as missing: `yarn add` runs again, which changes nothing, and so does `ng add @angular/material`, which asks its questions again.
+
+### A new app opens on its first list
+
+`apps/pidrang-cli/src/edit-app-routes.ts` (`isNewApp`, `declaresEntryRoute`), `entry-redirect.ts`, `run-cli.ts`
+
+`ng new` leaves `/` on an empty view once the welcome template is gone, so a new app showed nothing until the user typed a resource URL (#125). Init now redirects `''` to the first generated page, but only on a new app: an `app.routes.ts` that exports an empty `routes` array and an `app.html` that still holds the welcome template. An app with its own routes decides what it opens on, so init only prints the redirect line there, and not even that when `app.routes.ts` already declares a `''` route. Without `typescript`, the empty array and the `''` route are found with a pattern instead of the syntax tree.
+
+The target is the list of the first table that has one, and the create page of the first table that has one only when no table has a list: a form is a poor first screen when a list exists further down. Tables keep the order the provider lists them in. Where an app should open when its reads need a signed-in user is left to #129.
 
 ### Route order matters
 
@@ -291,13 +319,15 @@ The sign-in form submits natively, so Enter in either field signs in. While a si
 
 `tools/release-gate`
 
-The gate starts every server it tests on its own port (4310, 4311, 4320, 4321) and refuses to reuse one already running. A `nx serve` left running on 4200 points at the hosted project, and Playwright's `reuseExistingServer` would test that instead. For the same reason, every page blocks requests to non-loopback hosts. The fixtures are reloaded before each test, so the tests share one database and must run one at a time: the config sets one worker and one browser.
+The gate starts every server it tests on its own port (4310, 4311, 4320, 4321, 4322) and refuses to reuse one already running. A `nx serve` left running on 4200 points at the hosted project, and Playwright's `reuseExistingServer` would test that instead. For the same reason, every page blocks requests to non-loopback hosts. The fixtures are reloaded before each test, so the tests share one database and must run one at a time: the config sets one worker and one browser.
 
 The gate keeps the tarballs it tested next to their sha256 in `identities.json`, rather than only checking them and deleting them like `verify:artifacts`. Publishing can then prove it ships the bytes that were tested.
 
 The installed apps are copied outside the repository before `npm install`. Inside it, Node would resolve any package missing from the app in the repository's own `node_modules`, and a missing peer dependency would go unnoticed.
 
 The `CI` and `Release gate` workflows install npm 11.21.1 over the npm 10 that comes with Node 22. Since `vitest` 4.1.12 (2026-10-15), npm 10 crashes with `Cannot read properties of null (reading 'edgesOut')` while it resolves the optional peer dependencies of `@angular/build`, even in an app with no pidrang package. npm 11 and 12 install the same apps. The version is exact so a new npm release cannot change what the gate tests, and `identities.json` records it.
+
+The Material and Tailwind consumers are fixtures: apps already wired by hand, so they test the packages and the generated files, not what init does to an app. The `starter` consumer (full mode only, since init needs the local stack) runs `ng new` with the workspace's Angular CLI, installs the tarballs, runs `pidrang init --plan` with the navigation layout, and fails when init leaves a `pidrang:` comment in an app file. It then runs `ng test` and `ng build`, and Playwright checks the redirect, the layout and the sign-in link. Unit tests of each edit passed while a new app did not compile, failed `ng test`, stopped at startup and exceeded the bundle budget: only a real `ng new` app showed it.
 
 The old `apps/demo-material-e2e` and `apps/demo-tailwind-e2e` projects were removed. Their only test looked for a "Welcome" heading that no longer exists, and they served the demos against the hosted project. The demo smoke tests now live in the gate, against the local fixtures.
 
