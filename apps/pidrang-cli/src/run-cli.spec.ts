@@ -1011,6 +1011,9 @@ export class App {
       };
     }
 
+    const LAYOUT_IGNORED =
+      'src/app/app.html or src/app/app.routes.ts is no longer the one ng new writes, so pidrang did not add the navigation layout.';
+
     const STRUCTURAL_CONTEXT = () =>
       context(undefined, {
         ...STRUCTURAL,
@@ -1030,6 +1033,7 @@ export class App {
         join(root, 'src/app/layout/app-layout.ts'),
         'utf8',
       );
+      expect(err.join('\n')).not.toContain('navigation layout');
       expect(layout).toContain("selector: 'app-layout'");
       expect(layout).toContain('MatToolbarModule');
       expect(layout).toContain(
@@ -1189,9 +1193,41 @@ export const routes: Routes = [
       );
 
       const after = await snapshot();
+      expect(err).toContain(LAYOUT_IGNORED);
       expect(after['src/app/layout/app-layout.ts']).toBeUndefined();
       expect(after['src/app/app.html']).toBe('<router-outlet />\n');
       expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+    });
+
+    it('says the layout was not added when app.html is no longer the welcome page', async () => {
+      await put(
+        newAppFiles({ 'src/app/app.html': '<main><router-outlet /></main>\n' }),
+      );
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(err).toContain(LAYOUT_IGNORED);
+      expect(after['src/app/layout/app-layout.ts']).toBeUndefined();
+      expect(after['src/app/app.html']).toBe(
+        '<main><router-outlet /></main>\n',
+      );
+    });
+
+    it('says nothing about the layout when the plan does not ask for it', async () => {
+      await put(
+        newAppFiles({ 'src/app/app.html': '<main><router-outlet /></main>\n' }),
+      );
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      expect(err.join('\n')).not.toContain('navigation layout');
     });
 
     it('stops before writing when the layout file is already there', async () => {

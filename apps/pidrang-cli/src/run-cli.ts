@@ -520,6 +520,11 @@ async function runInit(
     tooling.welcomeTemplate,
   );
   const generation = await collectPlan(context, layout, planPath, newApp);
+  if (!newApp && generation.layout === 'sidebar') {
+    context.err(
+      `${htmlPath} or ${layout.routesFile} is no longer the one ng new writes, so pidrang did not add the navigation layout.`,
+    );
+  }
   const componentPath = posix.join(layout.appDirectory, 'app.ts');
   const componentSource =
     newApp && generation.layout === 'sidebar'
