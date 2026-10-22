@@ -25,9 +25,7 @@ describe('entryRedirect', () => {
 
   it('skips a table without a list', () => {
     expect(
-      entryRedirect(
-        plan(['orders', ['show', 'edit']], ['products', ['list']]),
-      ),
+      entryRedirect(plan(['orders', ['show', 'edit']], ['products', ['list']])),
     ).toBe('/products');
   });
 
@@ -35,6 +33,12 @@ describe('entryRedirect', () => {
     expect(
       entryRedirect(plan(['orders', ['show']], ['products', ['create']])),
     ).toBe('/products/create');
+  });
+
+  it('prefers a later list to an earlier create page', () => {
+    expect(
+      entryRedirect(plan(['users', ['create', 'show']], ['orders', ['list']])),
+    ).toBe('/orders');
   });
 
   it('prefers the list of a table that has both', () => {
