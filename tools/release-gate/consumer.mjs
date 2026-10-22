@@ -185,7 +185,7 @@ const cli = require('@pidrang/cli');
 const plan = JSON.parse(readFileSync(process.argv[1], 'utf8'));
 process.stdout.write(JSON.stringify({
   resources: cli.generateResourcesFile(plan),
-  routes: cli.RESOURCE_ROUTES_SNIPPET,
+  routes: cli.generateResourceRoutesFile().content,
   pages: cli.generatePagesBundle(),
   layout: process.argv[2] === 'material' ? cli.generateLayoutFile('material') : null,
 }));
@@ -268,9 +268,8 @@ function initWithBin(consumer, planPath, url, layout) {
 }
 
 function generateWithBin(consumer, planPath, url) {
-  const generated = initWithBin(consumer, planPath, url, 'none');
-  writeFile(consumer, 'src/app/resource-routes.ts', generated.routes);
-  const layout = requiredLayout(generated);
+  initWithBin(consumer, planPath, url, 'none');
+  const layout = requiredLayout(generatedFiles(consumer, planPath, 'material'));
   mkdirSync(dirname(join(consumer, layout.path)), { recursive: true });
   writeFileSync(join(consumer, layout.path), layout.content);
 }
