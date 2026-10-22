@@ -41,7 +41,33 @@ describe('editAppHtml', () => {
       expect(result.content.startsWith('<!-- pidrang:')).toBe(true);
       expect(result.content).toContain('<router-outlet />');
       expect(result.content.endsWith(source)).toBe(true);
+      expect(
+        result.content
+          .split('\n')
+          .filter((line) => line.startsWith('<!--'))
+          .every((line) => line.endsWith(' -->')),
+      ).toBe(true);
+      expect(result.content.replace(/<!--[\s\S]*?-->\n/g, '')).toBe(source);
     }
+  });
+
+  it('ignores an outlet that only appears in a comment', () => {
+    const source = '<!-- <router-outlet /> -->\n<main>Custom</main>\n';
+
+    expect(editAppHtml('src/app/app.html', source, WELCOME).kind).toBe(
+      'manual',
+    );
+  });
+
+  it('refreshes a comment left by an older init instead of stacking another', () => {
+    const source =
+      '<!-- pidrang: pidrang could not edit this file safely.\n<main>Custom</main>\n';
+    const result = editAppHtml('src/app/app.html', source, WELCOME);
+
+    const content = result.kind === 'manual' ? result.content : '';
+    expect(content.endsWith('\n<main>Custom</main>\n')).toBe(true);
+    expect(content.match(/could not edit this file safely/g)).toHaveLength(1);
+    expect(content).not.toContain('safely.\n');
   });
 
   it('does not accumulate its own comment', () => {
