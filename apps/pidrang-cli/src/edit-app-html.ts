@@ -1,4 +1,5 @@
 import { FileEdit } from './edit-app-config';
+import { stripLeadingLines } from './text-edit';
 
 const OUTLET = '<router-outlet />';
 const COMMENT = '<!-- pidrang:';
@@ -21,6 +22,10 @@ export function isWelcome(
   );
 }
 
+function withoutComments(source: string): string {
+  return source.replace(/<!--[\s\S]*?-->/g, '');
+}
+
 export function editAppHtml(
   path: string,
   source: string,
@@ -29,7 +34,8 @@ export function editAppHtml(
   if (isWelcome(source, welcomeTemplate)) {
     return { kind: 'edited', content: `${OUTLET}\n` };
   }
-  if (/<router-outlet\b/.test(source)) {
+  const rest = stripLeadingLines(source, COMMENT);
+  if (/<router-outlet\b/.test(withoutComments(rest))) {
     return { kind: 'unchanged' };
   }
   const steps = [
@@ -37,9 +43,9 @@ export function editAppHtml(
     'The generated pages only show up through a router outlet of the app component:',
     `  ${OUTLET}`,
     'A page that stays empty may come from the Angular welcome content hiding it.',
+    'If a component of this template already holds the router outlet, only delete these pidrang lines.',
   ];
-  const marker = COMMENT;
-  const content = `${steps.map((step) => `${marker} ${step}`).join('\n')}\n${source}`;
+  const content = `${steps.map((step) => `${COMMENT} ${step} -->`).join('\n')}\n${rest}`;
   return content === source
     ? { kind: 'unchanged' }
     : {
