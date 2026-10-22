@@ -42,7 +42,7 @@ test('lists a resource from the side menu', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('links the header to the sign-in path init wrote', async ({ page }) => {
+test('points the header to the sign-in path init wrote', async ({ page }) => {
   await page.goto('/');
 
   await expect(
