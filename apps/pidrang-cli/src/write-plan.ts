@@ -86,7 +86,7 @@ async function blockedParent(
   return null;
 }
 
-async function conflictReason(
+export async function conflictReason(
   root: string,
   file: GeneratedFile,
 ): Promise<string | null | 'unchanged'> {

@@ -68,7 +68,18 @@ describe('preflightApp', () => {
       configFile: 'src/app/app.config.ts',
       takenRoutes: [],
       bindsComponentInputs: false,
+      signInPath: '/sign-in',
+      signInRoute: false,
     });
+  });
+
+  it('sees whether the app already declares its own sign-in route', async () => {
+    await write({
+      'src/app/app.routes.ts':
+        "export const routes = [{ path: 'sign-in', loadComponent: () => Login }];",
+    });
+
+    expect(await preflightApp(root)).toMatchObject({ signInRoute: true });
   });
 
   it('sees whether the router already binds component inputs', async () => {

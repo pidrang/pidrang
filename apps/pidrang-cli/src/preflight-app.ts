@@ -10,6 +10,8 @@ export interface AppLayout {
   configFile: string;
   takenRoutes: string[];
   bindsComponentInputs: boolean;
+  signInPath: string;
+  signInRoute: boolean;
 }
 
 export class UnsupportedAppError extends Error {
@@ -23,6 +25,7 @@ export class UnsupportedAppError extends Error {
 
 const SUPPORTED_ANGULAR = 'Angular 22.1 or a later 22.x';
 const ROUTE_PATH = /\bpath\s*:\s*(['"`])((?:(?!\1).)*)\1/g;
+const SIGN_IN_PAGE = 'sign-in';
 
 async function readText(path: string): Promise<string | null> {
   try {
@@ -145,6 +148,10 @@ export function findTakenRoutes(routesSource: string): string[] {
   return [...new Set(routes)];
 }
 
+function declaresSignInRoute(routesSource: string): boolean {
+  return findTakenRoutes(routesSource).includes(SIGN_IN_PAGE);
+}
+
 export async function preflightApp(
   root: string,
   requestedProject?: string,
@@ -199,5 +206,7 @@ export async function preflightApp(
     configFile,
     takenRoutes: findTakenRoutes(routes ?? ''),
     bindsComponentInputs: (config ?? '').includes('withComponentInputBinding'),
+    signInPath: `/${SIGN_IN_PAGE}`,
+    signInRoute: declaresSignInRoute(routes ?? ''),
   };
 }

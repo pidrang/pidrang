@@ -1,10 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { LayoutUi } from '@pidrang/cli';
 
 export type TypeScriptApi = typeof import('typescript');
-
-export type LayoutUi = 'material' | 'tailwind';
 
 export interface AppTooling {
   typescript: TypeScriptApi | null;

@@ -241,5 +241,60 @@ export const appConfig = {
 
       expect(edit(source, SIGN_IN)).toEqual({ kind: 'unchanged' });
     });
+
+    describe('alone, without the pidrang setup', () => {
+      const SIGN_IN_ONLY: ConfigRequest = {
+        setup: { ...SETUP, imports: [], constants: [], pidrangConfig: [] },
+        environmentImport: null,
+        resourcesImport: './resources',
+        signInPath: '/sign-in',
+        signInOnly: true,
+      };
+
+      it('adds the import and the provider and nothing else', () => {
+        const result = edited(STOCK, SIGN_IN_ONLY);
+
+        expect(result).toContain(SIGN_IN_IMPORT);
+        expect(result).toContain("provideSignInPath('/sign-in')");
+        expect(result).not.toContain('providePidrang');
+        expect(result).not.toContain('withComponentInputBinding');
+        expect(result).not.toContain("from './resources'");
+        expect(edit(result, SIGN_IN_ONLY)).toEqual({ kind: 'unchanged' });
+      });
+
+      it('lists only that change when it has to write a comment', () => {
+        const result = editAppConfig(
+          null,
+          'src/app/app.config.ts',
+          STOCK,
+          SIGN_IN_ONLY,
+        );
+
+        expect(result).toEqual({
+          kind: 'manual',
+          content: [
+            '// pidrang: pidrang could not edit this file safely. Make these changes by hand, then delete these pidrang lines.',
+            '// pidrang: Add these imports:',
+            "// pidrang:   import { provideSignInPath } from './pidrang/index';",
+            '// pidrang: Add this to the providers of your application config, with the path of your sign-in page:',
+            "// pidrang:   provideSignInPath('/sign-in')",
+            STOCK,
+          ].join('\n'),
+          reason: 'TypeScript is not installed in this app',
+        });
+      });
+    });
+  });
+
+  it('keeps the sign-in steps in the comment across a second run', () => {
+    const SIGN_IN: ConfigRequest = { ...REQUEST, signInPath: '/sign-in' };
+    const once = editAppConfig(null, 'src/app/app.config.ts', STOCK, SIGN_IN);
+    if (once.kind !== 'manual') {
+      throw new Error('expected a manual edit');
+    }
+
+    expect(edited(once.content, SIGN_IN)).toContain(
+      "// pidrang:   provideSignInPath('/sign-in')",
+    );
   });
 });

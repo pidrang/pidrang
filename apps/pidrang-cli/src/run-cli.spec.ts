@@ -140,6 +140,7 @@ const PLAN = {
   provider: 'fake',
   connection: {},
   tables: [{ table: 'products', actions: ['list', 'show'] }],
+  signIn: true,
 };
 
 describe('runCli', () => {
@@ -595,6 +596,34 @@ export const routes: Routes = [
       );
     });
 
+    it('adds the sign-in imports to the comment of an app whose config was already described', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+      });
+      const plan = await planFile(PLAN);
+
+      expect(
+        await runCli(
+          ['init', '--plan', plan],
+          context(undefined, { ...STRUCTURAL, typescript: null }),
+        ),
+      ).toBe(0);
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+
+      const config = await readFile(
+        join(root, 'src/app/app.config.ts'),
+        'utf8',
+      );
+      expect(config).toContain(
+        "// pidrang:   import { provideSignInPath } from './pidrang/index';",
+      );
+      expect(config).toContain("// pidrang:   provideSignInPath('/sign-in')");
+      expect(output()).toContain(
+        'Nothing to write: every file already matches.',
+      );
+    });
+
     it.each([
       ['a page edited by hand', 'src/app/pages/resource-list-page.ts'],
       ['a helper from an older pidrang', 'src/app/pidrang/index.ts'],
@@ -863,6 +892,7 @@ export const routes: Routes = [
       expect(await listFiles('src/app')).toEqual([
         'src/app/app.config.ts',
         'src/app/app.routes.ts',
+        'src/app/resource-routes.ts',
       ]);
       expect(out.join('\n')).toContain('admin/src/app/app.routes.ts');
     });
@@ -974,13 +1004,156 @@ export const routes: Routes = [
       expect(await runCli(['init', '--plan', plan], context())).toBe(130);
 
       expect(err).toContain('\nWriting stopped: cancelled.');
-      expect(err).toContain(
-        `Not written: ${[...generatedPaths, 'src/app/app.config.ts', 'src/app/app.routes.ts'].join(', ')}.`,
+      const notWritten = err.find((line) => line.startsWith('Not written:'));
+      expect(
+        notWritten
+          ?.replace(/^Not written: /, '')
+          .replace(/\.$/, '')
+          .split(', '),
+      ).toEqual(
+        expect.arrayContaining([
+          ...generatedPaths,
+          'src/app/app.config.ts',
+          'src/app/app.routes.ts',
+        ]),
       );
       expect(await listFiles('src/app')).toEqual([
         'src/app/app.config.ts',
         'src/app/app.routes.ts',
       ]);
+    });
+  });
+
+  describe('pidrang generate auth', () => {
+    const GENERATED = 'src/app/pages/sign-in-page.ts';
+
+    it('writes the sign-in page and its route when TypeScript is available', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+      });
+
+      expect(
+        await runCli(['generate', 'auth'], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const after = await snapshot();
+      expect(after[GENERATED]).toContain("selector: 'app-sign-in-page'");
+      expect(after['src/app/app.routes.ts']).toContain(
+        "import { resourceRoutes } from './resource-routes';",
+      );
+      expect(after['src/app/app.routes.ts']).toContain('...resourceRoutes');
+      expect(after['src/app/app.config.ts']).toContain(
+        "import { provideSignInPath } from './pidrang/index';",
+      );
+      expect(after['src/app/app.config.ts']).toContain(
+        "provideSignInPath('/sign-in')",
+      );
+      expect(after['src/app/app.config.ts']).not.toContain(
+        'withComponentInputBinding',
+      );
+      expect(after['src/app/app.config.ts']).not.toContain('providePidrang');
+      expect(provider.promptConnection).not.toHaveBeenCalled();
+      expect(output()).toContain(
+        `The Sign in link of the layout and the sign-in prompts of the pages open /sign-in, set by provideSignInPath('/sign-in') in src/app/app.config.ts.`,
+      );
+      expect(err).toEqual([]);
+    });
+
+    it('writes the Tailwind sign-in page in an app that depends on @pidrang/tailwind', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        'package.json': JSON.stringify({
+          dependencies: {
+            '@angular/core': '^22.1.0',
+            '@pidrang/tailwind': '^1.0.0',
+          },
+        }),
+      });
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+
+      const page = (await snapshot())[GENERATED];
+      expect(page).toContain("selector: 'app-sign-in-page'");
+      expect(page).not.toContain('@angular/material');
+      expect(page).toContain('Sign out');
+    });
+
+    it('leaves the app as it is on a second run', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+      });
+      expect(
+        await runCli(['generate', 'auth'], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+      const before = await snapshot();
+      out = [];
+
+      expect(
+        await runCli(['generate', 'auth'], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      expect(await snapshot()).toEqual(before);
+      expect(output()).toContain(
+        `${GENERATED} is already the sign-in page pidrang generates for this app, so pidrang wrote nothing.`,
+      );
+    });
+
+    it('leaves the sign-in page to an app that declares its own route', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': `import { Routes } from '@angular/router';
+
+import { SignInPage } from './sign-in-page';
+
+export const routes: Routes = [
+  { path: 'sign-in', component: SignInPage },
+];
+`,
+      });
+      const before = await snapshot();
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+
+      expect(await snapshot()).toEqual(before);
+      expect(output()).toContain(
+        'app.routes.ts already declares its own /sign-in route, so pidrang left the sign-in page to it and wrote nothing.',
+      );
+    });
+
+    it('keeps a sign-in page it did not generate and says why', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        [GENERATED]: 'export const mine = true;\n',
+      });
+      const before = await snapshot();
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(1);
+
+      expect(await snapshot()).toEqual(before);
+      expect(err.join('\n')).toContain(`${GENERATED} is already there and`);
+      expect(err.join('\n')).toContain('wrote nothing');
+    });
+
+    it('refuses to point the app at another path than its own', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG.replace(
+          'provideRouter(routes)',
+          "provideRouter(routes), provideSignInPath('/login')",
+        ),
+        'src/app/app.routes.ts': NG_ROUTES,
+      });
+      const before = await snapshot();
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(1);
+
+      expect(await snapshot()).toEqual(before);
+      expect(err.join('\n')).toContain(
+        "src/app/app.config.ts already calls provideSignInPath with another path, so pidrang wrote nothing. Change that path to '/sign-in' to use the generated page, or keep your own sign-in page.",
+      );
     });
   });
 
@@ -1104,7 +1277,7 @@ export class App {
         "export * from './sign-in-url';",
       );
       expect(output()).toContain(
-        "open /sign-in, set by provideSignInPath('/sign-in') in src/app/app.config.ts. The app has no page there yet",
+        "open /sign-in, set by provideSignInPath('/sign-in') in src/app/app.config.ts. pidrang generated the sign-in page at src/app/pages/sign-in-page.ts.",
       );
     });
 
@@ -1161,7 +1334,7 @@ export class App {
     it('leaves the welcome page alone when the plan asks for no layout', async () => {
       await put(newAppFiles());
       const before = await snapshot();
-      const plan = await planFile(PLAN);
+      const plan = await planFile({ ...PLAN, signIn: false });
 
       expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
         0,
@@ -1171,7 +1344,63 @@ export class App {
       expect(after['src/app/layout/app-layout.ts']).toBeUndefined();
       expect(after['src/app/app.html']).toBe('<router-outlet />\n');
       expect(before['src/app/app.html']).toBe(NG_HTML);
+    });
+
+    it('leaves the sign-in page alone when the plan does not ask for one', async () => {
+      await put(newAppFiles());
+      const plan = await planFile({ ...PLAN, signIn: false });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/pages/sign-in-page.ts']).toBeUndefined();
       expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+    });
+
+    it('writes the sign-in page and its path when no layout is asked for', async () => {
+      await put(newAppFiles());
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/layout/app-layout.ts']).toBeUndefined();
+      expect(after['src/app/pages/sign-in-page.ts']).toContain(
+        "selector: 'app-sign-in-page'",
+      );
+      expect(output()).toContain(
+        'pidrang generated the sign-in page at src/app/pages/sign-in-page.ts.',
+      );
+    });
+
+    it('leaves the sign-in page to an app that declares its own sign-in route', async () => {
+      await put({
+        ...newAppFiles(),
+        'src/app/app.routes.ts': `import { Routes } from '@angular/router';
+
+import { SignInPage } from './sign-in-page';
+
+export const routes: Routes = [
+  { path: 'sign-in', component: SignInPage },
+];
+`,
+      });
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/pages/sign-in-page.ts']).toBeUndefined();
+      expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+      expect(output()).toContain(
+        'pidrang did not generate the sign-in page the pages and the layout link to: app.routes.ts already declares its own /sign-in route, so pidrang left the sign-in page to it.',
+      );
     });
 
     it('leaves the layout alone in an app that already has its own pages', async () => {
