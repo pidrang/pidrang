@@ -55,10 +55,11 @@ test('signs in from the generated page, then creates and edits', async ({
 }) => {
   const errors = pageErrors(page);
   await page.goto('/');
-  await page
+  const signIn = page
     .locator('mat-toolbar')
-    .getByRole('link', { name: 'Sign in' })
-    .click();
+    .getByRole('link', { name: 'Sign in' });
+  await expect(signIn).toBeVisible();
+  await signIn.click();
   await expect(page).toHaveURL(/\/sign-in$/);
 
   await page.getByLabel('Email').fill(expectations.writer.email);
