@@ -1374,6 +1374,9 @@ export class App {
       expect(after['src/app/pages/sign-in-page.ts']).toContain(
         "selector: 'app-sign-in-page'",
       );
+      expect(after['src/app/resource-routes.ts']).toContain(
+        "import('./pages/sign-in-page')",
+      );
       expect(output()).toContain(
         'pidrang generated the sign-in page at src/app/pages/sign-in-page.ts.',
       );
@@ -1405,6 +1408,7 @@ export const routes: Routes = [
       expect(output()).toContain(
         'pidrang did not generate the sign-in page the pages and the layout link to: app.routes.ts already declares its own /sign-in route, so pidrang left the sign-in page to it.',
       );
+      expect(after['src/app/resource-routes.ts']).not.toContain('sign-in');
     });
 
     it('leaves the layout alone in an app that already has its own pages', async () => {

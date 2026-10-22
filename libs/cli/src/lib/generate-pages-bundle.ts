@@ -1,6 +1,13 @@
 import { GeneratedFile } from './generated-file';
 import { GENERATED_PAGE_FILES } from './generated-pages';
 
+export const SIGN_IN_ROUTE_SNIPPET = `  {
+    path: 'sign-in',
+    loadComponent: () =>
+      import('./pages/sign-in-page').then((page) => page.SignInPage),
+  },
+`;
+
 export const RESOURCE_ROUTES_SNIPPET = `import { Route } from '@angular/router';
 
 import {
@@ -14,12 +21,7 @@ export const resourceRoutes: Route[] = [
     loadComponent: () =>
       import('./pages/not-found-page').then((page) => page.NotFoundPage),
   },
-  {
-    path: 'sign-in',
-    loadComponent: () =>
-      import('./pages/sign-in-page').then((page) => page.SignInPage),
-  },
-  {
+${SIGN_IN_ROUTE_SNIPPET}  {
     path: ':resource/create',
     loadComponent: () =>
       import('./pages/resource-create-page').then(
@@ -71,8 +73,13 @@ export const PAGES_UI_LAYER_PACKAGES: UiLayerPackages = {
 
 export const RESOURCE_ROUTES_FILE = 'src/app/resource-routes.ts';
 
-export function generateResourceRoutesFile(): GeneratedFile {
-  return { path: RESOURCE_ROUTES_FILE, content: RESOURCE_ROUTES_SNIPPET };
+export function generateResourceRoutesFile(signIn = true): GeneratedFile {
+  return {
+    path: RESOURCE_ROUTES_FILE,
+    content: signIn
+      ? RESOURCE_ROUTES_SNIPPET
+      : RESOURCE_ROUTES_SNIPPET.replace(SIGN_IN_ROUTE_SNIPPET, ''),
+  };
 }
 
 export function generatePagesBundle(): GeneratedFile[] {
