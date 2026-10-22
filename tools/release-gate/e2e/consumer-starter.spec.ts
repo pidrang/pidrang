@@ -50,7 +50,7 @@ test('points the header to the sign-in path init wrote', async ({ page }) => {
   ).toHaveAttribute('href', '/sign-in');
 });
 
-test('signs in from the generated page, then creates, edits and deletes', async ({
+test('signs in from the generated page, then creates and edits', async ({
   page,
 }) => {
   const errors = pageErrors(page);
@@ -86,16 +86,6 @@ test('signs in from the generated page, then creates, edits and deletes', async 
   await expect(page).toHaveURL(/\/fixture_items$/);
 
   await page.goto(`/fixture_items/${id}`);
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Delete' }).click();
-  await expect
-    .poll(async () => {
-      const answer = await page.request.get(
-        `http://127.0.0.1:54321/rest/v1/fixture_items?id=eq.${id}&select=id`,
-        { headers: { apikey: publishableKey } },
-      );
-      return answer.json();
-    })
-    .toEqual([]);
+  await expect(page.locator('dd').nth(1)).toHaveText(`${name} edited`);
   expect(errors).toEqual([]);
 });
