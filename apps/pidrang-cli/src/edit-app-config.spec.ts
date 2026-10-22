@@ -1,6 +1,6 @@
 import { AppSetup } from '@pidrang/cli';
 import * as typescript from 'typescript';
-import { ConfigRequest, editAppConfig } from './edit-app-config';
+import { commentBlock, ConfigRequest, editAppConfig } from './edit-app-config';
 
 const SETUP: AppSetup = {
   imports: [
@@ -296,5 +296,32 @@ export const appConfig = {
     expect(edited(once.content, SIGN_IN)).toContain(
       "// pidrang:   provideSignInPath('/sign-in')",
     );
+  });
+
+  it('keeps the sign-in steps when a second run does not ask for the page', () => {
+    const SIGN_IN: ConfigRequest = { ...REQUEST, signInPath: '/sign-in' };
+    const steps = commentBlock('// pidrang:', [
+      'pidrang could not edit this file safely. Make these changes by hand, then delete these pidrang lines.',
+      'Add this to the providers of your application config, with the path of your sign-in page:',
+      "  provideSignInPath('/sign-in')",
+    ]);
+
+    const again = editAppConfig(
+      null,
+      'src/app/app.config.ts',
+      `${steps}\n${edited(STOCK, SIGN_IN)}`,
+      REQUEST,
+    );
+
+    expect(again.kind).toBe('manual');
+    if (again.kind === 'manual') {
+      expect(again.content).toContain(
+        "// pidrang:   provideSignInPath('/sign-in')",
+      );
+      expect(
+        again.content.match(/provideSignInPath\('\/sign-in'\)/g),
+      ).toHaveLength(2);
+      expect(again.content.trimEnd().endsWith('};')).toBe(true);
+    }
   });
 });

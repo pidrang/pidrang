@@ -44,6 +44,13 @@ const SIGN_IN_IMPORT: SetupImport = {
   from: './pidrang/index',
 };
 
+const SIGN_IN_STEP = /^provideSignInPath\(/;
+const SIGN_IN_QUOTED = /provideSignInPath\('([^']*)'\)/;
+
+function keptSignInPath(call: string | undefined): string | undefined {
+  return call === undefined ? undefined : SIGN_IN_QUOTED.exec(call)?.[1];
+}
+
 function setupImports(request: ConfigRequest): SetupImport[] {
   return [
     ...(request.signInPath === undefined ? [] : [SIGN_IN_IMPORT]),
@@ -145,6 +152,13 @@ export function appendElement(
     : { at: last.end, text: `,\n${indent}${element(indent)}` };
 }
 
+function signInSteps(request: ConfigRequest): string[] {
+  return [
+    'Add this to the providers of your application config, with the path of your sign-in page:',
+    `  provideSignInPath(${quote(request.signInPath ?? '')})`,
+  ];
+}
+
 interface ManualNeeds {
   binding: boolean;
   setup: boolean;
@@ -179,10 +193,7 @@ function manualSteps(request: ConfigRequest, needs: ManualNeeds): string[] {
     );
   }
   if (needs.signIn) {
-    steps.push(
-      'Add this to the providers of your application config, with the path of your sign-in page:',
-      `  provideSignInPath(${quote(request.signInPath ?? '')})`,
-    );
+    steps.push(...signInSteps(request));
   }
   if (needs.setup) {
     steps.push('Add this to the providers of your application config:');
@@ -196,7 +207,16 @@ function manualSteps(request: ConfigRequest, needs: ManualNeeds): string[] {
 }
 
 export function commentBlock(marker: string, steps: string[]): string {
-  return steps.map((step) => `${marker} ${step}`.trimEnd()).join('\n');
+  return steps
+    .map((step) =>
+      step
+        .split('\n')
+        .map((line, index) =>
+          index === 0 ? `${marker} ${line.trimEnd()}` : line,
+        )
+        .join('\n'),
+    )
+    .join('\n');
 }
 
 function manual(
@@ -212,6 +232,33 @@ function manual(
     : { kind: 'manual', content, reason };
 }
 
+function signInCallInComment(source: string): string | undefined {
+  return source
+    .split('\n')
+    .filter((line) => line.startsWith(PIDRANG_COMMENT))
+    .map((line) => line.slice(PIDRANG_COMMENT.length).trimStart())
+    .find((line) => SIGN_IN_STEP.test(line));
+}
+
+function manualWithoutTypeScript(
+  source: string,
+  request: ConfigRequest,
+): FileEdit {
+  const reason = 'TypeScript is not installed in this app';
+  const kept = keptSignInPath(signInCallInComment(source));
+  const signInPath = request.signInPath ?? kept;
+  const keptRequest: ConfigRequest = { ...request, signInPath };
+  return manual(source, keptRequest, needsOf(request, true), reason);
+}
+
+function needsOf(request: ConfigRequest, signIn: boolean): ManualNeeds {
+  return {
+    binding: !request.signInOnly,
+    setup: !request.signInOnly,
+    signIn,
+  };
+}
+
 export function editAppConfig(
   typescript: TypeScriptApi | null,
   path: string,
@@ -219,16 +266,7 @@ export function editAppConfig(
   request: ConfigRequest,
 ): FileEdit {
   if (typescript === null) {
-    return manual(
-      source,
-      request,
-      {
-        binding: !request.signInOnly,
-        setup: !request.signInOnly,
-        signIn: request.signInPath !== undefined,
-      },
-      'TypeScript is not installed in this app',
-    );
+    return manualWithoutTypeScript(source, request);
   }
   const file = parseSource(typescript, path, source);
   const needsBinding =

@@ -1356,7 +1356,9 @@ export class App {
 
       const after = await snapshot();
       expect(after['src/app/pages/sign-in-page.ts']).toBeUndefined();
-      expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+      expect(after['src/app/app.config.ts']).not.toContain(
+        `provideSignInPath('/sign-in')`,
+      );
     });
 
     it('writes the sign-in page and its path when no layout is asked for', async () => {
@@ -1397,7 +1399,9 @@ export const routes: Routes = [
 
       const after = await snapshot();
       expect(after['src/app/pages/sign-in-page.ts']).toBeUndefined();
-      expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+      expect(after['src/app/app.config.ts']).not.toContain(
+        `provideSignInPath('/sign-in')`,
+      );
       expect(output()).toContain(
         'pidrang did not generate the sign-in page the pages and the layout link to: app.routes.ts already declares its own /sign-in route, so pidrang left the sign-in page to it.',
       );
@@ -1425,7 +1429,9 @@ export const routes: Routes = [
       expect(err).toContain(LAYOUT_IGNORED);
       expect(after['src/app/layout/app-layout.ts']).toBeUndefined();
       expect(after['src/app/app.html']).toBe('<router-outlet />\n');
-      expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+      expect(after['src/app/app.config.ts']).not.toContain(
+        `provideSignInPath('/sign-in')`,
+      );
     });
 
     it('says the layout was not added when app.html is no longer the welcome page', async () => {

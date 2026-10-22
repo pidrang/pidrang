@@ -6,11 +6,29 @@ import { generatePagesBundle } from './generate-pages-bundle';
 import { SIGN_IN_PAGE_FILE, generateSignInFile } from './generate-sign-in-file';
 
 const WORKSPACE_ROOT = join(__dirname, '../../../..');
-const readDemo = (name: string) =>
-  readFileSync(
-    join(WORKSPACE_ROOT, 'apps/demo-material/src/app/pages', name),
-    'utf8',
+const readDemoPage = (app: string, name: string) =>
+  readFileSync(join(WORKSPACE_ROOT, `apps/${app}/src/app/pages`, name), 'utf8');
+const readDemo = (name: string) => readDemoPage('demo-material', name);
+
+const DEMO_ACCOUNT_SECTION =
+  /^ *@if \(demoAccount;[\s\S]*?^ *\}\n(?= *<\/div>$)/m;
+
+function tailwindTemplateOf(source: string): string {
+  const literal = /^const TEMPLATE = `([\s\S]*?)`;\n/m.exec(source);
+  const template = literal === null ? null : literal[1];
+  const demo = template === null ? null : DEMO_ACCOUNT_SECTION.exec(template);
+  if (template === null || demo === null) {
+    throw new Error('The Tailwind demo sign-in page lost its demo account');
+  }
+  return (
+    template.slice(0, demo.index) + template.slice(demo.index + demo[0].length)
   );
+}
+
+function markup(template: string): string {
+  return template.replace(/\s+/g, ' ').replace(/> </g, '><').trim();
+}
+
 const BS = String.fromCharCode(92);
 const D = String.fromCharCode(34);
 
@@ -44,6 +62,8 @@ describe('generatedSignInPage', () => {
   it('inlines the template and the styles', () => {
     expect(page).toContain('const TEMPLATE = "<mat-card>');
     expect(page).toContain('styles: STYLES,');
+    expect(page).toMatch(/^const STYLES = "/m);
+    expect(page).toContain(':host');
     expect(page).not.toContain('const TEMPLATE = `');
   });
 
@@ -88,5 +108,19 @@ describe('generateSignInFile', () => {
       expect(content).toContain('this.signInState.signIn({');
       expect(content).toContain('await this.authProvider.logout();');
     }
+  });
+
+  it('keeps the Tailwind page on the markup of the Tailwind demo', () => {
+    const demo = tailwindTemplateOf(
+      readDemoPage('demo-tailwind', 'sign-in-page.ts'),
+    );
+    const page = generateSignInFile('tailwind').content;
+    const template = /^const TEMPLATE = "((?:[^"\\]|\\.)*)";$/m.exec(page);
+    const raw = (template?.[1] ?? '').replaceAll(`${BS}${D}`, D);
+    const pageMarkup = markup(raw);
+    const demoMarkup = markup(demo);
+
+    expect(template).not.toBeNull();
+    expect(pageMarkup).toBe(demoMarkup);
   });
 });
