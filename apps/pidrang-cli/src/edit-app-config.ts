@@ -169,7 +169,7 @@ function manualSteps(
   if (request.signInPath !== undefined) {
     steps.push(
       'Add this to the providers of your application config, with the path of your sign-in page:',
-      `  provideSignInPath('${request.signInPath}')`,
+      `  provideSignInPath(${quote(request.signInPath)})`,
     );
   }
   if (needsPidrang) {

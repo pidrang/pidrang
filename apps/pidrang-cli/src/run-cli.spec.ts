@@ -690,6 +690,75 @@ export const routes: Routes = [
       );
     });
 
+    describe("with a table name that holds a quote, such as o'brien", () => {
+      const QUOTED = "redirectTo: '/o\\'brien' }";
+      const quotedPlan = {
+        ...PLAN,
+        tables: [{ table: "o'brien", actions: ['list'] }],
+      };
+
+      beforeEach(() => {
+        vi.mocked(provider.createSchemaProvider).mockReturnValue({
+          listTables: vi.fn().mockResolvedValue(["o'brien"]),
+          introspectTable: vi.fn().mockResolvedValue({
+            fields: [{ name: 'id', type: 'number', readOnly: true }],
+            excludedColumns: [],
+            unavailableActions: [],
+          }),
+        });
+      });
+
+      it('escapes it in the redirect it writes into a new app', async () => {
+        await put({ 'src/app/app.html': NG_HTML });
+        const plan = await planFile(quotedPlan);
+
+        expect(
+          await runCli(
+            ['init', '--plan', plan],
+            context(undefined, STRUCTURAL),
+          ),
+        ).toBe(0);
+
+        expect(
+          await readFile(join(root, 'src/app/app.routes.ts'), 'utf8'),
+        ).toContain(QUOTED);
+      });
+
+      it('escapes it in the redirect it prints for an app with its own routes', async () => {
+        await put({
+          'src/app/app.html': NG_HTML,
+          'src/app/app.routes.ts':
+            "import { Routes } from '@angular/router';\n\nexport const routes: Routes = [\n  { path: 'sign-in', component: SignInPage },\n];\n",
+        });
+        const plan = await planFile(quotedPlan);
+
+        expect(
+          await runCli(
+            ['init', '--plan', plan],
+            context(undefined, STRUCTURAL),
+          ),
+        ).toBe(0);
+
+        expect(output()).toContain(QUOTED);
+      });
+
+      it('escapes it in the pidrang comment of a new app without TypeScript', async () => {
+        await put({ 'src/app/app.html': NG_HTML });
+        const plan = await planFile(quotedPlan);
+
+        expect(
+          await runCli(
+            ['init', '--plan', plan],
+            context(undefined, { ...STRUCTURAL, typescript: null }),
+          ),
+        ).toBe(0);
+
+        expect(
+          await readFile(join(root, 'src/app/app.routes.ts'), 'utf8'),
+        ).toContain(`// pidrang:   { path: '', pathMatch: 'full', ${QUOTED},`);
+      });
+    });
+
     it.each([
       ['with TypeScript', STRUCTURAL],
       ['without TypeScript', { ...STRUCTURAL, typescript: null }],
