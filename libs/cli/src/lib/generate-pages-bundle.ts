@@ -3,33 +3,47 @@ import { GENERATED_PAGE_FILES } from './generated-pages';
 
 export const RESOURCE_ROUTES_SNIPPET = `import { Route } from '@angular/router';
 
-import { NotFoundPage } from './pages/not-found-page';
-import { ResourceCreatePage } from './pages/resource-create-page';
-import { ResourceEditPage } from './pages/resource-edit-page';
-import { ResourceListPage } from './pages/resource-list-page';
-import { ResourceShowPage } from './pages/resource-show-page';
-import { RESOURCE_UNAVAILABLE_PATH, canMatchResourceAction } from './pidrang/index';
+import {
+  RESOURCE_UNAVAILABLE_PATH,
+  canMatchResourceAction,
+} from './pidrang/index';
 
 export const resourceRoutes: Route[] = [
-  { path: RESOURCE_UNAVAILABLE_PATH, component: NotFoundPage },
+  {
+    path: RESOURCE_UNAVAILABLE_PATH,
+    loadComponent: () =>
+      import('./pages/not-found-page').then((page) => page.NotFoundPage),
+  },
   {
     path: ':resource/create',
-    component: ResourceCreatePage,
+    loadComponent: () =>
+      import('./pages/resource-create-page').then(
+        (page) => page.ResourceCreatePage,
+      ),
     canMatch: [canMatchResourceAction('create')],
   },
   {
     path: ':resource/:id/edit',
-    component: ResourceEditPage,
+    loadComponent: () =>
+      import('./pages/resource-edit-page').then(
+        (page) => page.ResourceEditPage,
+      ),
     canMatch: [canMatchResourceAction('edit')],
   },
   {
     path: ':resource/:id',
-    component: ResourceShowPage,
+    loadComponent: () =>
+      import('./pages/resource-show-page').then(
+        (page) => page.ResourceShowPage,
+      ),
     canMatch: [canMatchResourceAction('show')],
   },
   {
     path: ':resource',
-    component: ResourceListPage,
+    loadComponent: () =>
+      import('./pages/resource-list-page').then(
+        (page) => page.ResourceListPage,
+      ),
     canMatch: [canMatchResourceAction('list')],
   },
 ];

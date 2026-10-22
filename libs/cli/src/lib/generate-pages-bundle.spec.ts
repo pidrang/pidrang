@@ -317,6 +317,32 @@ describe('RESOURCE_ROUTES_SNIPPET', () => {
     expect(editIndex).toBeLessThan(showIndex);
     expect(showIndex).toBeLessThan(listIndex);
   });
+
+  it('loads every page lazily from a generated file that exports it', () => {
+    const files = generatePagesBundle();
+    const loaded = [
+      ...RESOURCE_ROUTES_SNIPPET.matchAll(
+        /import\('(\.\/pages\/[^']+)'\)\.then\(\s*\(page\) => page\.(\w+),?\s*\)/g,
+      ),
+    ].map(([, specifier, name]) => ({ specifier, name }));
+
+    expect(loaded.map(({ name }) => name)).toEqual([
+      'NotFoundPage',
+      'ResourceCreatePage',
+      'ResourceEditPage',
+      'ResourceShowPage',
+      'ResourceListPage',
+    ]);
+    for (const { specifier, name } of loaded) {
+      const file = files.find(
+        (candidate) =>
+          candidate.path === posix.join('src/app', `${specifier}.ts`),
+      );
+      expect(file?.content, specifier).toContain(`export class ${name}`);
+    }
+    expect(RESOURCE_ROUTES_SNIPPET).not.toMatch(/^import .*\/pages\//m);
+    expect(RESOURCE_ROUTES_SNIPPET).not.toContain('component:');
+  });
 });
 
 describe('SIGN_IN_PATH_SNIPPET', () => {
