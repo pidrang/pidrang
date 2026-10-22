@@ -30,3 +30,4 @@ export * from './lib/sign-in-path';
 export * from './lib/sign-in-url';
 export * from './lib/sign-in';
 export * from './lib/sign-in-state';
+export * from './lib/sign-in-route';
