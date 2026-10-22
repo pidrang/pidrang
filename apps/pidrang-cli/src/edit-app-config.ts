@@ -51,13 +51,26 @@ const SIGN_IN_QUOTED = /provideSignInPath\('([^']*)'\)/;
 const SIGN_IN_ALREADY_DECLARED =
   'provideSignInPath is already declared in this file';
 
+function signInImportedElsewhere(from: string): string {
+  return `the file already imports provideSignInPath from ${quote(from)}`;
+}
+
+function signInDeclaredInFile(from: string): string {
+  return `${SIGN_IN_IMPORT.name} is already declared in this file and imported from ${quote(from)}`;
+}
+
 function keptSignInPath(call: string | undefined): string | undefined {
   return call === undefined ? undefined : SIGN_IN_QUOTED.exec(call)?.[1];
 }
 
-function setupImports(request: ConfigRequest): SetupImport[] {
+function setupImports(
+  request: ConfigRequest,
+  signInImport: boolean,
+): SetupImport[] {
   return [
-    ...(request.signInPath === undefined ? [] : [SIGN_IN_IMPORT]),
+    ...(request.signInPath === undefined || !signInImport
+      ? []
+      : [SIGN_IN_IMPORT]),
     ...request.setup.imports,
     ...(request.environmentImport === null
       ? []
@@ -167,6 +180,7 @@ interface ManualNeeds {
   binding: boolean;
   setup: boolean;
   signIn: boolean;
+  signInImport: boolean;
 }
 
 function manualSteps(request: ConfigRequest, needs: ManualNeeds): string[] {
@@ -175,10 +189,10 @@ function manualSteps(request: ConfigRequest, needs: ManualNeeds): string[] {
   ];
   const imports = [
     ...(needs.binding ? [BINDING_IMPORT] : []),
-    ...(needs.signIn && !needs.setup && request.signInPath !== undefined
+    ...(needs.signInImport && needs.signIn && !needs.setup
       ? [SIGN_IN_IMPORT]
       : []),
-    ...(needs.setup ? setupImports(request) : []),
+    ...(needs.setup ? setupImports(request, needs.signInImport) : []),
   ];
   if (imports.length > 0) {
     steps.push(
@@ -257,12 +271,40 @@ function manualWithoutTypeScript(
   return manual(source, keptRequest, needsOf(request, true), reason);
 }
 
-function needsOf(request: ConfigRequest, signIn: boolean): ManualNeeds {
+function needsOf(
+  request: ConfigRequest,
+  signIn: boolean,
+  signInImport = true,
+): ManualNeeds {
   return {
     binding: !request.signInOnly,
     setup: !request.signInOnly,
     signIn,
+    signInImport,
   };
+}
+
+function withSignInPath(
+  request: ConfigRequest,
+  signInPath: string | undefined,
+): ConfigRequest {
+  return signInPath === undefined || request.signInPath !== undefined
+    ? request
+    : { ...request, signInPath };
+}
+
+function manualSignIn(
+  source: string,
+  request: ConfigRequest,
+  signInPath: string | undefined,
+  reason: string,
+): FileEdit {
+  return manual(
+    source,
+    withSignInPath(request, signInPath),
+    needsOf(request, true, false),
+    reason,
+  );
 }
 
 export function editAppConfig(
@@ -285,19 +327,29 @@ export function editAppConfig(
   const importedSignIn = importedFrom(typescript, file).get(signInName);
   const callsSignIn = callsTo(typescript, file, signInName).length > 0;
   const localSignIn = declaredNames(typescript, file).has(signInName);
-  if (localSignIn && (!callsSignIn || importedSignIn !== undefined)) {
-    return manual(
-      source,
-      request,
-      needsOf(request, true),
-      SIGN_IN_ALREADY_DECLARED,
-    );
+  const signInPath = keptSignInPath(signInCallInComment(source));
+  const importedFromModule =
+    importedSignIn === undefined ? undefined : importedSignIn.split('#')[0];
+  const foreignImport =
+    importedFromModule !== undefined &&
+    importedFromModule !== SIGN_IN_IMPORT.from
+      ? importedFromModule
+      : undefined;
+  const signInReason =
+    foreignImport === undefined
+      ? null
+      : localSignIn
+        ? signInDeclaredInFile(foreignImport)
+        : signInImportedElsewhere(foreignImport);
+  if (signInReason !== null) {
+    return manualSignIn(source, request, signInPath, signInReason);
+  }
+  if (localSignIn && !callsSignIn) {
+    return manualSignIn(source, request, signInPath, SIGN_IN_ALREADY_DECLARED);
   }
   const needsSignIn = !callsSignIn;
   const needsSignInImport =
-    request.signInPath !== undefined &&
-    !localSignIn &&
-    (needsSignIn || importedSignIn !== SIGN_IN_IMPORT.from);
+    request.signInPath !== undefined && importedSignIn !== SIGN_IN_IMPORT.from;
   const needsPidrangSignIn = request.signInPath !== undefined && needsSignIn;
   if (!needsBinding && !needsPidrang && !needsPidrangSignIn) {
     return { kind: 'unchanged' };
@@ -306,6 +358,7 @@ export function editAppConfig(
     binding: !request.signInOnly,
     setup: !request.signInOnly,
     signIn: needsSignIn,
+    signInImport: needsSignInImport,
   };
   const fail = (reason: string) => manual(source, request, needs, reason);
 
@@ -351,7 +404,7 @@ export function editAppConfig(
   }
 
   if (needsPidrang) {
-    const pidrangImports = setupImports(request);
+    const pidrangImports = setupImports(request, needsSignInImport);
     const locals = request.setup.constants.map((constant) => constant.name);
     const conflicts = nameConflicts(typescript, file, pidrangImports, locals);
     if (conflicts.length > 0) {

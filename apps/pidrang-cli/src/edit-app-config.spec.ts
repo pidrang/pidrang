@@ -1,3 +1,4 @@
+import { dirname, posix } from 'node:path';
 import { AppSetup } from '@pidrang/cli';
 import * as typescript from 'typescript';
 import { commentBlock, ConfigRequest, editAppConfig } from './edit-app-config';
@@ -41,6 +42,95 @@ export const appConfig: ApplicationConfig = {
 };
 `;
 
+const STUBS: Record<string, string> = {
+  'src/app/pidrang/index.ts': `export const provideSignInPath = (
+  path: string,
+): { provide: string; useValue: string } => ({ provide: 'sign-in', useValue: path });
+`,
+  'src/app/environments/environment.ts': `export const environment = {
+  supabaseUrl: '',
+  supabasePublishableKey: '',
+};
+`,
+  'src/app/resources.ts': `export const resources = [];
+`,
+  'src/app/app.routes.ts': `export const routes = [];
+`,
+  'src/app/@angular/core.ts': `export interface ApplicationConfig {
+  providers: unknown[];
+}
+export const provideBrowserGlobalErrorListeners = () => ({});
+export const provideZoneChangeDetection = (options: unknown) => options;
+`,
+  'src/app/@angular/router.ts': `export const provideRouter = (...features: unknown[]) => features;
+export const withComponentInputBinding = () => ({});
+`,
+  'src/app/@pidrang/core.ts': `export const providePidrang = (config: unknown) => config;
+`,
+  'src/app/@pidrang/supabase.ts': `export const provideSupabaseDataProvider = (config: unknown) => config;`,
+  'src/app/@supabase/supabase-js.ts': `export const createClient = (url: string, key: string) => ({ url, key });
+`,
+  'src/environments/environment.ts': `export const environment = {
+  supabaseUrl: '',
+  supabasePublishableKey: '',
+};
+`,
+};
+
+function findDiagnostics(path: string, content: string): string[] {
+  const files = new Map(Object.entries(STUBS));
+  files.set(path, content);
+  const read = (name: string): string | undefined => files.get(name);
+  const host = typescript.createCompilerHost({});
+  const options: typescript.CompilerOptions = {
+    noEmit: true,
+    skipLibCheck: true,
+    strict: true,
+    lib: ['lib.es2020.d.ts'],
+  };
+  const program = typescript.createProgram([path], options, {
+    ...host,
+    fileExists: (name) =>
+      name === path || read(name) !== undefined || host.fileExists(name),
+    readFile: (name) => read(name) ?? host.readFile(name),
+    getSourceFile: (name) => {
+      const text = read(name);
+      return text === undefined
+        ? host.getSourceFile(name, typescript.ScriptTarget.Latest)
+        : typescript.createSourceFile(
+            name,
+            text,
+            typescript.ScriptTarget.Latest,
+          );
+    },
+    writeFile: () => undefined,
+    getDefaultLibFileName: () => '',
+    resolveModuleNameLiterals: (names, containing) => {
+      const directory = dirname(containing.fileName ?? path);
+      return names.map((name) => {
+        const base = name.text.startsWith('.')
+          ? posix.join(directory, name.text)
+          : posix.join('src/app', name.text);
+        const file = `${base}.ts`;
+        return {
+          resolvedModule: files.has(file)
+            ? {
+                resolvedFileName: file,
+                extension: typescript.Extension.Ts,
+                isExternalLibraryImport: false,
+              }
+            : undefined,
+        };
+      });
+    },
+  });
+  return typescript
+    .getPreEmitDiagnostics(program)
+    .map((diagnostic) =>
+      typescript.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+    );
+}
+
 const edit = (source: string, request: ConfigRequest = REQUEST) =>
   editAppConfig(typescript, 'src/app/app.config.ts', source, request);
 
@@ -77,6 +167,23 @@ export const appConfig: ApplicationConfig = {
   ]
 };
 `);
+  });
+
+  it('writes a config that compiles', () => {
+    const setup = {
+      ...SETUP,
+      imports: [
+        ...SETUP.imports,
+        { name: 'provideSupabaseDataProvider', from: '@pidrang/supabase' },
+      ],
+    };
+
+    expect(
+      findDiagnostics(
+        'src/app/app.config.ts',
+        edited(STOCK, { ...REQUEST, setup }),
+      ),
+    ).toEqual([]);
   });
 
   it('leaves a file that already binds inputs and registers pidrang alone', () => {
@@ -256,9 +363,13 @@ const provideSignInPath = (path: string) => ({ provide: path });`,
         expect(result.reason).toBe(
           'provideSignInPath is already declared in this file',
         );
-        expect(result.content).toContain(
+        expect(result.content).not.toContain(
           "// pidrang:   import { provideSignInPath } from './pidrang/index';",
         );
+        expect(result.content.trimEnd().endsWith('};')).toBe(true);
+        expect(
+          findDiagnostics('src/app/app.config.ts', result.content),
+        ).toEqual([]);
       }
     });
 
@@ -276,7 +387,7 @@ const provideSignInPath = 'something else';`,
         expect(result.reason).toBe(
           'provideSignInPath is already declared in this file',
         );
-        expect(result.content).toContain(
+        expect(result.content).not.toContain(
           "// pidrang:   import { provideSignInPath } from './pidrang/index';",
         );
         expect(result.content).toContain(
@@ -297,8 +408,35 @@ import { routes } from './app.routes';`,
       expect(result.kind).toBe('manual');
       if (result.kind === 'manual') {
         expect(result.reason).toBe(
-          'the file already uses provideSignInPath for something else',
+          "the file already imports provideSignInPath from './sign-in'",
         );
+        expect(result.content).not.toContain(
+          "// pidrang:   import { provideSignInPath } from './pidrang/index';",
+        );
+        expect(result.content).toContain(
+          "// pidrang:   provideSignInPath('/sign-in')",
+        );
+        expect(result.content).not.toContain(
+          "import { provideSignInPath } from './pidrang/index';\n" +
+            "import { provideSignInPath } from './sign-in';",
+        );
+      }
+    });
+
+    it('keeps the pidrang import it already has, and calls it', () => {
+      const source = STOCK.replace(
+        "import { routes } from './app.routes';",
+        `import { provideSignInPath } from './pidrang/index';
+import { routes } from './app.routes';`,
+      );
+      const result = edit(source, { ...SIGN_IN, signInOnly: true });
+
+      expect(result.kind).toBe('edited');
+      if (result.kind === 'edited') {
+        expect(result.content.split("from './pidrang/index'")).toHaveLength(2);
+        expect(
+          findDiagnostics('src/app/app.config.ts', result.content),
+        ).toEqual([]);
       }
     });
 
