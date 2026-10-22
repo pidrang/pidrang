@@ -1,16 +1,16 @@
 import type { GenerationPlan, TablePlan } from '@pidrang/cli';
 
-function canOpenTable(table: TablePlan): boolean {
-  return table.actions.includes('list') || table.actions.includes('create');
-}
-
-function entryPath(table: TablePlan): string {
-  return table.actions.includes('list')
-    ? `/${encodeURIComponent(table.table)}`
-    : `/${encodeURIComponent(table.table)}/create`;
+function segment(table: TablePlan): string {
+  return `/${encodeURIComponent(table.table)}`;
 }
 
 export function entryRedirect(plan: GenerationPlan): string | null {
-  const table = plan.tables.find(canOpenTable);
-  return table === undefined ? null : entryPath(table);
+  const listed = plan.tables.find((table) => table.actions.includes('list'));
+  if (listed !== undefined) {
+    return segment(listed);
+  }
+  const creatable = plan.tables.find((table) =>
+    table.actions.includes('create'),
+  );
+  return creatable === undefined ? null : `${segment(creatable)}/create`;
 }
