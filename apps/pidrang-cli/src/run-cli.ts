@@ -13,7 +13,6 @@ import {
   generateResourceRoutesFile,
   generateResourcesFile,
   layoutAppHtml,
-  layoutImport,
   parseInitPlan,
   runInitWizard,
   runScriptedInit,
@@ -30,8 +29,9 @@ import {
 } from './write-plan';
 import { AppTooling, loadAppTooling } from './app-tooling';
 import { ConfigRequest, FileEdit, editAppConfig } from './edit-app-config';
-import { editAppRoutes, isNewApp } from './edit-app-routes';
+import { declaresEntryRoute, editAppRoutes, isNewApp } from './edit-app-routes';
 import { editAppHtml } from './edit-app-html';
+import { editAppComponent } from './edit-app-component';
 import { editAppSpec } from './edit-app-spec';
 import { entryRedirect } from './entry-redirect';
 import {
@@ -222,6 +222,8 @@ async function collectPlan(
   return runScriptedInit(context.providers, plan, context.env, options);
 }
 
+const LAYOUT_SIGN_IN_PATH = '/sign-in';
+
 function printExistingAppNotice(
   context: CliContext,
   layout: AppLayout,
@@ -299,7 +301,7 @@ async function writeFiles(
 
 interface SetupReport {
   setup: AppSetup;
-  signInFile: string | null;
+  signInPath: string | null;
   edits: FileEditPlan[];
   environmentPath: string;
   environmentDevelopmentPath: string;
@@ -339,17 +341,16 @@ function printInstructions(
     report.environmentLines.forEach((line) => context.out(line));
   }
   report.setup.notes.forEach((note) => context.out(`\n${note}`));
-  if (report.signInFile !== null) {
-    context.out('');
+  context.out('');
+  if (report.signInPath !== null) {
     context.out(
-      `When a write needs a signed-in user, or the navigation asks for a sign-in page, the pages say so in plain text. To turn that into a link, pass this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of your sign-in page inside the app:\n`,
+      `The Sign in link of the layout and the sign-in prompts of the pages open ${report.signInPath}, set by provideSignInPath('${report.signInPath}') in ${layout.configFile}. The app has no page there yet: add your sign-in page at that route, or change the path to the one of your sign-in page.`,
     );
-  } else {
-    context.out('');
-    context.out(
-      `When a write needs a signed-in user, the pages say so in plain text. To turn that into a link to your sign-in page, add this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of that page inside your app:\n`,
-    );
+    return;
   }
+  context.out(
+    `When a write needs a signed-in user, the pages say so in plain text. To turn that into a link to your sign-in page, add this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of that page inside your app:\n`,
+  );
   context.out(SIGN_IN_PATH_SNIPPET);
 }
 
@@ -512,11 +513,18 @@ async function runInit(
     tooling.welcomeTemplate,
   );
   const generation = await collectPlan(context, layout, planPath, newApp);
-  const withLayout = newApp && generation.layout === 'sidebar';
-  const signInPath = withLayout ? '/your-sign-in-route' : undefined;
-  const signInPathFile = withLayout
-    ? posix.join(layout.appDirectory, 'pidrang/index.ts')
-    : null;
+  const componentPath = posix.join(layout.appDirectory, 'app.ts');
+  const componentSource =
+    newApp && generation.layout === 'sidebar'
+      ? await readOptional(context.cwd, componentPath)
+      : null;
+  if (newApp && generation.layout === 'sidebar' && componentSource === null) {
+    context.err(
+      `${componentPath} was not found, so pidrang did not add the navigation layout.`,
+    );
+  }
+  const withLayout = componentSource !== null;
+  const signInPath = withLayout ? LAYOUT_SIGN_IN_PATH : undefined;
   const [resources] = relocateFiles(
     [
       {
@@ -559,7 +567,6 @@ async function runInit(
     ),
     resourcesImport: './resources',
     signInPath,
-    ...(signInPathFile === null ? {} : { signInPathFile }),
   };
   const configEdit = editAppConfig(
     tooling.typescript,
@@ -580,7 +587,7 @@ async function runInit(
       : withLayout
         ? {
             kind: 'edited' as const,
-            content: `${layoutImport()}\n${layoutAppHtml(layout.projectName)}\n`,
+            content: layoutAppHtml(layout.projectName),
           }
         : editAppHtml(htmlPath, htmlSource, tooling.welcomeTemplate);
 
@@ -596,12 +603,19 @@ async function runInit(
     ...(htmlSource === null
       ? []
       : editCandidate(htmlPath, htmlSource, htmlEdit)),
+    ...(componentSource === null
+      ? []
+      : editCandidate(
+          componentPath,
+          componentSource,
+          editAppComponent(tooling.typescript, componentPath, componentSource),
+        )),
     ...(specSource === null
       ? []
       : editCandidate(
           specPath,
           specSource,
-          editAppSpec(tooling.typescript, specPath, specSource),
+          editAppSpec(tooling.typescript, specPath, specSource, withLayout),
         )),
   ];
 
@@ -644,7 +658,7 @@ async function runInit(
   if (status !== EXIT_OK) {
     return status;
   }
-  if (!newApp) {
+  if (!newApp && !declaresEntryRoute(tooling.typescript, routesSource)) {
     printExistingAppNotice(context, layout, entryRedirect(generation));
   }
   const installPlan = await planInstall(context, generation.setup.packages);
@@ -660,7 +674,7 @@ async function runInit(
     environmentDevelopmentPath: environment.development,
     createdEnvironment,
     environmentLines: environmentLinesToAdd,
-    signInFile: signInPathFile,
+    signInPath: signInPath ?? null,
   });
   printInstallReport(context, installPlan, installResult);
   return INSTALL_STATUS[installResult.outcome];

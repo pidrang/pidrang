@@ -6,12 +6,6 @@ import {
 
 export const LAYOUT_FILE = 'src/app/layout/app-layout.ts';
 
-const LAYOUT_MODULE_IMPORT = './layout/app-layout';
-
-export function layoutImport(): string {
-  return `import { AppLayout } from '${LAYOUT_MODULE_IMPORT}';\n`;
-}
-
 export function layoutAppHtml(appName: string): string {
   return `<app-layout appName=${JSON.stringify(appName)} />\n`;
 }

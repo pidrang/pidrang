@@ -690,6 +690,34 @@ export const routes: Routes = [
       );
     });
 
+    it.each([
+      ['with TypeScript', STRUCTURAL],
+      ['without TypeScript', { ...STRUCTURAL, typescript: null }],
+    ])(
+      'proposes no redirect to an app that already opens on its own page, %s',
+      async (_, tooling) => {
+        await put({
+          'src/app/app.html': NG_HTML,
+          'src/app/app.routes.ts': `import { Routes } from '@angular/router';
+
+import { HomePage } from './home-page';
+
+export const routes: Routes = [
+  { path: '', component: HomePage },
+];
+`,
+        });
+        const plan = await planFile(PLAN);
+
+        expect(
+          await runCli(['init', '--plan', plan], context(undefined, tooling)),
+        ).toBe(0);
+
+        expect(output()).not.toContain('The app already has its own pages');
+        expect(output()).not.toContain("redirectTo: '/products'");
+      },
+    );
+
     it('lists every conflict at once', async () => {
       await put({
         'src/app/resources.ts': 'old\n',
@@ -888,9 +916,24 @@ export const routes: Routes = [
   });
 
   describe('the navigation layout', () => {
+    const NG_APP = `import { Component, signal } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+
+@Component({
+  imports: [RouterOutlet],
+  selector: 'app-root',
+  templateUrl: './app.html',
+  styleUrl: './app.css'
+})
+export class App {
+  protected readonly title = signal('shop');
+}
+`;
+
     function newAppFiles(extra: Record<string, string> = {}) {
       return {
         ...STOCK_FILES,
+        'src/app/app.ts': NG_APP,
         'src/app/app.config.ts': NG_CONFIG,
         'src/app/app.routes.ts': NG_ROUTES,
         'src/app/app.html': NG_HTML,
@@ -921,13 +964,19 @@ export const routes: Routes = [
       expect(layout).toContain("selector: 'app-layout'");
       expect(layout).toContain('MatToolbarModule');
       expect(layout).toContain(
-        "import { SIGN_IN_PATH } from '../pidrang/index';",
+        "import { injectSignInUrl } from '../pidrang/index';",
       );
       expect(layout).not.toContain('@pidrang/demo-shared');
 
       expect(await readFile(join(root, 'src/app/app.html'), 'utf8')).toBe(
-        'import { AppLayout } from \'./layout/app-layout\';\n\n<app-layout appName="Shop" />\n\n',
+        '<app-layout appName="Shop" />\n',
       );
+      expect(await readFile(join(root, 'src/app/app.ts'), 'utf8')).toContain(
+        '// pidrang:   imports: [AppLayout],',
+      );
+      expect(
+        await readFile(join(root, 'src/app/app.spec.ts'), 'utf8'),
+      ).toContain('// pidrang:   TestBed.overrideComponent(App, {');
       const config = await readFile(
         join(root, 'src/app/app.config.ts'),
         'utf8',
@@ -935,9 +984,7 @@ export const routes: Routes = [
       expect(config).toContain(
         "// pidrang:   import { provideSignInPath } from './pidrang/index';",
       );
-      expect(config).toContain(
-        "// pidrang:   provideSignInPath('/your-sign-in-route')",
-      );
+      expect(config).toContain("// pidrang:   provideSignInPath('/sign-in')");
       expect(output()).not.toContain(
         'add this provider to your src/app/app.config.ts',
       );
@@ -946,6 +993,64 @@ export const routes: Routes = [
       ).toContain(
         "// pidrang:   { path: '', pathMatch: 'full', redirectTo: '/products' },",
       );
+    });
+
+    it('wires the layout into the root component and its test with TypeScript', async () => {
+      await put(newAppFiles());
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const after = await snapshot();
+      expect(after['src/app/app.html']).toBe('<app-layout appName="Shop" />\n');
+      expect(after['src/app/app.ts']).toBe(
+        NG_APP.replace(
+          "import { RouterOutlet } from '@angular/router';",
+          "import { AppLayout } from './layout/app-layout';",
+        ).replace('imports: [RouterOutlet]', 'imports: [AppLayout]'),
+      );
+      expect(after['src/app/app.spec.ts']).toContain(
+        'remove: { imports: [AppLayout] },',
+      );
+      expect(after['src/app/app.spec.ts']).not.toContain('should render title');
+      expect(after['src/app/app.config.ts']).toContain(
+        "provideSignInPath('/sign-in')",
+      );
+      expect(after['src/app/app.config.ts']).toContain(
+        "import { provideSignInPath } from './pidrang/index';",
+      );
+      expect(after['src/app/app.routes.ts']).toContain(
+        "{ path: '', pathMatch: 'full', redirectTo: '/products' },",
+      );
+      expect(after['src/app/layout/app-layout.ts']).toContain(
+        "import { injectSignInUrl } from '../pidrang/index';",
+      );
+      expect(after['src/app/pidrang/index.ts']).toContain(
+        "export * from './sign-in-url';",
+      );
+      expect(output()).toContain(
+        "open /sign-in, set by provideSignInPath('/sign-in') in src/app/app.config.ts. The app has no page there yet",
+      );
+    });
+
+    it('skips the layout and says so when the root component file is missing', async () => {
+      const files: Record<string, string> = newAppFiles();
+      delete files['src/app/app.ts'];
+      await put(files);
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(err).toContain(
+        'src/app/app.ts was not found, so pidrang did not add the navigation layout.',
+      );
+      expect(after['src/app/layout/app-layout.ts']).toBeUndefined();
+      expect(after['src/app/app.html']).toBe('<router-outlet />\n');
     });
 
     it('writes the Tailwind layout when the app depends on @pidrang/tailwind', async () => {

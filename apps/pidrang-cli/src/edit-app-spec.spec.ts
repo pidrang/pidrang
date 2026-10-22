@@ -143,4 +143,86 @@ describe('editAppSpec', () => {
       kind: 'unchanged',
     });
   });
+
+  describe('with the navigation layout', () => {
+    const LAYOUT_SPEC = `import { TestBed } from '@angular/core/testing';
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { App } from './app';
+import { AppLayout } from './layout/app-layout';
+
+describe('App', () => {
+  beforeEach(async () => {
+    TestBed.overrideComponent(App, {
+      remove: { imports: [AppLayout] },
+      add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] },
+    });
+
+    await TestBed.configureTestingModule({
+      imports: [App],
+    })
+      .compileComponents();
+  });
+
+${CREATE_TEST}
+});
+`;
+
+    it('removes the title test and keeps the layout out of the root component test', () => {
+      expect(
+        editAppSpec(typescript, PATH, spec(CREATE_TEST, ZONE_TITLE_TEST), true),
+      ).toEqual({ kind: 'edited', content: LAYOUT_SPEC });
+    });
+
+    it('leaves a spec it already edited alone', () => {
+      expect(editAppSpec(typescript, PATH, LAYOUT_SPEC, true)).toEqual({
+        kind: 'unchanged',
+      });
+    });
+
+    it('adds a comment when no beforeEach configures the test module', () => {
+      const source = spec(CREATE_TEST).replace(
+        / {2}beforeEach[\s\S]*?\n {2}\}\);\n\n/,
+        '',
+      );
+
+      const result = editAppSpec(typescript, PATH, source, true);
+
+      expect(result).toMatchObject({
+        kind: 'manual',
+        reason: 'no single beforeEach configures the test module',
+      });
+      const content = result.kind === 'manual' ? result.content : '';
+      expect(content).toContain(
+        '// pidrang:   TestBed.overrideComponent(App, {',
+      );
+      expect(content.endsWith(source)).toBe(true);
+      expect(editAppSpec(typescript, PATH, content, true)).toEqual({
+        kind: 'unchanged',
+      });
+    });
+
+    it('lists the heading tests and the layout steps without TypeScript', () => {
+      const result = editAppSpec(
+        null,
+        PATH,
+        spec(CREATE_TEST, ZONE_TITLE_TEST),
+        true,
+      );
+
+      const content = result.kind === 'manual' ? result.content : '';
+      expect(content).toContain('with the navigation layout, so the app');
+      expect(content).toContain(
+        "// pidrang:   import { AppLayout } from './layout/app-layout';",
+      );
+      expect(editAppSpec(null, PATH, content, true)).toEqual({
+        kind: 'unchanged',
+      });
+    });
+
+    it('asks for the layout override without TypeScript even with no heading test', () => {
+      expect(editAppSpec(null, PATH, spec(CREATE_TEST), true)).toMatchObject({
+        kind: 'manual',
+      });
+    });
+  });
 });
