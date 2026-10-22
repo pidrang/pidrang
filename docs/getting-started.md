@@ -271,15 +271,44 @@ Run `pidrang init` from the root of an Angular 22.1 (or later 22.x) standalone a
 
 When a table has a `created_at` column of type `timestamp` or `date`, even a hidden one, the generated `Resource` gets `defaultSorters` with `created_at` descending, then `id`, so a new row shows on the first page. Other tables are sorted by `id`.
 
+Each table and column gets a readable `label` made from its name (`fixture_items` becomes `Fixture items`, `createdAt` becomes `Created at`), which the page titles, the menu, the table headers and the form fields show. A `created_at` or `updated_at` column of type `timestamp` with a database default is generated with `readOnly: true`, so the forms leave it to the database.
+
 It asks for the project URL first, then how to read your table definitions. The default is the secret key (formerly service role, `sb_secret_...`; the legacy `service_role` key still works), from Project Settings, API Keys in the Supabase dashboard: it is only used to read the schema and is never written to disk or into the app. The other choices are a direct database connection and GraphQL with the publishable key (formerly anon), which requires the `pg_graphql` extension (not enabled on a new project). A key Supabase refuses is asked again, and so is a publishable key given where the secret key is expected or the other way round. When `pg_graphql` is off the wizard offers to continue with the secret key.
 
 It also wires the app itself, so nothing has to be pasted by hand:
 
 - `app.config.ts`: imports `providePidrang`, `provideSupabaseDataProvider`, `provideSupabaseAuthProvider` and `createClient`, creates the Supabase client once, adds `providePidrang({ dataProvider, authProvider, resources })` to `providers`, and adds `withComponentInputBinding()` to the existing `provideRouter(...)` call. Input binding is required: the pages receive the resource name and the record id as inputs, and stay blank without it.
-- `app.routes.ts`: adds `import { resourceRoutes } from './resource-routes';` and `...resourceRoutes` at the top of the `routes` array, above any `**` route. Your own fixed paths such as a sign-in page still work: the resource routes skip a name that is not a resource.
-- `app.html`: replaces the welcome template `ng new` writes with `<router-outlet />`, so the routes have somewhere to render. A template you already changed is left alone; if it has no router outlet, init adds the `pidrang` comment described below.
-- `app.spec.ts`: when init replaces the welcome template, it also removes the `should render title` test `ng new` writes, which reads the welcome `h1` and would make `ng test` fail. Another test that reads that `h1` is left in place, and init lists it in a `pidrang` comment.
+- `app.routes.ts`: adds `import { resourceRoutes } from './resource-routes';` and `...resourceRoutes` at the top of the `routes` array, above any `**` route. Your own fixed paths such as a sign-in page still work: the resource routes skip a name that is not a resource. On a new app it also redirects `''` to the first generated page, see [A new app and an existing app](#a-new-app-and-an-existing-app).
+- `app.html`: replaces the welcome template `ng new` writes with `<router-outlet />`, or with the navigation layout when you ask for it, so the routes have somewhere to render. A template you already changed is left alone; if it has no router outlet, init adds the `pidrang` comment described below (delete it when a component of the template already holds the outlet).
+- `app.ts`: only with the navigation layout, adds `AppLayout` to the `imports` of the root component, in place of `RouterOutlet` when nothing else uses it.
+- `app.spec.ts`: when init replaces the welcome template, it also removes the `should render title` test `ng new` writes, which reads the welcome `h1` and would make `ng test` fail. Another test that reads that `h1` is left in place, and init lists it in a `pidrang` comment. With the navigation layout, it also keeps the layout out of the root component test (see below).
 - `src/environments/environment.ts` and `environment.development.ts`: created when the app has neither, with a `supabaseUrl` and a `supabasePublishableKey` placeholder, plus the development file replacement in `angular.json`. When an environment file already exists, the missing lines are printed instead and you add them there.
+
+`resource-routes.ts` loads each page with `loadComponent`, so Angular Material's table and form code is not in the initial bundle.
+
+### A new app and an existing app
+
+Init treats the app as new when `app.routes.ts` exports an empty `routes` array and `app.html` still holds the welcome template of `ng new`. Only a new app gets these, since an app with its own routes and shell already decides what it opens on:
+
+- a redirect from `''` to the list of the first table that has one, or to the create page of the first table that has one when no table has a list: `{ path: '', pathMatch: 'full', redirectTo: '/products' }`;
+- the question `Generate a navigation layout?` (yes by default), or the `layout` key of a plan.
+
+The navigation layout is a header with the app name, the signed-in user's email, a Sign in or Sign out button and a Menu button, and a side menu with Home and one link per resource (its list, or its create page when it has no list). Init writes it to `src/app/layout/app-layout.ts`, with Angular Material, or with Tailwind classes when your `package.json` lists `@pidrang/tailwind` (the generated pages themselves use Angular Material either way). Then it:
+
+- replaces `app.html` with `<app-layout appName="..." />`, the name being your project name from `angular.json` (`my-admin` shows as `My admin`);
+- adds `AppLayout` to the `imports` of `app.ts`;
+- adds this to the `beforeEach` of `app.spec.ts`, because the layout needs `providePidrang`, which the root component test does not provide:
+
+  ```ts
+  TestBed.overrideComponent(App, {
+    remove: { imports: [AppLayout] },
+    add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] },
+  });
+  ```
+
+- adds `provideSignInPath('/sign-in')` to `app.config.ts`, so the Sign in button and the sign-in prompts of the pages link to `/sign-in`. Init does not generate a sign-in page yet: add yours at that route, or change the path to the route of your sign-in page.
+
+In an app that is not new, init only adds the resource routes, prints the redirect line to add yourself (unless `app.routes.ts` already declares a `''` route), and never writes the layout.
 
 The publishable key is always written as a placeholder: put your project URL and publishable key (formerly anon) in the environment file. Init never writes the database password or the secret key into the app, and the app runs in the browser, so it must only ever get the publishable key.
 
@@ -303,7 +332,8 @@ To run it without questions, for example in CI, put the answers in a plan file a
 {
   "provider": "supabase",
   "connection": { "strategy": "secret-key", "url": "https://abcdefgh.supabase.co" },
-  "tables": [{ "table": "products", "actions": ["list", "create", "show", "edit", "delete"], "hiddenFields": ["created_at"] }]
+  "tables": [{ "table": "products", "actions": ["list", "create", "show", "edit", "delete"], "hiddenFields": ["created_at"] }],
+  "layout": "sidebar"
 }
 ```
 
@@ -311,9 +341,9 @@ To run it without questions, for example in CI, put the answers in a plan file a
 PIDRANG_SUPABASE_SECRET_KEY=<your secret key> npx pidrang init --plan plan.json
 ```
 
-The same answers give the same files as the questions. It exits with `0` when done or when there is nothing to write, `1` on an invalid plan, an unsupported Node.js or app, a file in the way or a failed install (the files are written then), and `130` when cancelled.
+`layout` is `"sidebar"` for the navigation layout or `"none"` (the default), and only applies to a new app. The same answers give the same files as the questions. It exits with `0` when done or when there is nothing to write, `1` on an invalid plan, an unsupported Node.js or app, a file in the way or a failed install (the files are written then), and `130` when cancelled.
 
-When a write fails because the user is not signed in, the generated pages say "You may need to sign in" as plain text, since they cannot know where your sign-in page lives. To make it a link, provide the path once in `app.config.ts` (the CLI prints this snippet too), replacing `/your-sign-in-route` with your sign-in page's path. It must be a route of your Angular app: the link navigates inside the app, so a sign-in handled by the server or another site (an OAuth redirect, `https://…`) cannot be linked and the prompt stays plain text. `provideSignInPath` throws while the app config is built when the path is not a string, is empty, has spaces at either end, uses `.` or `..` segments, is a full URL or is malformed (`/%`), so those stop the app at startup. So is the `/your-sign-in-route` placeholder left as printed. A well-formed path to a route that does not exist cannot be caught there and lands on your not-found route, A path whose first segment is one of your resource names (`/users/sign-in` with a `users` resource) works only if your sign-in route is declared above `resourceRoutes`; below them, the link opens the Show page of a record whose id is `sign-in`. It is resolved from the app root and may carry a query string:
+When a write fails because the user is not signed in, the generated pages say "You may need to sign in" as plain text, since they cannot know where your sign-in page lives. With the navigation layout, init already wrote `provideSignInPath('/sign-in')`, see above. Otherwise, to make it a link, provide the path once in `app.config.ts` (the CLI prints this snippet too), replacing `/your-sign-in-route` with your sign-in page's path. It must be a route of your Angular app: the link navigates inside the app, so a sign-in handled by the server or another site (an OAuth redirect, `https://…`) cannot be linked and the prompt stays plain text. `provideSignInPath` throws while the app config is built when the path is not a string, is empty, has spaces at either end, uses `.` or `..` segments, is a full URL or is malformed (`/%`), so those stop the app at startup. So is the `/your-sign-in-route` placeholder left as printed. A well-formed path to a route that does not exist cannot be caught there and lands on your not-found route, A path whose first segment is one of your resource names (`/users/sign-in` with a `users` resource) works only if your sign-in route is declared above `resourceRoutes`; below them, the link opens the Show page of a record whose id is `sign-in`. It is resolved from the app root and may carry a query string:
 
 ```ts
 import { provideSignInPath } from './pidrang/provide-sign-in-path';
@@ -325,7 +355,11 @@ Pages generated by an older `pidrang init` keep their hard-coded `/login` link a
 
 ### Troubleshooting
 
-The app still shows the Angular welcome page: `app.html` still holds it. Init replaces that template with `<router-outlet />`; if you had already changed the file and it has no outlet, the page renders nothing below your content, so add `<router-outlet />` where the pages should appear.
+The app still shows the Angular welcome page: `app.html` still holds it. Init replaces that template with `<router-outlet />` or the navigation layout; if you had already changed the file and it has no outlet, the page renders nothing below your content, so add `<router-outlet />` where the pages should appear.
+
+`ng build` warns that the initial bundle exceeded its budget: the budget `ng new` sets warns above 500 kB, and an app with the Supabase client, Angular Material and the layout starts above it (about 690 kB with the layout) even though the pages load lazily. It is a warning, the build succeeds; raise `maximumWarning` in the `budgets` of `angular.json` if you want it gone.
+
+The Sign in button does nothing and the console shows the router error `NG04002` (`Cannot match any routes. URL Segment: 'sign-in'` in a development build): init wrote `provideSignInPath('/sign-in')` but no sign-in page, and the resource routes do not match a name that is not a resource. Add your sign-in page at `/sign-in`, or change the path in `app.config.ts`.
 
 The URL changes but a page stays blank: `provideRouter` has no `withComponentInputBinding()`. The pages read `:resource` and `:id` from their inputs and render nothing without it. Init adds it to the existing `provideRouter(...)` call; if your app config could not be edited, the `// pidrang:` comment at the top of the file shows the line to write.
 
