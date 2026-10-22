@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { root } from '../shared.mjs';
@@ -26,6 +26,18 @@ const GENERATORS = ['library', 'bin'];
 
 const ADAPTERS = {
   material: {
+    packages: [
+      '@pidrang/core',
+      '@pidrang/supabase',
+      '@pidrang/material',
+      '@pidrang/cli',
+      '@pidrang/cli-supabase',
+      'pidrang',
+    ],
+    dependencies: ['@angular/material', '@angular/cdk'],
+    devDependencies: [],
+  },
+  starter: {
     packages: [
       '@pidrang/core',
       '@pidrang/supabase',
@@ -84,6 +96,14 @@ if (!GENERATORS.includes(values.generator)) {
 const adapter = ADAPTERS[values.adapter];
 if (!adapter) {
   console.error(`--adapter must be one of ${Object.keys(ADAPTERS).join(', ')}`);
+  process.exit(1);
+}
+
+if (
+  values.adapter === 'starter' &&
+  (values.generator !== 'bin' || !values.plan)
+) {
+  console.error('--adapter starter needs --generator bin and --plan');
   process.exit(1);
 }
 
@@ -206,7 +226,7 @@ function generateWithLibrary(consumer, planPath) {
   );
 }
 
-function initPlanFrom(planPath, url) {
+function initPlanFrom(planPath, url, layout) {
   const plan = JSON.parse(readFileSync(planPath, 'utf8'));
   return {
     provider: plan.providerId,
@@ -216,14 +236,15 @@ function initPlanFrom(planPath, url) {
       actions,
       hiddenFields,
     })),
+    layout,
   };
 }
 
-function generateWithBin(consumer, planPath, url) {
+function initWithBin(consumer, planPath, url, layout) {
   const initPlan = join(output_directory, 'init-plan.json');
   writeFileSync(
     initPlan,
-    `${JSON.stringify(initPlanFrom(planPath, url), null, 2)}\n`,
+    `${JSON.stringify(initPlanFrom(planPath, url, layout), null, 2)}\n`,
   );
   execute(
     'init',
@@ -231,7 +252,7 @@ function generateWithBin(consumer, planPath, url) {
     ['init', '--plan', initPlan],
     { cwd: consumer },
   );
-  const generated = generatedFiles(consumer, planPath, values.adapter);
+  const generated = generatedFiles(consumer, planPath, 'material');
   const resources = readFileSync(
     join(consumer, 'src/app/resources.ts'),
     'utf8',
@@ -242,15 +263,95 @@ function generateWithBin(consumer, planPath, url) {
       `the installed pidrang bin generated another resources.ts from the local stack than ${planPath} describes: update ${planPath} to the introspected fields (the generated file is in ${output_directory}/resources.ts)`,
     );
   }
+  return generated;
+}
+
+function generateWithBin(consumer, planPath, url) {
+  const generated = initWithBin(consumer, planPath, url, 'none');
   writeFile(consumer, 'src/app/resource-routes.ts', generated.routes);
-  writeFile(
-    consumer,
-    'src/app/app.routes.ts',
-    "import { Routes } from '@angular/router';\n\nimport { resourceRoutes } from './resource-routes';\n\nexport const routes: Routes = [...resourceRoutes];\n",
-  );
   const layout = requiredLayout(generated);
   mkdirSync(dirname(join(consumer, layout.path)), { recursive: true });
   writeFileSync(join(consumer, layout.path), layout.content);
+}
+
+const STARTER_NAME = 'pidrang-starter';
+const PUBLISHABLE_KEY = /(supabasePublishableKey: )'[^']*'/;
+
+function createStarter(consumer) {
+  execute(
+    'ng-new',
+    resolve(root, 'node_modules/.bin/ng'),
+    [
+      'new',
+      STARTER_NAME,
+      '--directory',
+      basename(consumer),
+      '--routing',
+      '--style=css',
+      '--ssr=false',
+      '--zoneless',
+      '--skip-install',
+      '--skip-git',
+      '--defaults',
+      '--ai-config=none',
+      '--package-manager=npm',
+    ],
+    { cwd: dirname(consumer) },
+  );
+}
+
+function starterManifest(consumer, dependencies, devDependencies) {
+  const manifest = JSON.parse(
+    readFileSync(join(consumer, 'package.json'), 'utf8'),
+  );
+  return {
+    ...manifest,
+    dependencies: { ...manifest.dependencies, ...dependencies },
+    devDependencies: { ...manifest.devDependencies, ...devDependencies },
+  };
+}
+
+function useBackendKey(consumer, publishableKey) {
+  for (const file of ['environment.ts', 'environment.development.ts']) {
+    const path = join(consumer, 'src/environments', file);
+    const source = readFileSync(path, 'utf8');
+    if (!PUBLISHABLE_KEY.test(source)) {
+      throw new Error(
+        `pidrang init wrote no supabasePublishableKey in src/environments/${file}`,
+      );
+    }
+    writeFileSync(
+      path,
+      source.replace(PUBLISHABLE_KEY, (_, key) => `${key}'${publishableKey}'`),
+    );
+  }
+}
+
+function initStarter(consumer, planPath) {
+  initWithBin(consumer, planPath, backend.url, 'sidebar');
+  for (const file of [
+    'src/app/layout/app-layout.ts',
+    'src/app/pidrang/index.ts',
+  ]) {
+    if (!existsSync(join(consumer, file))) {
+      throw new Error(`pidrang init wrote no ${file} in the new app`);
+    }
+  }
+  const leftovers = [
+    'app.ts',
+    'app.html',
+    'app.spec.ts',
+    'app.config.ts',
+    'app.routes.ts',
+  ].filter((file) =>
+    readFileSync(join(consumer, 'src/app', file), 'utf8').includes('pidrang:'),
+  );
+  if (leftovers.length > 0) {
+    throw new Error(
+      `pidrang init left manual steps in ${leftovers.map((file) => `src/app/${file}`).join(', ')} of the new app`,
+    );
+  }
+  useBackendKey(consumer, backend.publishableKey);
 }
 
 function breakGeneratedImport(consumer) {
@@ -294,11 +395,15 @@ const backend = values.backend ? JSON.parse(values.backend) : OFFLINE_BACKEND;
 const consumer = mkdtempSync(join(tmpdir(), `pidrang-gate-${values.adapter}-`));
 
 try {
-  cpSync(
-    resolve(root, 'tools/release-gate/consumers', values.adapter),
-    consumer,
-    { recursive: true },
-  );
+  if (values.adapter === 'starter') {
+    createStarter(consumer);
+  } else {
+    cpSync(
+      resolve(root, 'tools/release-gate/consumers', values.adapter),
+      consumer,
+      { recursive: true },
+    );
+  }
   if (values['drop-tailwind-source']) {
     const styles = join(consumer, 'src/styles.css');
     writeFileSync(
@@ -345,15 +450,26 @@ try {
       range(name),
     ]),
   );
+  const consumerManifest =
+    values.adapter === 'starter'
+      ? starterManifest(consumer, dependencies, devDependencies)
+      : {
+          name: `pidrang-gate-${values.adapter}`,
+          private: true,
+          dependencies,
+          devDependencies,
+        };
   writeFileSync(
     join(consumer, 'package.json'),
-    `${JSON.stringify({ name: `pidrang-gate-${values.adapter}`, private: true, dependencies, devDependencies }, null, 2)}\n`,
+    `${JSON.stringify(consumerManifest, null, 2)}\n`,
   );
-  writeFile(
-    consumer,
-    'src/app/backend.ts',
-    `export const backend = ${JSON.stringify(backend, null, 2)};\n`,
-  );
+  if (values.adapter !== 'starter') {
+    writeFile(
+      consumer,
+      'src/app/backend.ts',
+      `export const backend = ${JSON.stringify(backend, null, 2)};\n`,
+    );
+  }
 
   execute('install', 'npm', ['install', '--no-audit', '--no-fund'], {
     cwd: consumer,
@@ -377,11 +493,27 @@ try {
     }
   }
 
+  if (values.adapter === 'starter') {
+    initStarter(consumer, values.plan);
+    execute(
+      'test',
+      join(consumer, 'node_modules/.bin/ng'),
+      ['test', '--watch=false'],
+      {
+        cwd: consumer,
+      },
+    );
+  }
+
   execute('build', join(consumer, 'node_modules/.bin/ng'), ['build'], {
     cwd: consumer,
   });
   const site = join(output_directory, 'site');
-  cpSync(join(consumer, 'dist/browser'), site, { recursive: true });
+  const built =
+    values.adapter === 'starter'
+      ? join(consumer, 'dist', STARTER_NAME, 'browser')
+      : join(consumer, 'dist/browser');
+  cpSync(built, site, { recursive: true });
   if (values.adapter === 'tailwind') {
     checkTailwindClasses(site);
   }
@@ -390,7 +522,7 @@ try {
   recorded.consumers[values.adapter] = {
     backend: backend.url,
     plan: values.plan ?? null,
-    generator: values.adapter === 'material' ? values.generator : null,
+    generator: values.adapter === 'tailwind' ? null : values.generator,
     installed: Object.fromEntries(
       [
         ...COMMON_DEPENDENCIES,

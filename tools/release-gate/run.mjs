@@ -58,9 +58,9 @@ function consumer(adapter, keys) {
       'tools/release-gate/consumer.mjs',
       '--adapter',
       adapter,
-      ...(adapter === 'material'
-        ? ['--plan', PLAN, '--generator', keys ? 'bin' : 'library']
-        : []),
+      ...(adapter === 'tailwind'
+        ? []
+        : ['--plan', PLAN, '--generator', keys ? 'bin' : 'library']),
       ...(backend ? ['--backend', JSON.stringify(backend)] : []),
     ],
     keys
@@ -262,6 +262,7 @@ if (values.mode === 'build') {
   pack();
   consumer('material', keys);
   consumer('tailwind', keys);
+  consumer('starter', keys);
   recordFixtures(fixturesCommit);
 
   run(
@@ -290,6 +291,7 @@ if (values.mode === 'build') {
       suites: [
         'consumer-material',
         'consumer-tailwind',
+        'consumer-starter',
         'demo-material',
         'demo-tailwind',
       ],

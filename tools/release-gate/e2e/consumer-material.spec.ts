@@ -16,9 +16,7 @@ async function signIn(page: Page): Promise<void> {
   await page.getByLabel('Email').fill(expectations.writer.email);
   await page.getByLabel('Password').fill(expectations.writer.password);
   await page.getByLabel('Password').press('Enter');
-  await expect(page.getByTestId('identity')).toHaveText(
-    expectations.writer.email,
-  );
+  await expect(page.locator('.identity')).toHaveText(expectations.writer.email);
 }
 
 function deleteRequests(page: Page): string[] {
@@ -73,7 +71,7 @@ test('signs in with the keyboard and out again', async ({ page }) => {
   await signIn(page);
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
-  await expect(page.getByTestId('identity')).toHaveCount(0);
+  await expect(page.locator('.identity')).toHaveCount(0);
 });
 
 test('says a sign-in failed and clears the message on the next try', async ({
@@ -87,9 +85,7 @@ test('says a sign-in failed and clears the message on the next try', async ({
 
   await page.getByLabel('Password').fill(expectations.writer.password);
   await page.getByLabel('Password').press('Enter');
-  await expect(page.getByTestId('identity')).toHaveText(
-    expectations.writer.email,
-  );
+  await expect(page.locator('.identity')).toHaveText(expectations.writer.email);
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
@@ -243,7 +239,7 @@ test('asks an anonymous user to sign in, then lets the write through', async ({
   await page.getByLabel('Email').fill(expectations.writer.email);
   await page.getByLabel('Password').fill(expectations.writer.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByTestId('identity')).toBeVisible();
+  await expect(page.locator('.identity')).toBeVisible();
 
   const [newestId] = await productIdsNewestFirst(page);
   await page.goto('/products');
@@ -265,7 +261,9 @@ test('honours the generated action flags', async ({ page }) => {
 
   await page.goto('/orders');
   await expect(page.locator('tbody tr').first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Create' })).toHaveCount(0);
+  await expect(
+    page.getByRole('main').getByRole('link', { name: 'Create' }),
+  ).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Edit' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Show' }).first()).toBeVisible();
@@ -315,7 +313,7 @@ test('renders a record into the show page through route input binding', async ({
 
 test('styles the generated pages with the Material theme', async ({ page }) => {
   await page.goto('/products');
-  const create = page.getByRole('link', { name: 'Create' });
+  const create = page.getByRole('main').getByRole('link', { name: 'Create' });
   await expect(create).toBeVisible();
   const background = await create.evaluate(
     (element) => getComputedStyle(element).backgroundColor,
@@ -357,7 +355,7 @@ test('creates without sending untouched defaults and keeps exact values', async 
   await page.goto('/fixture_items/create');
   await page.getByLabel('name').fill('Gate precise item');
   await page.getByLabel('amount').fill('12345678901234.5678');
-  await page.getByLabel('available_on').fill('2026-03-04');
+  await page.getByLabel('Available on').fill('2026-03-04');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page).toHaveURL(/\/fixture_items$/);
 
@@ -420,8 +418,8 @@ test('clears a nullable date to null', async ({ page }) => {
   );
   const [{ id }] = (await listed.json()) as { id: string }[];
   await page.goto(`/fixture_items/${id}/edit`);
-  await expect(page.getByLabel('available_on')).not.toHaveValue('');
-  await page.getByLabel('available_on').fill('');
+  await expect(page.getByLabel('Available on')).not.toHaveValue('');
+  await page.getByLabel('Available on').fill('');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { level: 1 })).not.toContainText(
     'Edit',

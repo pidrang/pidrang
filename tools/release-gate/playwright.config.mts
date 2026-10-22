@@ -12,6 +12,10 @@ const SUITES = {
     port: 4321,
     command: `node tools/release-gate/serve-spa.mjs ${join(gateDirectory, 'consumers/tailwind/site')} 4321`,
   },
+  'consumer-starter': {
+    port: 4322,
+    command: `node tools/release-gate/serve-spa.mjs ${join(gateDirectory, 'consumers/starter/site')} 4322`,
+  },
   'demo-material': {
     port: 4310,
     command:
