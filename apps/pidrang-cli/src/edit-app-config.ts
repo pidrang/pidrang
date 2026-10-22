@@ -12,6 +12,8 @@ import {
 } from './text-edit';
 import {
   callsTo,
+  declaredNames,
+  importedFrom,
   importInsertions,
   lastImportEnd,
   nameConflicts,
@@ -46,6 +48,8 @@ const SIGN_IN_IMPORT: SetupImport = {
 
 const SIGN_IN_STEP = /^provideSignInPath\(/;
 const SIGN_IN_QUOTED = /provideSignInPath\('([^']*)'\)/;
+const SIGN_IN_ALREADY_DECLARED =
+  'provideSignInPath is already declared in this file';
 
 function keptSignInPath(call: string | undefined): string | undefined {
   return call === undefined ? undefined : SIGN_IN_QUOTED.exec(call)?.[1];
@@ -171,7 +175,9 @@ function manualSteps(request: ConfigRequest, needs: ManualNeeds): string[] {
   ];
   const imports = [
     ...(needs.binding ? [BINDING_IMPORT] : []),
-    ...(needs.signIn && !needs.setup ? [SIGN_IN_IMPORT] : []),
+    ...(needs.signIn && !needs.setup && request.signInPath !== undefined
+      ? [SIGN_IN_IMPORT]
+      : []),
     ...(needs.setup ? setupImports(request) : []),
   ];
   if (imports.length > 0) {
@@ -275,11 +281,24 @@ export function editAppConfig(
   const needsPidrang =
     !request.signInOnly &&
     callsTo(typescript, file, 'providePidrang').length === 0;
-  const needsPidrangSignIn =
+  const signInName = SIGN_IN_IMPORT.name;
+  const importedSignIn = importedFrom(typescript, file).get(signInName);
+  const callsSignIn = callsTo(typescript, file, signInName).length > 0;
+  const localSignIn = declaredNames(typescript, file).has(signInName);
+  if (localSignIn && (!callsSignIn || importedSignIn !== undefined)) {
+    return manual(
+      source,
+      request,
+      needsOf(request, true),
+      SIGN_IN_ALREADY_DECLARED,
+    );
+  }
+  const needsSignIn = !callsSignIn;
+  const needsSignInImport =
     request.signInPath !== undefined &&
-    callsTo(typescript, file, 'provideSignInPath').length === 0;
-  const needsSignIn =
-    callsTo(typescript, file, 'provideSignInPath').length === 0;
+    !localSignIn &&
+    (needsSignIn || importedSignIn !== SIGN_IN_IMPORT.from);
+  const needsPidrangSignIn = request.signInPath !== undefined && needsSignIn;
   if (!needsBinding && !needsPidrang && !needsPidrangSignIn) {
     return { kind: 'unchanged' };
   }
@@ -326,6 +345,8 @@ export function editAppConfig(
         () => `provideSignInPath(${quote(signInPath)})`,
       ),
     );
+  }
+  if (needsSignInImport) {
     imports.push(SIGN_IN_IMPORT);
   }
 
