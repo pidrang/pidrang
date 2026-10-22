@@ -10,6 +10,7 @@ import { AuthIdentity, AuthProvider } from './auth-provider';
 import { DataProvider } from './data-provider';
 import { injectAuthSession } from './auth-session';
 import { providePidrang } from './provide-pidrang';
+import { SESSION_IDENTITY } from './session-identity';
 
 const noopDataProvider: DataProvider = {
   getList: <T>() =>
@@ -270,5 +271,78 @@ describe('injectAuthSession', () => {
 
     expect(session.isLoading()).toBe(true);
     expect(session.value()).toBeNull();
+  });
+});
+
+describe('SESSION_IDENTITY', () => {
+  const shared = () => TestBed.inject(SESSION_IDENTITY);
+
+  it('starts null and holds the identity the auth provider reports at startup', async () => {
+    const auth = subscribableAuthProvider(() =>
+      Promise.resolve({ id: '1', email: 'ada@example.com' }),
+    );
+    configure(auth.provider);
+
+    const identity = shared();
+    await settle();
+
+    expect(identity()).toEqual({ id: '1', email: 'ada@example.com' });
+  });
+
+  it('stays null when no auth provider is configured', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        providePidrang({ dataProvider: noopDataProvider, resources: [] }),
+      ],
+    });
+
+    expect(shared()()).toBeNull();
+  });
+
+  it('follows a session change without a component reading injectAuthSession()', async () => {
+    let identity: AuthIdentity | null = null;
+    const auth = subscribableAuthProvider(() => Promise.resolve(identity));
+    configure(auth.provider);
+    await settle();
+    expect(shared()()).toBeNull();
+
+    identity = { id: '1' };
+    auth.notify();
+    await settle();
+    expect(shared()()).toEqual({ id: '1' });
+
+    identity = null;
+    auth.notify();
+    await settle();
+    expect(shared()()).toBeNull();
+  });
+
+  it('clears on a session change that signs the user out', async () => {
+    let identity: AuthIdentity | null = { id: '1' };
+    const auth = subscribableAuthProvider(() => Promise.resolve(identity));
+    configure(auth.provider);
+    await settle();
+    const sharedIdentity = shared();
+    await settle();
+    expect(sharedIdentity()).toEqual({ id: '1' });
+
+    identity = null;
+    auth.notify();
+    await settle();
+
+    expect(sharedIdentity()).toBeNull();
+  });
+
+  it('stays null when the auth provider fails at startup', async () => {
+    const auth = subscribableAuthProvider(() =>
+      Promise.reject(new Error('network down')),
+    );
+    configure(auth.provider);
+
+    const session = TestBed.runInInjectionContext(() => injectAuthSession());
+    await settle();
+
+    expect(session.error()).toBeInstanceOf(Error);
+    expect(shared()()).toBeNull();
   });
 });
