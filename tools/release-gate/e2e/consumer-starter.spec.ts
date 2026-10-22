@@ -65,13 +65,15 @@ test('signs in from the generated page, then creates and edits', async ({
   await page.getByLabel('Email').fill(expectations.writer.email);
   await page.getByLabel('Password').fill(expectations.writer.password);
   await page.getByLabel('Password').press('Enter');
-  await expect(page.locator('mat-card')).toContainText(
+  await expect(page).toHaveURL(/\/orders$/);
+  await expect(page.locator('mat-toolbar')).toContainText(
     expectations.writer.email,
   );
 
   const name = `Starter sign-in ${Date.now()}`;
   await page.goto('/fixture_items/create');
   await page.getByLabel('name').fill(name);
+  await page.getByLabel('Amount').fill('1');
   await page.getByLabel('name').press('Enter');
   await expect(page).toHaveURL(/\/fixture_items$/);
 
@@ -84,7 +86,7 @@ test('signs in from the generated page, then creates and edits', async ({
   await page.goto(`/fixture_items/${id}/edit`);
   await page.getByLabel('name').fill(`${name} edited`);
   await page.getByLabel('name').press('Enter');
-  await expect(page).toHaveURL(/\/fixture_items$/);
+  await expect(page).toHaveURL(new RegExp(`/fixture_items/${id}$`));
 
   await page.goto(`/fixture_items/${id}`);
   await expect(page.locator('dd').nth(1)).toHaveText(`${name} edited`);
