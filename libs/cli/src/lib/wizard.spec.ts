@@ -233,11 +233,40 @@ describe('runInitWizard', () => {
 
     const plan = await runInitWizard([definition], { isNewApp: true });
 
-    expect(vi.mocked(confirm).mock.calls[0][0]).toEqual({
+    const asked = vi.mocked(confirm).mock.calls.map(([question]) => question);
+    expect(asked.map((question) => question.message.split('?')[0])).toEqual([
+      expect.stringContaining('layout'),
+      expect.stringContaining('/sign-in'),
+      expect.stringContaining('signed-in user'),
+    ]);
+    expect(asked[2]).toEqual({
       message: expect.stringContaining('signed-in user'),
       default: false,
     });
     expect(plan.tables[0].readsNeedSignIn).toBe(true);
+  });
+
+  it('asks about reads after the sign-in page, and skips it when there is none', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider({}, null));
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+    vi.mocked(confirm)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false);
+
+    const plan = await runInitWizard([definition], { isNewApp: true });
+
+    const messages = vi
+      .mocked(confirm)
+      .mock.calls.map(([question]) => question.message);
+    expect(messages.some((message) => message.includes('signed-in user'))).toBe(
+      false,
+    );
+    expect(plan.signIn).toBe(false);
+    expect(plan.tables[0].readsNeedSignIn).toBe(false);
   });
 
   it('does not ask about reads in an app that already exists', async () => {
@@ -271,7 +300,10 @@ describe('runInitWizard', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce(['list'])
       .mockResolvedValueOnce([]);
-    vi.mocked(confirm).mockResolvedValue(false);
+    vi.mocked(confirm)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValue(false);
 
     const plan = await runInitWizard([definition], { isNewApp: true });
 
