@@ -21,9 +21,17 @@ export interface InitPlan {
   tables: TableSelection[];
   layout: AppLayoutChoice;
   signIn: boolean;
+  readsNeedSignIn: boolean;
 }
 
-const PLAN_KEYS = ['provider', 'connection', 'tables', 'layout', 'signIn'];
+const PLAN_KEYS = [
+  'provider',
+  'connection',
+  'tables',
+  'layout',
+  'signIn',
+  'readsNeedSignIn',
+];
 const TABLE_KEYS = ['table', 'actions', 'hiddenFields'];
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -123,6 +131,12 @@ function planProblems(value: unknown): string[] {
   if (value['signIn'] !== undefined && typeof value['signIn'] !== 'boolean') {
     problems.push('signIn must be true or false');
   }
+  if (
+    value['readsNeedSignIn'] !== undefined &&
+    typeof value['readsNeedSignIn'] !== 'boolean'
+  ) {
+    problems.push('readsNeedSignIn must be true or false');
+  }
   const tables = value['tables'];
   if (!Array.isArray(tables) || tables.length === 0) {
     problems.push('tables must list at least one table');
@@ -155,6 +169,7 @@ export function parseInitPlan(value: unknown): InitPlan {
     connection: plan['connection'],
     layout: (plan['layout'] as AppLayoutChoice | undefined) ?? 'none',
     signIn: plan['signIn'] === true,
+    readsNeedSignIn: plan['readsNeedSignIn'] === true,
     tables: (plan['tables'] as Record<string, unknown>[]).map((table) => ({
       table: table['table'] as string,
       actions: table['actions'] as CrudAction[],

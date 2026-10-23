@@ -37,8 +37,28 @@ describe('parseInitPlan', () => {
       ],
       layout: 'none',
       signIn: false,
+      readsNeedSignIn: false,
     });
   });
+
+  it('defaults readsNeedSignIn to false', () => {
+    expect(parseInitPlan(plan()).readsNeedSignIn).toBe(false);
+  });
+
+  it('reads readsNeedSignIn true', () => {
+    expect(parseInitPlan(plan({ readsNeedSignIn: true })).readsNeedSignIn).toBe(
+      true,
+    );
+  });
+
+  it.each([['yes'], [1], [null]])(
+    'refuses the readsNeedSignIn %j',
+    (readsNeedSignIn) => {
+      expect(() => parseInitPlan(plan({ readsNeedSignIn }))).toThrow(
+        'readsNeedSignIn must be true or false',
+      );
+    },
+  );
 
   it.each(['sidebar', 'none'] as const)(
     'reads the layout choice %s',

@@ -27,6 +27,9 @@ const SETUP: AppSetup = {
 
 function fakeSchemaProvider(
   introspection: Partial<TableIntrospection> = {},
+  readsNeedSignIn: SchemaProvider['readsNeedSignIn'] | null = vi
+    .fn()
+    .mockResolvedValue(false),
 ): SchemaProvider {
   return {
     listTables: vi.fn().mockResolvedValue(['products', 'orders']),
@@ -39,6 +42,7 @@ function fakeSchemaProvider(
       unavailableActions: [],
       ...introspection,
     }),
+    ...(readsNeedSignIn === null ? {} : { readsNeedSignIn }),
   };
 }
 
@@ -89,6 +93,7 @@ describe('runInitWizard', () => {
           ],
           actions: ['list', 'create'],
           hiddenFields: [],
+          readsNeedSignIn: false,
         },
       ],
       setup: SETUP,
@@ -190,6 +195,98 @@ describe('runInitWizard', () => {
 
     expect(confirm).not.toHaveBeenCalled();
     expect(plan.layout).toBe('none');
+  });
+
+  it('applies the answer of the provider to every table without asking', async () => {
+    const readsNeedSignIn = vi.fn().mockResolvedValue(true);
+    const definition = fakeDefinition(
+      'supabase',
+      fakeSchemaProvider({}, readsNeedSignIn),
+    );
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products', 'orders'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+
+    const plan = await runInitWizard([definition]);
+
+    expect(readsNeedSignIn).toHaveBeenCalledWith('products');
+    expect(readsNeedSignIn).toHaveBeenCalledWith('orders');
+    expect(confirm).not.toHaveBeenCalled();
+    expect(plan.tables.map((table) => table.readsNeedSignIn)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('asks whether reads need a signed-in user on a new app when the provider cannot tell', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider({}, null));
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValue(true);
+
+    const plan = await runInitWizard([definition], { isNewApp: true });
+
+    expect(vi.mocked(confirm).mock.calls[0][0]).toEqual({
+      message: expect.stringContaining('signed-in user'),
+      default: false,
+    });
+    expect(plan.tables[0].readsNeedSignIn).toBe(true);
+  });
+
+  it('does not ask about reads in an app that already exists', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider({}, null));
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+
+    const plan = await runInitWizard([definition]);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(plan.tables[0].readsNeedSignIn).toBe(false);
+  });
+
+  it('asks the question for the tables the provider leaves open only', async () => {
+    const readsNeedSignIn = vi
+      .fn()
+      .mockImplementation(async (table: string) =>
+        table === 'orders' ? true : null,
+      );
+    const definition = fakeDefinition(
+      'supabase',
+      fakeSchemaProvider({}, readsNeedSignIn),
+    );
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products', 'orders'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValue(false);
+
+    const plan = await runInitWizard([definition], { isNewApp: true });
+
+    const asked = vi
+      .mocked(confirm)
+      .mock.calls.filter(([question]) =>
+        question.message.includes('signed-in user'),
+      );
+    expect(asked).toHaveLength(1);
+    expect(
+      plan.tables.map((table) => [table.table, table.readsNeedSignIn]),
+    ).toEqual([
+      ['products', false],
+      ['orders', true],
+    ]);
   });
 
   it('prompts for a provider when several are registered', async () => {
@@ -431,6 +528,7 @@ describe('runScriptedInit', () => {
       tables,
       layout: 'none',
       signIn: false,
+      readsNeedSignIn: false,
     };
   }
 
@@ -512,6 +610,7 @@ describe('runScriptedInit', () => {
           ],
           actions: ['list', 'create'],
           hiddenFields: [],
+          readsNeedSignIn: false,
         },
       ],
       setup: SETUP,
@@ -549,6 +648,45 @@ describe('runScriptedInit', () => {
     );
 
     expect(fromPlan).toEqual(interactive);
+  });
+
+  it('takes the readsNeedSignIn of the plan when the provider cannot tell', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider({}, null));
+
+    const plan = await runScriptedInit(
+      [definition],
+      {
+        ...scripted([
+          { table: 'products', actions: ['list'], hiddenFields: [] },
+        ]),
+        readsNeedSignIn: true,
+      },
+      {},
+    );
+
+    expect(plan.tables[0].readsNeedSignIn).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('prefers the answer of the provider to the plan key', async () => {
+    const readsNeedSignIn = vi.fn().mockResolvedValue(false);
+    const definition = fakeDefinition(
+      'supabase',
+      fakeSchemaProvider({}, readsNeedSignIn),
+    );
+
+    const plan = await runScriptedInit(
+      [definition],
+      {
+        ...scripted([
+          { table: 'products', actions: ['list'], hiddenFields: [] },
+        ]),
+        readsNeedSignIn: true,
+      },
+      {},
+    );
+
+    expect(plan.tables[0].readsNeedSignIn).toBe(false);
   });
 
   it('names the provider ids it knows when the plan asks for another one', async () => {

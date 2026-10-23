@@ -8,6 +8,7 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
   ...[
     'auth-required-error.ts',
     'can-match-resource-action.ts',
+    'can-match-signed-in.ts',
     'delete-failure.ts',
     'delete-failure-of.ts',
     'earlier-save.ts',

@@ -8,6 +8,7 @@ export interface TablePlan {
   fields: Field[];
   actions: CrudAction[];
   hiddenFields: string[];
+  readsNeedSignIn: boolean;
 }
 
 export interface GenerationPlan {

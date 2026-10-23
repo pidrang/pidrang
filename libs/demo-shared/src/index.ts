@@ -1,5 +1,6 @@
 export * from './lib/auth-required-error';
 export * from './lib/can-match-resource-action';
+export * from './lib/can-match-signed-in';
 export * from './lib/delete-failure';
 export * from './lib/delete-failure-of';
 export * from './lib/demo-account';
