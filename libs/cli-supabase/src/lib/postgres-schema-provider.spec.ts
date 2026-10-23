@@ -411,4 +411,79 @@ describe('createPostgresSchemaProvider', () => {
       }),
     );
   });
+
+  describe('readsNeedSignIn', () => {
+    async function readsNeedSignIn(row: unknown): Promise<boolean | null> {
+      query.mockResolvedValueOnce({ rows: row === undefined ? [] : [row] });
+      return createPostgresSchemaProvider(connection).readsNeedSignIn!(
+        'products',
+      );
+    }
+
+    it('reads the policies of the table from the catalog', async () => {
+      await readsNeedSignIn({
+        row_security: true,
+        restrictive_policies: '0',
+        unconditional_policies: '1',
+      });
+
+      const [sql, values] = query.mock.calls[0];
+      expect(sql).toContain('pg_class');
+      expect(sql).toContain('pg_policy');
+      expect(sql).toContain("r.rolname = 'anon'");
+      expect(values).toEqual(['products']);
+      expect(end).toHaveBeenCalledTimes(1);
+    });
+
+    it('needs no signed-in user when the table has no row level security', async () => {
+      expect(
+        await readsNeedSignIn({
+          row_security: false,
+          restrictive_policies: '0',
+          unconditional_policies: '0',
+        }),
+      ).toBe(false);
+    });
+
+    it('needs a signed-in user when no policy lets anon read the table', async () => {
+      expect(
+        await readsNeedSignIn({
+          row_security: true,
+          restrictive_policies: '0',
+          unconditional_policies: '0',
+        }),
+      ).toBe(true);
+    });
+
+    it('needs no signed-in user when an unconditional policy lets anon read', async () => {
+      expect(
+        await readsNeedSignIn({
+          row_security: true,
+          restrictive_policies: '0',
+          unconditional_policies: '1',
+        }),
+      ).toBe(false);
+    });
+
+    it('needs a signed-in user when a restrictive policy narrows anon reads', async () => {
+      expect(
+        await readsNeedSignIn({
+          row_security: true,
+          restrictive_policies: '1',
+          unconditional_policies: '1',
+        }),
+      ).toBe(true);
+    });
+
+    it('cannot tell when the table is not in the catalog', async () => {
+      expect(await readsNeedSignIn(undefined)).toBeNull();
+    });
+
+    it('refuses a table name PostgREST cannot expose', async () => {
+      await expect(
+        createPostgresSchemaProvider(connection).readsNeedSignIn!('a.b'),
+      ).rejects.toThrow('Table "a.b" cannot be scaffolded');
+      expect(query).not.toHaveBeenCalled();
+    });
+  });
 });
