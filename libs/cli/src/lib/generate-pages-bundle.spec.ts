@@ -355,6 +355,50 @@ describe('RESOURCE_ROUTES_SNIPPET', () => {
     );
   });
 
+  it('sends a signed-out visitor of a private resource to the sign-in page', () => {
+    const routes = generateResourceRoutesFile(true, ['orders']).content;
+
+    expect(routes).toContain(
+      '  canMatchResourceAction,\n  canMatchSignedIn,\n}',
+    );
+    expect(routes.match(/canMatchSignedIn\(\['orders'\]\)/g)).toHaveLength(4);
+    for (const action of ['create', 'edit', 'show', 'list']) {
+      expect(routes).toContain(
+        `canMatch: [\n      canMatchSignedIn(['orders']),\n      canMatchResourceAction('${action}'),\n    ],`,
+      );
+    }
+  });
+
+  it('leaves every resource route unguarded when no read needs a signed-in user', () => {
+    const routes = generateResourceRoutesFile(true, []).content;
+
+    expect(routes).toBe(RESOURCE_ROUTES_SNIPPET);
+    expect(routes).not.toContain('canMatchSignedIn');
+  });
+
+  it('guards the private resources alone and quotes their names', () => {
+    const routes = generateResourceRoutesFile(true, [
+      'orders',
+      'my products',
+    ]).content;
+
+    expect(routes).toContain("canMatchSignedIn(['orders', 'my products'])");
+    expect(routes.match(/canMatchSignedIn\(/g)).toHaveLength(4);
+  });
+
+  it('ships the guard the routes import in the pages bundle', () => {
+    const files = generatePagesBundle();
+    const guard = files.find(
+      (file) => file.path === 'src/app/pidrang/can-match-signed-in.ts',
+    );
+    const barrel = files.find(
+      (file) => file.path === 'src/app/pidrang/index.ts',
+    );
+
+    expect(guard?.content).toContain('export function canMatchSignedIn');
+    expect(barrel?.content).toContain("export * from './can-match-signed-in';");
+  });
+
   it('leaves the sign-in route out when the app keeps its own page', () => {
     const routes = generateResourceRoutesFile(false).content;
 

@@ -31,6 +31,28 @@ function promptSignIn(): Promise<boolean> {
   });
 }
 
+function promptReadsNeedSignIn(): Promise<boolean> {
+  return confirm({
+    message:
+      'Do your tables need a signed-in user to be read? Say yes when the select policy of the tables hides their rows from anonymous visitors, so a new app opens on the sign-in page instead of an empty list.',
+    default: false,
+  });
+}
+
+async function providerReadsNeedSignIn(
+  schemaProvider: SchemaProvider,
+  tables: string[],
+): Promise<Map<string, boolean>> {
+  const answers = new Map<string, boolean>();
+  for (const table of tables) {
+    const answer = await schemaProvider.readsNeedSignIn?.(table);
+    if (typeof answer === 'boolean') {
+      answers.set(table, answer);
+    }
+  }
+  return answers;
+}
+
 const ACTION_CHOICES: { name: string; value: CrudAction }[] = [
   { name: 'List', value: 'list' },
   { name: 'Create', value: 'create' },
@@ -111,6 +133,7 @@ function tablePlan(
   introspection: TableIntrospection,
   actions: CrudAction[],
   hiddenFields: string[],
+  readsNeedSignIn: boolean,
 ): TablePlan {
   assertSupportedActions(table, introspection, actions);
   const fieldNames = introspection.fields.map((field) => field.name);
@@ -127,6 +150,7 @@ function tablePlan(
     fields: introspection.fields,
     actions: CRUD_ACTIONS.filter((action) => actions.includes(action)),
     hiddenFields: fieldNames.filter((field) => hiddenFields.includes(field)),
+    readsNeedSignIn,
   };
 }
 
@@ -145,9 +169,16 @@ export async function runInitWizard(
   });
   assertScaffoldableTables(selectedTables, options);
 
+  const answers = await providerReadsNeedSignIn(schemaProvider, selectedTables);
+  const fallback =
+    options.isNewApp === true && answers.size !== selectedTables.length
+      ? await promptReadsNeedSignIn()
+      : false;
   const tables: TablePlan[] = [];
   for (const table of selectedTables) {
-    tables.push(await promptTable(schemaProvider, table));
+    tables.push(
+      await promptTable(schemaProvider, table, answers.get(table) ?? fallback),
+    );
   }
   const layout = options.isNewApp === true ? await promptLayout() : 'none';
   const wantsSignIn = options.isNewApp === true ? await promptSignIn() : true;
@@ -197,6 +228,7 @@ export async function runScriptedInit(
   );
   assertScaffoldableTables(selectedTables, options);
 
+  const answers = await providerReadsNeedSignIn(schemaProvider, selectedTables);
   const tables: TablePlan[] = [];
   for (const table of selectedTables) {
     const selection = plan.tables.find((planned) => planned.table === table);
@@ -211,6 +243,7 @@ export async function runScriptedInit(
         introspection,
         selection?.actions ?? [],
         selection?.hiddenFields ?? [],
+        answers.get(table) ?? plan.readsNeedSignIn,
       ),
     );
   }
@@ -278,6 +311,7 @@ function actionsMessage(
 async function promptTable(
   schemaProvider: SchemaProvider,
   table: string,
+  readsNeedSignIn: boolean,
 ): Promise<TablePlan> {
   const introspection = await schemaProvider.introspectTable(table);
 
@@ -300,7 +334,13 @@ async function promptTable(
     })),
   });
 
-  return tablePlan(table, introspection, actions, hiddenFields);
+  return tablePlan(
+    table,
+    introspection,
+    actions,
+    hiddenFields,
+    readsNeedSignIn,
+  );
 }
 
 export function confirmPackageInstall(): Promise<boolean> {
