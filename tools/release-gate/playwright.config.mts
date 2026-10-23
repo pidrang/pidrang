@@ -16,6 +16,10 @@ const SUITES = {
     port: 4322,
     command: `node tools/release-gate/serve-spa.mjs ${join(gateDirectory, 'consumers/starter/site')} 4322`,
   },
+  'consumer-starter-private': {
+    port: 4323,
+    command: `node tools/release-gate/serve-spa.mjs ${join(gateDirectory, 'consumers/starter-private/site')} 4323`,
+  },
   'demo-material': {
     port: 4310,
     command:

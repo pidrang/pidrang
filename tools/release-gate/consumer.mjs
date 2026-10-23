@@ -24,6 +24,19 @@ const OFFLINE_BACKEND = {
 
 const GENERATORS = ['library', 'bin'];
 
+const STARTER_ADAPTER = {
+  packages: [
+    '@pidrang/core',
+    '@pidrang/supabase',
+    '@pidrang/material',
+    '@pidrang/cli',
+    '@pidrang/cli-supabase',
+    'pidrang',
+  ],
+  dependencies: ['@angular/material', '@angular/cdk'],
+  devDependencies: [],
+};
+
 const ADAPTERS = {
   material: {
     packages: [
@@ -37,24 +50,16 @@ const ADAPTERS = {
     dependencies: ['@angular/material', '@angular/cdk'],
     devDependencies: [],
   },
-  starter: {
-    packages: [
-      '@pidrang/core',
-      '@pidrang/supabase',
-      '@pidrang/material',
-      '@pidrang/cli',
-      '@pidrang/cli-supabase',
-      'pidrang',
-    ],
-    dependencies: ['@angular/material', '@angular/cdk'],
-    devDependencies: [],
-  },
+  starter: STARTER_ADAPTER,
+  'starter-private': STARTER_ADAPTER,
   tailwind: {
     packages: ['@pidrang/core', '@pidrang/supabase', '@pidrang/tailwind'],
     dependencies: [],
     devDependencies: ['tailwindcss', '@tailwindcss/postcss', 'postcss'],
   },
 };
+
+const STARTER_ADAPTERS = ['starter', 'starter-private'];
 
 const COMMON_DEPENDENCIES = [
   '@angular/common',
@@ -85,6 +90,7 @@ const { values } = parseArgs({
     'drop-tailwind-source': { type: 'boolean', default: false },
     'drop-material-theme': { type: 'boolean', default: false },
     'drop-input-binding': { type: 'boolean', default: false },
+    'reads-need-sign-in': { type: 'boolean', default: false },
   },
 });
 
@@ -99,11 +105,10 @@ if (!adapter) {
   process.exit(1);
 }
 
-if (
-  values.adapter === 'starter' &&
-  (values.generator !== 'bin' || !values.plan)
-) {
-  console.error('--adapter starter needs --generator bin and --plan');
+const isStarter = STARTER_ADAPTERS.includes(values.adapter);
+
+if (isStarter && (values.generator !== 'bin' || !values.plan)) {
+  console.error(`--adapter ${values.adapter} needs --generator bin and --plan`);
   process.exit(1);
 }
 
@@ -238,6 +243,7 @@ function initPlanFrom(planPath, url, layout) {
     })),
     layout,
     signIn: true,
+    readsNeedSignIn: values['reads-need-sign-in'] === true,
   };
 }
 
@@ -396,7 +402,7 @@ const backend = values.backend ? JSON.parse(values.backend) : OFFLINE_BACKEND;
 const consumer = mkdtempSync(join(tmpdir(), `pidrang-gate-${values.adapter}-`));
 
 try {
-  if (values.adapter === 'starter') {
+  if (isStarter) {
     createStarter(consumer);
   } else {
     cpSync(
@@ -451,20 +457,19 @@ try {
       range(name),
     ]),
   );
-  const consumerManifest =
-    values.adapter === 'starter'
-      ? starterManifest(consumer, dependencies, devDependencies)
-      : {
-          name: `pidrang-gate-${values.adapter}`,
-          private: true,
-          dependencies,
-          devDependencies,
-        };
+  const consumerManifest = isStarter
+    ? starterManifest(consumer, dependencies, devDependencies)
+    : {
+        name: `pidrang-gate-${values.adapter}`,
+        private: true,
+        dependencies,
+        devDependencies,
+      };
   writeFileSync(
     join(consumer, 'package.json'),
     `${JSON.stringify(consumerManifest, null, 2)}\n`,
   );
-  if (values.adapter !== 'starter') {
+  if (!isStarter) {
     writeFile(
       consumer,
       'src/app/backend.ts',
@@ -494,7 +499,7 @@ try {
     }
   }
 
-  if (values.adapter === 'starter') {
+  if (isStarter) {
     initStarter(consumer, values.plan);
     execute(
       'test',
@@ -510,10 +515,9 @@ try {
     cwd: consumer,
   });
   const site = join(output_directory, 'site');
-  const built =
-    values.adapter === 'starter'
-      ? join(consumer, 'dist', STARTER_NAME, 'browser')
-      : join(consumer, 'dist/browser');
+  const built = isStarter
+    ? join(consumer, 'dist', STARTER_NAME, 'browser')
+    : join(consumer, 'dist/browser');
   cpSync(built, site, { recursive: true });
   if (values.adapter === 'tailwind') {
     checkTailwindClasses(site);
