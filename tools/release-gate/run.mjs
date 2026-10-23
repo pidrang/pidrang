@@ -16,6 +16,7 @@ import { MANIFEST } from './identities.mjs';
 import { gateDirectory } from './paths.mjs';
 
 const PLAN = 'tools/release-gate/generation-plan.json';
+const PRIVATE_PLAN = 'tools/release-gate/generation-plan-private.json';
 const LOCAL_API = 'http://127.0.0.1:54321';
 const DEMOS = ['demo-material', 'demo-tailwind'];
 
@@ -52,6 +53,7 @@ function consumer(adapter, keys) {
   const backend = keys
     ? { url: keys.apiUrl, publishableKey: keys.publishableKey }
     : null;
+  const privateAdapter = adapter === 'starter-private';
   run(
     'node',
     [
@@ -60,7 +62,13 @@ function consumer(adapter, keys) {
       adapter,
       ...(adapter === 'tailwind'
         ? []
-        : ['--plan', PLAN, '--generator', keys ? 'bin' : 'library']),
+        : [
+            '--plan',
+            privateAdapter ? PRIVATE_PLAN : PLAN,
+            '--generator',
+            keys ? 'bin' : 'library',
+          ]),
+      ...(privateAdapter ? ['--reads-need-sign-in'] : []),
       ...(backend ? ['--backend', JSON.stringify(backend)] : []),
     ],
     keys
@@ -263,6 +271,7 @@ if (values.mode === 'build') {
   consumer('material', keys);
   consumer('tailwind', keys);
   consumer('starter', keys);
+  consumer('starter-private', keys);
   recordFixtures(fixturesCommit);
 
   run(
@@ -292,6 +301,7 @@ if (values.mode === 'build') {
         'consumer-material',
         'consumer-tailwind',
         'consumer-starter',
+        'consumer-starter-private',
         'demo-material',
         'demo-tailwind',
       ],
