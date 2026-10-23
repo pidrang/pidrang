@@ -119,13 +119,18 @@ function usage(providers: SchemaProviderDefinition[]): string {
     '      { "table": "products", "actions": ["list", "create", "show", "edit", "delete"], "hiddenFields": ["created_at"] }',
     '    ],',
     '    "layout": "sidebar",',
-    '    "signIn": true',
+    '    "signIn": true,',
+    '    "readsNeedSignIn": false',
     '  }',
     '  actions lists at least one of list, create, show, edit, delete. hiddenFields is optional.',
     '  layout is "sidebar" to add a header and a side menu of the resources to a new app, or',
     '  "none" to leave the pages bare. It defaults to "none" and an existing app never gets one.',
     '  signIn is true to generate the sign-in page that the pages and the layout link to. It',
     '  defaults to false and init asks for it on a new app.',
+    '  readsNeedSignIn is true when the select policy of the tables hides their rows from anonymous',
+    '  visitors: a new app then opens on the sign-in page instead of an empty list. It applies to',
+    '  every table, defaults to false, and the direct database connection strategy reads the answer',
+    '  from the table policies instead.',
     '  Credentials never go in the plan file: they come from environment variables.',
     '',
     ...providers.map((provider) => provider.planHelp),
@@ -564,6 +569,19 @@ const INSTALL_STATUS: Record<InstallOutcome, number> = {
   cancelled: EXIT_CANCELLED,
 };
 
+function signedInResources(
+  generation: InitResult,
+  newApp: boolean,
+  signIn: SignInPlan,
+): string[] {
+  if (!newApp || !signIn.written) {
+    return [];
+  }
+  return generation.tables
+    .filter((table) => table.readsNeedSignIn)
+    .map((table) => table.table);
+}
+
 async function runInit(
   context: CliContext,
   options: InitOptions,
@@ -573,7 +591,7 @@ async function runInit(
   const pages = relocateFiles(
     generatePagesBundle().filter((file) => file.path !== SIGN_IN_PAGE_FILE),
     layout.appDirectory,
-  ).concat(generateResourceRoutesFile(!layout.signInRoute));
+  );
   const pagesPlan = await planWrites(context.cwd, pages);
   if (pagesPlan.conflicts.length > 0) {
     const resourcesExist = await access(
@@ -600,6 +618,11 @@ async function runInit(
   );
   const generation = await collectPlan(context, layout, planPath, newApp);
   const signIn = await planSignIn(context, layout, tooling, generation.signIn);
+  const guardedResources = signedInResources(generation, newApp, signIn);
+  const resourceRoutes = generateResourceRoutesFile(
+    !layout.signInRoute,
+    guardedResources,
+  );
   if (!newApp && generation.layout === 'sidebar') {
     context.err(
       `${htmlPath} or ${layout.routesFile} is no longer the one ng new writes, so pidrang did not add the navigation layout.`,
@@ -737,6 +760,7 @@ async function runInit(
   const plan = await planWrites(context.cwd, [
     resources,
     ...pages,
+    resourceRoutes,
     ...environmentFilesToWrite,
     ...layoutFiles,
     ...(signIn.file === null ? [] : [signIn.file]),
