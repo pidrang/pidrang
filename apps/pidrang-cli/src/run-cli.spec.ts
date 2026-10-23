@@ -1533,6 +1533,28 @@ export const routes: Routes = [
       expect(after['src/app/resource-routes.ts']).not.toContain(
         'canMatchSignedIn',
       );
+      expect(err.join('\n')).toContain(
+        '"products": reads need a signed-in user, but pidrang did not add the sign-in guard: You declined the sign-in page',
+      );
+    });
+
+    it('says why a private table stays unguarded in an app that keeps its own routes', async () => {
+      await put(
+        newAppFiles({ 'src/app/app.html': '<main><router-outlet /></main>\n' }),
+      );
+      const plan = await planFile({ ...PLAN, readsNeedSignIn: true });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).not.toContain(
+        'canMatchSignedIn',
+      );
+      expect(err.join('\n')).toContain(
+        'pidrang only adds the guard to a new app',
+      );
     });
 
     it('guards only the tables the connection reads as signed in', async () => {
