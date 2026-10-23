@@ -129,8 +129,8 @@ function usage(providers: SchemaProviderDefinition[]): string {
     '  defaults to false and init asks for it on a new app.',
     '  readsNeedSignIn is true when the select policy of the tables hides their rows from anonymous',
     '  visitors: a new app then opens on the sign-in page instead of an empty list. It applies to',
-    '  every table, defaults to false, and the direct database connection strategy reads the answer',
-    '  from the table policies instead.',
+    '  every table, defaults to false, and the direct database connection strategy answers per table',
+    '  from its row level security, its select policies and its grant to the anonymous role instead.',
     '  Credentials never go in the plan file: they come from environment variables.',
     '',
     ...providers.map((provider) => provider.planHelp),
@@ -577,9 +577,25 @@ function signedInResources(
   if (!newApp || !signIn.written) {
     return [];
   }
+  return privateResources(generation);
+}
+
+function privateResources(generation: InitResult): string[] {
   return generation.tables
     .filter((table) => table.readsNeedSignIn)
     .map((table) => table.table);
+}
+
+function unguardedReadsMessage(
+  tables: string[],
+  newApp: boolean,
+  signIn: SignInPlan,
+): string {
+  const names = tables.map((table) => JSON.stringify(table)).join(', ');
+  const reason = newApp
+    ? signIn.reason
+    : 'pidrang only adds the guard to a new app, and this one keeps its own routes';
+  return `${names}: reads need a signed-in user, but pidrang did not add the sign-in guard: ${reason}.`;
 }
 
 async function runInit(
@@ -619,6 +635,12 @@ async function runInit(
   const generation = await collectPlan(context, layout, planPath, newApp);
   const signIn = await planSignIn(context, layout, tooling, generation.signIn);
   const guardedResources = signedInResources(generation, newApp, signIn);
+  const unguardedResources = privateResources(generation).filter(
+    (table) => !guardedResources.includes(table),
+  );
+  if (unguardedResources.length > 0) {
+    context.err(unguardedReadsMessage(unguardedResources, newApp, signIn));
+  }
   const resourceRoutes = generateResourceRoutesFile(
     !layout.signInRoute,
     guardedResources,
