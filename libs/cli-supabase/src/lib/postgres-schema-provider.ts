@@ -149,5 +149,49 @@ export function createPostgresSchemaProvider(
         return describeTable(table, columns, unavailableActions);
       });
     },
+
+    async readsNeedSignIn(table) {
+      assertPostgrestTableName(table);
+      return withClient(connection, async (client) => {
+        const result = await client.query<{
+          row_security: boolean;
+          restrictive_policies: string;
+          unconditional_policies: string;
+        }>(
+          `select c.relrowsecurity as row_security,
+                  count(p.*) filter (where not p.polpermissive) as restrictive_policies,
+                  count(p.*) filter (
+                    where p.polpermissive
+                      and coalesce(btrim(pg_get_expr(p.polqual, p.polrelid)), 'true') in ('true', '(true)')
+                  ) as unconditional_policies
+           from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+           left join pg_policy p
+             on p.polrelid = c.oid
+            and p.polcmd in ('r', '*')
+            and (
+              p.polroles = '{0}'::oid[]
+              or exists (
+                select 1 from pg_roles r
+                where r.oid = any(p.polroles) and r.rolname = 'anon'
+              )
+            )
+           where n.nspname = 'public' and c.relname = $1 and c.relkind in ('r', 'p')
+           group by c.relrowsecurity`,
+          [table],
+        );
+        const row = result.rows[0];
+        if (!row) {
+          return null;
+        }
+        if (!row.row_security) {
+          return false;
+        }
+        return !(
+          Number(row.restrictive_policies) === 0 &&
+          Number(row.unconditional_policies) > 0
+        );
+      });
+    },
   };
 }
