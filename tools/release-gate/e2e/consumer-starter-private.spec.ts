@@ -33,9 +33,11 @@ test('opens a new app whose reads need a signed-in user on the sign-in page', as
 test('sends a signed-out visitor of a private table to the sign-in page', async ({
   page,
 }) => {
+  const errors = pageErrors(page);
   await page.goto('/staff_notes');
 
   await expect(page).toHaveURL(/\/sign-in$/);
+  expect(errors).toEqual([]);
 });
 
 test('lands on the first list after signing in, private tables included', async ({
