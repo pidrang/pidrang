@@ -35,6 +35,34 @@
       "hiddenFields": []
     },
     {
+      "table": "staff_notes",
+      "fields": [
+        {
+          "name": "id",
+          "type": "text",
+          "readOnly": true,
+          "hasDefault": true
+        },
+        {
+          "name": "title",
+          "type": "text"
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "readOnly": true,
+          "hasDefault": true
+        }
+      ],
+      "actions": ["list", "show"],
+      "hiddenFields": []
+    },
+    {
       "table": "orders",
       "fields": [
         {
@@ -147,34 +175,6 @@
         }
       ],
       "actions": ["list", "create", "show", "edit", "delete"],
-      "hiddenFields": []
-    },
-    {
-      "table": "staff_notes",
-      "fields": [
-        {
-          "name": "id",
-          "type": "text",
-          "readOnly": true,
-          "hasDefault": true
-        },
-        {
-          "name": "title",
-          "type": "text"
-        },
-        {
-          "name": "body",
-          "type": "text",
-          "nullable": true
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "readOnly": true,
-          "hasDefault": true
-        }
-      ],
-      "actions": ["list", "show"],
       "hiddenFields": []
     }
   ]
