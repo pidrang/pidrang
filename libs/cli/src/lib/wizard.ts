@@ -169,9 +169,13 @@ export async function runInitWizard(
   });
   assertScaffoldableTables(selectedTables, options);
 
+  const layout = options.isNewApp === true ? await promptLayout() : 'none';
+  const wantsSignIn = options.isNewApp === true ? await promptSignIn() : true;
   const answers = await providerReadsNeedSignIn(schemaProvider, selectedTables);
   const fallback =
-    options.isNewApp === true && answers.size !== selectedTables.length
+    options.isNewApp === true &&
+    wantsSignIn &&
+    answers.size !== selectedTables.length
       ? await promptReadsNeedSignIn()
       : false;
   const tables: TablePlan[] = [];
@@ -180,8 +184,6 @@ export async function runInitWizard(
       await promptTable(schemaProvider, table, answers.get(table) ?? fallback),
     );
   }
-  const layout = options.isNewApp === true ? await promptLayout() : 'none';
-  const wantsSignIn = options.isNewApp === true ? await promptSignIn() : true;
 
   return {
     providerId: providerDefinition.id,
