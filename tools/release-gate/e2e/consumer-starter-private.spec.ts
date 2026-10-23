@@ -47,15 +47,12 @@ test('lands on the first list after signing in, private tables included', async 
 
   await signIn(page);
 
-  await expect(page).toHaveURL(/\/orders$/);
-  expect(await rowIds(page)).toHaveLength(expectations.counts['orders']);
-
-  await page
-    .locator('#app-menu')
-    .getByRole('link', { name: 'Staff notes' })
-    .click();
-
   await expect(page).toHaveURL(/\/staff_notes$/);
   expect(await rowIds(page)).toHaveLength(expectations.counts['staff_notes']);
+
+  await page.locator('#app-menu').getByRole('link', { name: 'Orders' }).click();
+
+  await expect(page).toHaveURL(/\/orders$/);
+  expect(await rowIds(page)).toHaveLength(expectations.counts['orders']);
   expect(errors).toEqual([]);
 });
