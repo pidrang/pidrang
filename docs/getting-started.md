@@ -291,7 +291,8 @@ It also wires the app itself, so nothing has to be pasted by hand:
 Init treats the app as new when `app.routes.ts` exports an empty `routes` array and `app.html` still holds the welcome template of `ng new`. Only a new app gets these, since an app with its own routes and shell already decides what it opens on:
 
 - a redirect from `''` to the list of the first table that has one, or to the create page of the first table that has one when no table has a list: `{ path: '', pathMatch: 'full', redirectTo: '/products' }`;
-- the question `Generate a navigation layout?` (yes by default), or the `layout` key of a plan.
+- the question `Generate a navigation layout?` (yes by default), or the `layout` key of a plan;
+- guards on the routes of the tables whose rows an anonymous visitor cannot read, so the app opens on the sign-in page instead of an empty list: see [When the tables need a signed-in user](#when-the-tables-need-a-signed-in-user).
 
 The navigation layout is a header with the app name, the signed-in user's email, a Sign in or Sign out button and a Menu button, and a side menu with Home and one link per resource (its list, or its create page when it has no list). Init writes it to `src/app/layout/app-layout.ts`, with Angular Material, or with Tailwind classes when your `package.json` lists `@pidrang/tailwind` (the generated pages themselves use Angular Material either way). Then it:
 
@@ -308,7 +309,29 @@ The navigation layout is a header with the app name, the signed-in user's email,
 
 - adds `provideSignInPath('/sign-in')` to `app.config.ts`, so the Sign in button and the sign-in prompts of the pages link to `/sign-in`. A new app is also asked `Generate a sign-in page at /sign-in?` (yes by default), or takes the `signIn` key of a plan; see [The sign-in page](#the-sign-in-page).
 
-In an app that is not new, init only adds the resource routes, prints the redirect line to add yourself (unless `app.routes.ts` already declares a `''` route), and never writes the layout.
+In an app that is not new, init only adds the resource routes, prints the redirect line to add yourself (unless `app.routes.ts` already declares a `''` route), never writes the layout, and adds no sign-in guard.
+
+### When the tables need a signed-in user
+
+When the `select` policy of a table only lets the `authenticated` role read it, a new app that opens on that table shows an empty list or an error, since init leaves the app anonymous. Init asks `Do your tables need a signed-in user to be read?` (no by default), or takes `readsNeedSignIn` from a plan, and, on a new app whose sign-in page it writes, guards the resource routes of those tables:
+
+```ts
+{
+  path: ':resource',
+  loadComponent: () =>
+    import('./pages/resource-list-page').then(
+      (page) => page.ResourceListPage,
+    ),
+  canMatch: [
+    canMatchSignedIn(['orders']),
+    canMatchResourceAction('list'),
+  ],
+},
+```
+
+`/` then opens the sign-in page, and a signed-out visitor of one of those pages is sent there too. After signing in, the sign-in page opens `/`, which redirects to the first list, so the app lands on its first screen. Only the routes of the tables marked that way are guarded, so a public table still opens for a signed-out visitor next to a private one. The guard is written by init, not read at run time: it is emitted into `src/app/pidrang` and `resource-routes.ts` names the tables it covers, so a table added later is covered only after init runs again, which means deleting the `resource-routes.ts` it will not overwrite first. With `"signIn": false`, or in an app that keeps its own `sign-in` route, init writes no guard: it would send the visitor to a path with no page.
+
+With the direct database connection, init answers per table from the policies rather than asking. A table is public when row security is off, or when it grants `anon` or `public` a `select` policy with no condition of its own and no restrictive policy applies; it is private otherwise, including when the policy has a condition, even one an anonymous visitor passes. The secret-key and GraphQL strategies cannot read policies from what they see (PostgREST's OpenAPI document and `pg_graphql`'s introspection), so they use the question, or `readsNeedSignIn` in a plan, for every table of the run. The answer changes where the app opens, not the generated `Resource`, so `resources.ts` does not record it.
 
 The publishable key is always written as a placeholder: put your project URL and publishable key (formerly anon) in the environment file. Init never writes the database password or the secret key into the app, and the app runs in the browser, so it must only ever get the publishable key.
 
@@ -334,7 +357,8 @@ To run it without questions, for example in CI, put the answers in a plan file a
   "connection": { "strategy": "secret-key", "url": "https://abcdefgh.supabase.co" },
   "tables": [{ "table": "products", "actions": ["list", "create", "show", "edit", "delete"], "hiddenFields": ["created_at"] }],
   "layout": "sidebar",
-  "signIn": true
+  "signIn": true,
+  "readsNeedSignIn": false
 }
 ```
 
@@ -342,7 +366,7 @@ To run it without questions, for example in CI, put the answers in a plan file a
 PIDRANG_SUPABASE_SECRET_KEY=<your secret key> npx pidrang init --plan plan.json
 ```
 
-`layout` is `"sidebar"` for the navigation layout or `"none"` (the default), and only applies to a new app: on another app, init prints that it did not add the layout and goes on. `signIn` is `true` to generate the sign-in page or `false` (the default) to leave it out; without a plan, init asks on a new app and generates it without asking on an app that already exists. The same answers give the same files as the questions. It exits with `0` when done or when there is nothing to write, `1` on an invalid plan, an unsupported Node.js or app, a file in the way or a failed install (the files are written then), and `130` when cancelled.
+`layout` is `"sidebar"` for the navigation layout or `"none"` (the default), and only applies to a new app: on another app, init prints that it did not add the layout and goes on. `signIn` is `true` to generate the sign-in page or `false` (the default) to leave it out; without a plan, init asks on a new app and generates it without asking on an app that already exists. `readsNeedSignIn` is `true` to treat every table as needing a signed-in user and `false` (the default) otherwise; it only changes the routes of a new app, and the direct database connection answers per table instead, see [When the tables need a signed-in user](#when-the-tables-need-a-signed-in-user). The same answers give the same files as the questions. It exits with `0` when done or when there is nothing to write, `1` on an invalid plan, an unsupported Node.js or app, a file in the way or a failed install (the files are written then), and `130` when cancelled.
 
 When a write fails because the user is not signed in, the generated pages say "You may need to sign in" as plain text, since they cannot know where your sign-in page lives. With the navigation layout, init already wrote `provideSignInPath('/sign-in')`, see above. Otherwise, to make it a link, provide the path once in `app.config.ts` (the CLI prints this snippet too), replacing `/your-sign-in-route` with your sign-in page's path. It must be a route of your Angular app: the link navigates inside the app, so a sign-in handled by the server or another site (an OAuth redirect, `https://…`) cannot be linked and the prompt stays plain text. `provideSignInPath` throws while the app config is built when the path is not a string, is empty, has spaces at either end, uses `.` or `..` segments, is a full URL or is malformed (`/%`), so those stop the app at startup. So is the `/your-sign-in-route` placeholder left as printed. A well-formed path to a route that does not exist cannot be caught there and lands on your not-found route, A path whose first segment is one of your resource names (`/users/sign-in` with a `users` resource) works only if your sign-in route is declared above `resourceRoutes`; below them, the link opens the Show page of a record whose id is `sign-in`. It is resolved from the app root and may carry a query string:
 
@@ -374,7 +398,7 @@ The URL changes but a page stays blank: `provideRouter` has no `withComponentInp
 
 `/products` opens the not-found route: `...resourceRoutes` is missing from `routes`, or sits below a `**` route, which matches everything. It belongs at the top of the array, with your fixed paths after it.
 
-The table is empty: the table has no rows, or Row Level Security hides them from the publishable key. Reads are public on the demo schema, but your own project decides that per table.
+The table is empty: the table has no rows, or Row Level Security hides them from the publishable key. Reads are public on the demo schema, but your own project decides that per table; when the `select` policy needs a signed-in user, sign in, and on a new app let init guard the routes as described in [When the tables need a signed-in user](#when-the-tables-need-a-signed-in-user).
 
 Saving says you may need to sign in, or returns a permission error: writes need an authenticated user. Sign in with a Supabase user of the project; the generated pages say "You may need to sign in" as plain text until you call `provideSignInPath`, above.
 
