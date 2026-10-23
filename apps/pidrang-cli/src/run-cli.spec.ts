@@ -1157,8 +1157,7 @@ export const routes: Routes = [
     });
   });
 
-  describe('the navigation layout', () => {
-    const NG_APP = `import { Component, signal } from '@angular/core';
+  const NG_APP = `import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 @Component({
@@ -1172,28 +1171,29 @@ export class App {
 }
 `;
 
-    function newAppFiles(extra: Record<string, string> = {}) {
-      return {
-        ...STOCK_FILES,
-        'src/app/app.ts': NG_APP,
-        'src/app/app.config.ts': NG_CONFIG,
-        'src/app/app.routes.ts': NG_ROUTES,
-        'src/app/app.html': NG_HTML,
-        'src/app/app.spec.ts': NG_SPEC,
-        ...extra,
-      };
-    }
+  function newAppFiles(extra: Record<string, string> = {}) {
+    return {
+      ...STOCK_FILES,
+      'src/app/app.ts': NG_APP,
+      'src/app/app.config.ts': NG_CONFIG,
+      'src/app/app.routes.ts': NG_ROUTES,
+      'src/app/app.html': NG_HTML,
+      'src/app/app.spec.ts': NG_SPEC,
+      ...extra,
+    };
+  }
 
-    const LAYOUT_IGNORED =
-      'src/app/app.html or src/app/app.routes.ts is no longer the one ng new writes, so pidrang did not add the navigation layout.';
+  const LAYOUT_IGNORED =
+    'src/app/app.html or src/app/app.routes.ts is no longer the one ng new writes, so pidrang did not add the navigation layout.';
 
-    const STRUCTURAL_CONTEXT = () =>
-      context(undefined, {
-        ...STRUCTURAL,
-        typescript: null,
-        layoutUi: 'material',
-      });
+  const STRUCTURAL_CONTEXT = () =>
+    context(undefined, {
+      ...STRUCTURAL,
+      typescript: null,
+      layoutUi: 'material',
+    });
 
+  describe('the navigation layout', () => {
     it('writes the Material layout into a new app that asks for it', async () => {
       await put(newAppFiles());
       const plan = await planFile({ ...PLAN, layout: 'sidebar' });
@@ -1482,6 +1482,87 @@ export const routes: Routes = [
       expect(after['src/app/layout/app-layout.ts']).toBe('// mine\n');
       expect(after['src/app/resources.ts']).toBeUndefined();
       expect(after['src/app/app.html']).toBe(NG_HTML);
+    });
+  });
+
+  describe('where a new app opens', () => {
+    it('guards the resources whose reads need a signed-in user', async () => {
+      await put(newAppFiles());
+      const plan = await planFile({ ...PLAN, readsNeedSignIn: true });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).toContain(
+        "canMatchSignedIn(['products'])",
+      );
+      expect(after['src/app/pidrang/can-match-signed-in.ts']).toContain(
+        'export function canMatchSignedIn',
+      );
+    });
+
+    it('leaves the resource routes unguarded when the reads are public', async () => {
+      await put(newAppFiles());
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).not.toContain(
+        'canMatchSignedIn',
+      );
+    });
+
+    it('leaves the routes unguarded when init writes no sign-in page', async () => {
+      await put(newAppFiles());
+      const plan = await planFile({
+        ...PLAN,
+        signIn: false,
+        readsNeedSignIn: true,
+      });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).not.toContain(
+        'canMatchSignedIn',
+      );
+    });
+
+    it('guards only the tables the connection reads as signed in', async () => {
+      await put(newAppFiles());
+      vi.mocked(provider.createSchemaProvider).mockReturnValueOnce({
+        listTables: vi.fn().mockResolvedValue(['products', 'orders']),
+        introspectTable: vi.fn().mockResolvedValue({
+          fields: [{ name: 'id', type: 'number', readOnly: true }],
+          excludedColumns: [],
+          unavailableActions: [],
+        }),
+        readsNeedSignIn: vi.fn(async (table: string) => table === 'orders'),
+      });
+      const plan = await planFile({
+        ...PLAN,
+        tables: [
+          { table: 'products', actions: ['list'] },
+          { table: 'orders', actions: ['list'] },
+        ],
+      });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).toContain(
+        "canMatchSignedIn(['orders'])",
+      );
+      expect(after['src/app/resource-routes.ts']).not.toContain("'products'");
     });
   });
 
