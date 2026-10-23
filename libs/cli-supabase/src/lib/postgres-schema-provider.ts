@@ -155,10 +155,16 @@ export function createPostgresSchemaProvider(
       return withClient(connection, async (client) => {
         const result = await client.query<{
           row_security: boolean;
+          anon_can_select: boolean;
           restrictive_policies: string;
           unconditional_policies: string;
         }>(
           `select c.relrowsecurity as row_security,
+                  coalesce(
+                    (select has_table_privilege(r.oid, c.oid, 'SELECT')
+                     from pg_roles r where r.rolname = 'anon'),
+                    true
+                  ) as anon_can_select,
                   count(p.*) filter (where not p.polpermissive) as restrictive_policies,
                   count(p.*) filter (
                     where p.polpermissive
@@ -177,12 +183,15 @@ export function createPostgresSchemaProvider(
               )
             )
            where n.nspname = 'public' and c.relname = $1 and c.relkind in ('r', 'p')
-           group by c.relrowsecurity`,
+           group by c.relrowsecurity, c.oid`,
           [table],
         );
         const row = result.rows[0];
         if (!row) {
           return null;
+        }
+        if (!row.anon_can_select) {
+          return true;
         }
         if (!row.row_security) {
           return false;

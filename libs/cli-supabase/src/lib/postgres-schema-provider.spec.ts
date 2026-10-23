@@ -420,9 +420,10 @@ describe('createPostgresSchemaProvider', () => {
       );
     }
 
-    it('reads the policies of the table from the catalog', async () => {
+    it('reads the policies and the grant of the table from the catalog', async () => {
       await readsNeedSignIn({
         row_security: true,
+        anon_can_select: true,
         restrictive_policies: '0',
         unconditional_policies: '1',
       });
@@ -430,15 +431,33 @@ describe('createPostgresSchemaProvider', () => {
       const [sql, values] = query.mock.calls[0];
       expect(sql).toContain('pg_class');
       expect(sql).toContain('pg_policy');
+      expect(sql).toContain("has_table_privilege(r.oid, c.oid, 'SELECT')");
       expect(sql).toContain("r.rolname = 'anon'");
       expect(values).toEqual(['products']);
       expect(end).toHaveBeenCalledTimes(1);
+    });
+
+    it('counts only a permissive policy with no condition as public', async () => {
+      await readsNeedSignIn({
+        row_security: true,
+        anon_can_select: true,
+        restrictive_policies: '0',
+        unconditional_policies: '0',
+      });
+
+      const [sql] = query.mock.calls[0];
+      expect(sql).toContain(
+        "coalesce(btrim(pg_get_expr(p.polqual, p.polrelid)), 'true')",
+      );
+      expect(sql).toContain("in ('true', '(true)')");
+      expect(sql).toContain("p.polcmd in ('r', '*')");
     });
 
     it('needs no signed-in user when the table has no row level security', async () => {
       expect(
         await readsNeedSignIn({
           row_security: false,
+          anon_can_select: true,
           restrictive_policies: '0',
           unconditional_policies: '0',
         }),
@@ -449,6 +468,7 @@ describe('createPostgresSchemaProvider', () => {
       expect(
         await readsNeedSignIn({
           row_security: true,
+          anon_can_select: true,
           restrictive_policies: '0',
           unconditional_policies: '0',
         }),
@@ -459,6 +479,7 @@ describe('createPostgresSchemaProvider', () => {
       expect(
         await readsNeedSignIn({
           row_security: true,
+          anon_can_select: true,
           restrictive_policies: '0',
           unconditional_policies: '1',
         }),
@@ -469,8 +490,31 @@ describe('createPostgresSchemaProvider', () => {
       expect(
         await readsNeedSignIn({
           row_security: true,
+          anon_can_select: true,
           restrictive_policies: '1',
           unconditional_policies: '1',
+        }),
+      ).toBe(true);
+    });
+
+    it('needs a signed-in user when anon is granted no select, whatever the policies allow', async () => {
+      expect(
+        await readsNeedSignIn({
+          row_security: true,
+          anon_can_select: false,
+          restrictive_policies: '0',
+          unconditional_policies: '1',
+        }),
+      ).toBe(true);
+    });
+
+    it('needs a signed-in user when anon is granted no select without row level security', async () => {
+      expect(
+        await readsNeedSignIn({
+          row_security: false,
+          anon_can_select: false,
+          restrictive_policies: '0',
+          unconditional_policies: '0',
         }),
       ).toBe(true);
     });
