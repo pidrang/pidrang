@@ -1,0 +1,34 @@
+name: Blog dispatch
+
+on:
+  discussion:
+    types:
+      - created
+      - edited
+      - deleted
+      - transferred
+      - category_changed
+      - labeled
+      - unlabeled
+
+permissions: {}
+
+concurrency:
+  group: blog-dispatch
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    if: github.event.discussion.category.slug == 'blog' || (github.event.action == 'category_changed' && github.event.changes.category.from.slug == 'blog')
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.BLOG_DISPATCH_TOKEN }}
+          SITE_REPOSITORY: ${{ vars.BLOG_SITE_REPOSITORY || 'pidrang/pidrang.github.io' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "BLOG_DISPATCH_TOKEN is not set: the blog sync cannot be started." >&2
+            exit 1
+          fi
+          gh workflow run sync-blog.yml --repo "$SITE_REPOSITORY" --ref main
