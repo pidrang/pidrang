@@ -14,6 +14,7 @@ export interface InitOptions {
   reportLeftOutColumns?: (message: string) => void;
   warn?: (message: string) => void;
   isNewApp?: boolean;
+  askReadsNeedSignIn?: boolean;
 }
 
 function promptLayout(): Promise<AppLayoutChoice> {
@@ -173,7 +174,7 @@ export async function runInitWizard(
   const wantsSignIn = options.isNewApp === true ? await promptSignIn() : true;
   const answers = await providerReadsNeedSignIn(schemaProvider, selectedTables);
   const fallback =
-    options.isNewApp === true &&
+    (options.isNewApp === true || options.askReadsNeedSignIn === true) &&
     wantsSignIn &&
     answers.size !== selectedTables.length
       ? await promptReadsNeedSignIn()

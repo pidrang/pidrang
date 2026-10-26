@@ -269,6 +269,27 @@ describe('runInitWizard', () => {
     expect(plan.tables[0].readsNeedSignIn).toBe(false);
   });
 
+  it('asks about reads in an app that already exists when its routes already guard private tables', async () => {
+    const definition = fakeDefinition('supabase', fakeSchemaProvider({}, null));
+
+    vi.mocked(checkbox)
+      .mockResolvedValueOnce(['products'])
+      .mockResolvedValueOnce(['list'])
+      .mockResolvedValueOnce([]);
+    vi.mocked(confirm).mockResolvedValue(true);
+
+    const plan = await runInitWizard([definition], {
+      askReadsNeedSignIn: true,
+    });
+
+    const messages = vi
+      .mocked(confirm)
+      .mock.calls.map(([question]) => question.message);
+    expect(messages).toEqual([expect.stringContaining('signed-in user')]);
+    expect(plan.layout).toBe('none');
+    expect(plan.tables[0].readsNeedSignIn).toBe(true);
+  });
+
   it('does not ask about reads in an app that already exists', async () => {
     const definition = fakeDefinition('supabase', fakeSchemaProvider({}, null));
 
