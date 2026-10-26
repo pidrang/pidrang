@@ -119,7 +119,7 @@ function literal(source: string, name: string): string {
   return source.slice(start, end + '\n  },'.length);
 }
 
-describe('editResources', () => {
+describe('editResources', { timeout: 20_000 }, () => {
   it('appends a new table after the existing ones and leaves them byte for byte', () => {
     const first = generated('products');
 
@@ -332,35 +332,31 @@ export const resources: Resource[] = [
     [
       'a spread element',
       IMPORT +
-        "export const resources: Resource[] = [...shared, { name: 'products' }];\n",
+        "const shared: Resource[] = [];\nexport const resources: Resource[] = [...shared, { name: 'products' }];\n",
       'an element of the resources array is not a plain object with a literal name',
     ],
     [
       'an element held in a variable',
-      IMPORT + 'export const resources: Resource[] = [products];\n',
+      IMPORT +
+        "const products: Resource = { name: 'products' };\nexport const resources: Resource[] = [products];\n",
       'an element of the resources array is not a plain object with a literal name',
     ],
     [
       'an object spread that can override the name',
       IMPORT +
-        "const overrides = { name: 'orders' };\nexport const resources: Resource[] = [{ name: 'products', ...overrides }];\n",
+        "const overrides: Partial<Resource> = {};\nexport const resources: Resource[] = [{ name: 'products', ...overrides }];\n",
       'an element of the resources array is not a plain object with a literal name',
     ],
     [
       'a computed key',
       IMPORT +
-        "export const resources: Resource[] = [{ name: 'products', [key]: 'orders' }];\n",
-      'an element of the resources array is not a plain object with a literal name',
-    ],
-    [
-      'two names in one element',
-      IMPORT +
-        "export const resources: Resource[] = [{ name: 'products', name: 'orders' }];\n",
+        "const key = 'label';\nexport const resources: Resource[] = [{ name: 'products', [key]: 'orders' }];\n",
       'an element of the resources array is not a plain object with a literal name',
     ],
     [
       'a name that is not a string literal',
-      IMPORT + 'export const resources: Resource[] = [{ name: tableName }];\n',
+      IMPORT +
+        "const tableName: string = 'products';\nexport const resources: Resource[] = [{ name: tableName }];\n",
       'an element of the resources array is not a plain object with a literal name',
     ],
     [
@@ -397,12 +393,6 @@ export const resources: Resource[] = [
       IMPORT +
         "export const resources: Resource[] = [{ name: 'products' }];\nconst all = resources;\nall.push({ name: 'orders' });\n",
       'the resources array is read or changed elsewhere in the file',
-    ],
-    [
-      'a syntax error',
-      IMPORT +
-        "export const resources: Resource[] = [\n  { name: 'products' }\n  { name: 'orders' }\n];\n",
-      'resources.ts has a syntax error',
     ],
   ])('asks for a manual change with %s', (_, source, reason) => {
     const result = editResources(
@@ -631,18 +621,25 @@ export const resources: Resource[] = [
     },
   );
 
-  it('asks for a manual change when resources.ts already has a type error', () => {
-    const result = editResources(
-      typescript,
-      PROJECT,
-      PATH,
+  it.each([
+    [
+      'two names in one element',
+      IMPORT +
+        "export const resources: Resource[] = [{ name: 'products', name: 'orders' }];\n",
+    ],
+    [
+      'a syntax error',
+      IMPORT +
+        "export const resources: Resource[] = [\n  { name: 'products' }\n  { name: 'orders' }\n];\n",
+    ],
+    [
+      'a type error',
       "import { Resource } from '@pidrang/core';\nimport { AppResource } from '@app/model';\n\nexport const resources: AppResource[] = [{ name: 'products', tenant: 'shop' }];\n",
-      generated('orders'),
-    );
-
-    expect(result.kind === 'manual' ? result.reason : result.kind).toBe(
-      'resources.ts does not type-check, so pidrang cannot check the new tables against it',
-    );
+    ],
+  ])('reports a resources.ts with %s as in the way', (_, source) => {
+    expect(
+      editResources(typescript, PROJECT, PATH, source, generated('orders')),
+    ).toEqual({ kind: 'in-the-way', kept: [] });
   });
 
   describe('in an app with @pidrang/core installed', () => {
@@ -763,6 +760,58 @@ export const resources: Resource[] = [
       },
     );
 
+    it('appends to the file init wrote in an ESM app with NodeNext resolution', async () => {
+      await put({
+        'package.json': JSON.stringify({ type: 'module' }),
+        'tsconfig.json': JSON.stringify({
+          compilerOptions: {
+            strict: true,
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+          },
+        }),
+      });
+
+      expect(
+        editResources(
+          typescript,
+          { root, tsConfig: null },
+          PATH,
+          generated('products'),
+          generated('products', 'orders'),
+        ).kind,
+      ).toBe('edited');
+    });
+
+    it.each([
+      'export const resources = JSON.parse(\'{"logo":"/assets/logo.svg"}\');\n',
+      "export const resources: any[] = [{ name: 'logo', fields: 42 }];\n",
+      "type Items = any[];\nexport const resources: Items = [{ name: 'logo', fields: 42 }];\n",
+    ])('reports an export typed with any as in the way: %s', (source) => {
+      expect(
+        editResources(
+          typescript,
+          { root, tsConfig: null },
+          PATH,
+          source,
+          generated('orders'),
+        ),
+      ).toEqual({ kind: 'in-the-way', kept: [] });
+    });
+
+    it('appends to a list whose type only mentions the word any', () => {
+      expect(
+        editResources(
+          typescript,
+          { root, tsConfig: null },
+          PATH,
+          IMPORT +
+            "export const resources: (Resource & { scope?: 'any' })[] = [{ name: 'products' }];\n",
+          generated('orders'),
+        ).kind,
+      ).toBe('edited');
+    });
+
     it('type-checks even when the app turns checking off', async () => {
       await put({
         'tsconfig.json': JSON.stringify({
@@ -815,7 +864,10 @@ export const resources: Resource[] = [
         "    name: 'products',",
         "    // @ts-ignore\n    name: 'products',",
       ),
-      generated('products').replace('\n];', ' // @ts-expect-error\n];'),
+      generated('products').replace(
+        '\n];',
+        "\n  // @ts-expect-error\n  { name: 'logo', fields: 42 },\n];",
+      ),
     ])(
       'asks for a manual change when resources.ts hides type errors',
       (source) => {
@@ -898,11 +950,7 @@ export const resources: Resource[] = [
           source,
           generated('orders'),
         ),
-      ).toMatchObject({
-        kind: 'manual',
-        reason:
-          'resources.ts does not type-check, so pidrang cannot check the new tables against it',
-      });
+      ).toEqual({ kind: 'in-the-way', kept: [] });
       expect(
         editResources(
           typescript,

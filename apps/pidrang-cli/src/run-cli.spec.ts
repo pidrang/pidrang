@@ -1785,7 +1785,7 @@ export const routes: Routes = [
         html,
         (await readFile(html, 'utf8')).replace(
           /appName="[^"]*"/,
-          'appName="My shop"',
+          'appName="Orders > Archive"',
         ),
         'utf8',
       );
@@ -1843,6 +1843,89 @@ export const routes: Routes = [
         expect((await snapshot())['src/app/app.html']).toContain('pidrang:');
       },
     );
+
+    it('leaves the guard alone when resources.ts needs a manual change', async () => {
+      await put(newAppFiles());
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+      const path = join(root, 'src/app/resources.ts');
+      await writeFile(
+        path,
+        `${await readFile(path, 'utf8')}// @ts-ignore\n`,
+        'utf8',
+      );
+      const routes = (await snapshot())['src/app/resource-routes.ts'];
+      err = [];
+
+      expect(
+        await run({ ...TWO_TABLES, readsNeedSignIn: true }, 'second.json'),
+      ).toBe(0);
+
+      expect((await snapshot())['src/app/resource-routes.ts']).toBe(routes);
+      expect(err.join('\n')).toContain(
+        'did not add them to the sign-in guard yet',
+      );
+
+      err = [];
+      expect(
+        await run(
+          { ...TWO_TABLES, signIn: false, readsNeedSignIn: true },
+          'third.json',
+        ),
+      ).toBe(0);
+
+      expect((await snapshot())['src/app/resource-routes.ts']).toBe(routes);
+      expect(err.join('\n')).toContain(
+        'did not add them to the sign-in guard yet',
+      );
+    });
+
+    it('guards the new private table once the manual change lists it, without TypeScript', async () => {
+      const second = { ...TWO_TABLES, signIn: false, readsNeedSignIn: true };
+      const app = root;
+      root = await mkdtemp(join(tmpdir(), 'pidrang-reference-'));
+      await put(newAppFiles());
+      expect(
+        await run({ ...TWO_TABLES, readsNeedSignIn: true }, 'reference.json'),
+      ).toBe(0);
+      const listed = await readFile(join(root, 'src/app/resources.ts'), 'utf8');
+      await rm(root, { recursive: true, force: true });
+      root = app;
+      await put(newAppFiles());
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+      const plan = await planFile(second, 'second.json');
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+      expect(err.join('\n')).toContain(
+        'did not add them to the sign-in guard yet',
+      );
+      await put({ 'src/app/resources.ts': listed });
+      err = [];
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+
+      expect((await snapshot())['src/app/resource-routes.ts']).toContain(
+        "canMatchSignedIn(['products', 'orders'])",
+      );
+      expect(err.join('\n')).not.toContain('did not add them');
+    });
+
+    it('writes no guard for a private table a new app cannot list yet', async () => {
+      await put(
+        newAppFiles({
+          'src/app/resources.ts':
+            "import { Resource } from '@pidrang/core';\n\nexport const resources: Resource[] = [...[{ name: 'products' }]];\n",
+        }),
+      );
+
+      expect(
+        await run({ ...TWO_TABLES, readsNeedSignIn: true }, 'first.json'),
+      ).toBe(0);
+
+      const routes = (await snapshot())['src/app/resource-routes.ts'];
+      expect(routes).not.toContain("'orders'");
+      expect(err.join('\n')).toContain(
+        'did not add them to the sign-in guard yet',
+      );
+    });
 
     it('keeps the guard when a public table is added', async () => {
       await put(newAppFiles());

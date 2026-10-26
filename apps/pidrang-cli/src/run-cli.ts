@@ -558,8 +558,10 @@ function printInstallReport(
   );
 }
 
-const LAYOUT_HOST =
-  /^\s*<app-layout(?=[\s/>])[^<>]*(?:\/>|>\s*<\/app-layout>)\s*$/;
+const HTML_COMMENTS = String.raw`(?:\s*<!--[\s\S]*?-->)*\s*`;
+const LAYOUT_HOST = new RegExp(
+  String.raw`^${HTML_COMMENTS}<app-layout(?=[\s/>])(?:[^<>"']|"[^"]*"|'[^']*')*(?:\/>|>${HTML_COMMENTS}<\/app-layout>)${HTML_COMMENTS}$`,
+);
 
 const INSTALL_STATUS: Record<InstallOutcome, number> = {
   installed: EXIT_OK,
@@ -661,10 +663,6 @@ async function runInit(
   if (unguardedResources.length > 0) {
     context.err(unguardedReadsMessage(unguardedResources, newApp, signIn));
   }
-  const [resourceRoutes] = relocateFiles(
-    [generateResourceRoutesFile(!layout.signInRoute, guardedResources)],
-    layout.appDirectory,
-  );
   const routesGuardEdit =
     existingRoutes !== null &&
     existingGuards.length > 0 &&
@@ -676,7 +674,7 @@ async function runInit(
     layout.appDirectory,
   );
   const hasLayout =
-    LAYOUT_HOST.test((htmlSource ?? '').replace(/<!--[\s\S]*?-->/g, '')) &&
+    LAYOUT_HOST.test(htmlSource ?? '') &&
     (await readOptional(context.cwd, layoutFile.path))?.replace(
       /\r\n/g,
       '\n',
@@ -791,6 +789,32 @@ async function runInit(
     ),
   );
 
+  const listed = (table: string) =>
+    existingGuards.includes(table) ||
+    resourcesEdit === null ||
+    resourcesEdit.kind === 'edited' ||
+    resourcesEdit.kept.includes(table) ||
+    existingResources?.replace(/\r\n/g, '\n') === generatedResources.content;
+  const heldGuards = guardedResources.filter((table) => !listed(table));
+  if (heldGuards.length > 0) {
+    context.err(
+      `${heldGuards
+        .map((table) => JSON.stringify(table))
+        .join(
+          ', ',
+        )}: reads need a signed-in user, but pidrang did not add them to the sign-in guard yet: pidrang does not see them in ${generatedResources.path}. Run init again once the manual change there is made (it reads the tables listed there with the app's typescript).`,
+    );
+  }
+  const confirmedGuards = guardedResources.filter(listed);
+  const guardEdit =
+    routesGuardEdit !== null && confirmedGuards.length > existingGuards.length
+      ? routesGuardEdit
+      : null;
+  const [guardedRoutes] = relocateFiles(
+    [generateResourceRoutesFile(!layout.signInRoute, confirmedGuards)],
+    layout.appDirectory,
+  );
+
   const candidates: FileEditPlan[] = [
     ...(existingResources === null || resourcesEdit === null
       ? []
@@ -799,13 +823,13 @@ async function runInit(
           existingResources,
           resourcesEdit,
         )),
-    ...(routesGuardEdit === null
+    ...(guardEdit === null
       ? []
       : [
           {
-            path: resourceRoutes.path,
-            before: routesGuardEdit,
-            after: resourceRoutes.content,
+            path: guardedRoutes.path,
+            before: guardEdit,
+            after: guardedRoutes.content,
             manual: false,
           },
         ]),
@@ -856,7 +880,7 @@ async function runInit(
   const plan = await planWrites(context.cwd, [
     ...(resourcesEdit === null ? [generatedResources] : []),
     ...pages,
-    ...(routesGuardEdit === null ? [resourceRoutes] : []),
+    ...(routesGuardEdit === null ? [guardedRoutes] : []),
     ...environmentFilesToWrite,
     ...layoutFiles,
     ...(signIn.file === null ? [] : [signIn.file]),
