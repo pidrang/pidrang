@@ -1,4 +1,4 @@
-import { Component, input, linkedSignal } from '@angular/core';
+import { Component, DOCUMENT, inject, input, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
   injectAuthProvider,
@@ -10,7 +10,7 @@ import { injectSignInUrl } from '@pidrang/demo-shared';
 
 const TEMPLATE = `
   <header
-    class="flex items-center gap-4 border-b border-gray-200 bg-white px-4 py-3"
+    class="flex items-center gap-4 border-b border-gray-200 bg-white px-4 py-3 max-[48rem]:flex-wrap"
   >
     <button
       type="button"
@@ -21,13 +21,17 @@ const TEMPLATE = `
     >
       Menu
     </button>
-    <strong class="text-lg text-gray-900">{{ appName() }}</strong>
-    <span class="ml-auto text-sm text-gray-700">
+    <strong class="min-w-0 truncate text-lg text-gray-900">{{
+      appName()
+    }}</strong>
+    <span
+      class="ml-auto text-sm text-gray-700 max-[48rem]:flex max-[48rem]:min-w-0 max-[48rem]:items-center"
+    >
       @if (session.value(); as identity) {
-        {{ identity.email ?? identity.id }}
+        <span class="min-w-0 truncate">{{ identity.email ?? identity.id }}</span>
         <button
           type="button"
-          class="ml-2 rounded border border-gray-300 px-3 py-1 hover:bg-gray-100"
+          class="ml-2 shrink-0 rounded border border-gray-300 px-3 py-1 hover:bg-gray-100"
           (click)="signOut()"
         >
           Sign out
@@ -35,21 +39,25 @@ const TEMPLATE = `
       } @else if (signInUrl; as path) {
         <a
           [routerLink]="path"
-          class="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+          class="shrink-0 rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
           >Sign in</a
         >
       }
     </span>
   </header>
 
-  <div class="flex min-h-svh">
+  <div class="relative flex min-h-svh">
     @if (menuOpen()) {
-      <nav id="app-menu" class="w-56 border-r border-gray-200 bg-gray-50 p-2">
+      <nav
+        id="app-menu"
+        class="w-56 border-r border-gray-200 bg-gray-50 p-2 max-[48rem]:absolute max-[48rem]:inset-y-0 max-[48rem]:left-0 max-[48rem]:z-10 max-[48rem]:max-w-full max-[48rem]:shadow-lg"
+      >
         <a
           routerLink="/"
           routerLinkActive="bg-gray-200 font-semibold"
           [routerLinkActiveOptions]="{ exact: true }"
-          class="block rounded px-3 py-2 text-sm text-gray-800 hover:bg-gray-200"
+          (click)="closeOnNarrow()"
+          class="block rounded px-3 py-2 text-sm break-words text-gray-800 hover:bg-gray-200"
           >Home</a
         >
         @for (resource of resources; track resource.name) {
@@ -57,21 +65,23 @@ const TEMPLATE = `
             <a
               [routerLink]="['/', resource.name]"
               routerLinkActive="bg-gray-200 font-semibold"
-              class="block rounded px-3 py-2 text-sm text-gray-800 hover:bg-gray-200"
+              (click)="closeOnNarrow()"
+              class="block rounded px-3 py-2 text-sm break-words text-gray-800 hover:bg-gray-200"
               >{{ resource.label ?? resource.name }}</a
             >
           } @else if (isResourceActionEnabled(resource, 'create')) {
             <a
               [routerLink]="['/', resource.name, 'create']"
               routerLinkActive="bg-gray-200 font-semibold"
-              class="block rounded px-3 py-2 text-sm text-gray-800 hover:bg-gray-200"
+              (click)="closeOnNarrow()"
+              class="block rounded px-3 py-2 text-sm break-words text-gray-800 hover:bg-gray-200"
               >Create {{ resource.label ?? resource.name }}</a
             >
           }
         }
       </nav>
     }
-    <main class="min-w-0 flex-1 p-6">
+    <main class="min-w-0 flex-1 p-6 max-[48rem]:overflow-x-auto">
       <router-outlet />
     </main>
   </div>
@@ -87,11 +97,19 @@ export class AppLayout {
 
   protected readonly session = injectAuthSession();
   protected readonly signInUrl = injectSignInUrl();
-  protected readonly menuOpen = linkedSignal(() => true);
+  private readonly narrow =
+    inject(DOCUMENT).defaultView?.matchMedia?.('(width < 48rem)');
+  protected readonly menuOpen = signal(this.narrow?.matches !== true);
   protected readonly isResourceActionEnabled = isResourceActionEnabled;
   protected readonly resources = injectResources();
 
   private readonly authProvider = injectAuthProvider();
+
+  protected closeOnNarrow(): void {
+    if (this.narrow?.matches) {
+      this.menuOpen.set(false);
+    }
+  }
 
   protected async signOut(): Promise<void> {
     await this.authProvider.logout();

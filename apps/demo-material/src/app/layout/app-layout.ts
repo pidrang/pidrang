@@ -1,4 +1,4 @@
-import { Component, input, linkedSignal } from '@angular/core';
+import { Component, DOCUMENT, inject, input, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
   injectAuthProvider,
@@ -22,6 +22,7 @@ const TEMPLATE = `
           #homeLink="routerLinkActive"
           [activated]="homeLink.isActive"
           [routerLinkActiveOptions]="{ exact: true }"
+          (click)="closeOnNarrow()"
           >Home</a
         >
         @for (resource of resources; track resource.name) {
@@ -32,10 +33,14 @@ const TEMPLATE = `
               routerLinkActive
               #listLink="routerLinkActive"
               [activated]="listLink.isActive"
+              (click)="closeOnNarrow()"
               >{{ resource.label ?? resource.name }}</a
             >
           } @else if (isResourceActionEnabled(resource, 'create')) {
-            <a mat-list-item [routerLink]="['/', resource.name, 'create']"
+            <a
+              mat-list-item
+              [routerLink]="['/', resource.name, 'create']"
+              (click)="closeOnNarrow()"
               >Create {{ resource.label ?? resource.name }}</a
             >
           }
@@ -53,7 +58,7 @@ const TEMPLATE = `
         >
           Menu
         </button>
-        <span>{{ appName() }}</span>
+        <span class="app-name">{{ appName() }}</span>
         <span class="spacer"></span>
         @if (session.value(); as identity) {
           <span class="identity">{{ identity.email ?? identity.id }}</span>
@@ -101,6 +106,48 @@ const STYLES = `
   .content {
     padding: 1.5rem;
   }
+
+  .app-name,
+  .identity {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (width < 48rem) {
+    .layout {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .main {
+      display: contents;
+    }
+
+    mat-toolbar {
+      grid-row: 1;
+      grid-column: 1;
+    }
+
+    .content {
+      grid-row: 2;
+      grid-column: 1;
+      min-width: 0;
+      overflow: auto;
+    }
+
+    .menu {
+      grid-row: 2;
+      grid-column: 1;
+      z-index: 1;
+      justify-self: start;
+      box-sizing: border-box;
+      width: min(14rem, 100%);
+      background: var(--mat-sys-surface, Canvas);
+      box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 0.2);
+    }
+  }
 `;
 
 @Component({
@@ -121,11 +168,19 @@ export class AppLayout {
 
   protected readonly session = injectAuthSession();
   protected readonly signInUrl = injectSignInUrl();
-  protected readonly menuOpen = linkedSignal(() => true);
+  private readonly narrow =
+    inject(DOCUMENT).defaultView?.matchMedia?.('(width < 48rem)');
+  protected readonly menuOpen = signal(this.narrow?.matches !== true);
   protected readonly resources = injectResources();
   protected readonly isResourceActionEnabled = isResourceActionEnabled;
 
   private readonly authProvider = injectAuthProvider();
+
+  protected closeOnNarrow(): void {
+    if (this.narrow?.matches) {
+      this.menuOpen.set(false);
+    }
+  }
 
   protected async signOut(): Promise<void> {
     await this.authProvider.logout();

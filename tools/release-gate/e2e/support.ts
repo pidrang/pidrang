@@ -85,3 +85,39 @@ export async function rowIds(page: Page): Promise<string[]> {
   await expect(rows.first()).toBeVisible();
   return rows.locator('td:first-child').allInnerTexts();
 }
+
+export const NARROW = { width: 390, height: 844 };
+
+export async function expectNoHorizontalScroll(page: Page): Promise<void> {
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth, 'document wider than the viewport').toBeLessThanOrEqual(
+    clientWidth,
+  );
+}
+
+export async function expectMenuOverContent(page: Page): Promise<void> {
+  const menu = page.locator('#app-menu');
+  const content = page.getByRole('main');
+  await expect(menu).toHaveCount(0);
+  const closed = await content.boundingBox();
+
+  await page.getByRole('button', { name: 'Menu' }).click();
+
+  await expect(menu).toBeVisible();
+  expect(await content.boundingBox()).toEqual(closed);
+  const opened = await menu.boundingBox();
+  if (closed === null || opened === null) {
+    throw new Error('the menu or the page has no box');
+  }
+  expect(opened.x).toBeCloseTo(closed.x, 0);
+  expect(opened.y).toBeCloseTo(closed.y, 0);
+  expect(opened.width).toBeLessThan(closed.width);
+  expect(
+    await menu.evaluate((element) => getComputedStyle(element).backgroundColor),
+    'the open menu lets the page show through',
+  ).not.toMatch(/^(transparent|rgba\(0, 0, 0, 0\))$/);
+  await expectNoHorizontalScroll(page);
+}
