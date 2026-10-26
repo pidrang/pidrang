@@ -1,4 +1,12 @@
-import { Component, DOCUMENT, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DOCUMENT,
+  ElementRef,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
   injectAuthProvider,
@@ -13,6 +21,7 @@ const TEMPLATE = `
     class="flex items-center gap-4 border-b border-gray-200 bg-white px-4 py-3 max-[48rem]:flex-wrap"
   >
     <button
+      #menuButton
       type="button"
       class="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100"
       [attr.aria-expanded]="menuOpen()"
@@ -21,14 +30,16 @@ const TEMPLATE = `
     >
       Menu
     </button>
-    <strong class="min-w-0 truncate text-lg text-gray-900">{{
+    <strong class="min-w-0 text-lg text-gray-900 max-[48rem]:truncate">{{
       appName()
     }}</strong>
     <span
       class="ml-auto text-sm text-gray-700 max-[48rem]:flex max-[48rem]:min-w-0 max-[48rem]:items-center"
     >
       @if (session.value(); as identity) {
-        <span class="min-w-0 truncate">{{ identity.email ?? identity.id }}</span>
+        <span class="min-w-0 max-[48rem]:truncate">{{
+          identity.email ?? identity.id
+        }}</span>
         <button
           type="button"
           class="ml-2 shrink-0 rounded border border-gray-300 px-3 py-1 hover:bg-gray-100"
@@ -49,8 +60,9 @@ const TEMPLATE = `
   <div class="relative flex min-h-svh">
     @if (menuOpen()) {
       <nav
+        #menu
         id="app-menu"
-        class="w-56 border-r border-gray-200 bg-gray-50 p-2 max-[48rem]:absolute max-[48rem]:inset-y-0 max-[48rem]:left-0 max-[48rem]:z-10 max-[48rem]:max-w-full max-[48rem]:shadow-lg"
+        class="w-56 border-r border-gray-200 bg-gray-50 p-2 max-[48rem]:absolute max-[48rem]:inset-y-0 max-[48rem]:left-0 max-[48rem]:z-10 max-[48rem]:max-w-full max-[48rem]:overflow-y-auto max-[48rem]:shadow-lg"
       >
         <a
           routerLink="/"
@@ -91,6 +103,7 @@ const TEMPLATE = `
   selector: 'app-layout',
   imports: [RouterLink, RouterLinkActive, RouterOutlet],
   template: TEMPLATE,
+  host: { '(document:click)': 'closeOnOutside($event)' },
 })
 export class AppLayout {
   readonly appName = input.required<string>();
@@ -105,10 +118,30 @@ export class AppLayout {
 
   private readonly authProvider = injectAuthProvider();
 
+  private readonly menuButton = viewChild.required('menuButton', {
+    read: ElementRef<HTMLElement>,
+  });
+  private readonly menu = viewChild('menu', { read: ElementRef<HTMLElement> });
+
   protected closeOnNarrow(): void {
     if (this.narrow?.matches) {
       this.menuOpen.set(false);
+      this.menuButton().nativeElement.focus();
     }
+  }
+
+  protected closeOnOutside(event: MouseEvent): void {
+    const path = event.composedPath();
+    const menu = this.menu()?.nativeElement;
+    if (
+      this.narrow?.matches !== true ||
+      !this.menuOpen() ||
+      (menu !== undefined && path.includes(menu)) ||
+      path.includes(this.menuButton().nativeElement)
+    ) {
+      return;
+    }
+    this.menuOpen.set(false);
   }
 
   protected async signOut(): Promise<void> {

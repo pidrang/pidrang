@@ -1,4 +1,12 @@
-import { Component, DOCUMENT, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DOCUMENT,
+  ElementRef,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
   injectAuthProvider,
@@ -14,7 +22,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 const TEMPLATE = `
   <div class="layout">
     @if (menuOpen()) {
-      <mat-nav-list id="app-menu" class="menu">
+      <mat-nav-list #menu id="app-menu" class="menu">
         <a
           mat-list-item
           routerLink="/"
@@ -50,6 +58,7 @@ const TEMPLATE = `
     <div class="main">
       <mat-toolbar>
         <button
+          #menuButton
           mat-button
           type="button"
           [attr.aria-expanded]="menuOpen()"
@@ -107,14 +116,14 @@ const STYLES = `
     padding: 1.5rem;
   }
 
-  .app-name,
-  .identity {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   @media (width < 48rem) {
+    .app-name,
+    .identity {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .layout {
       display: grid;
       grid-template-rows: auto minmax(0, 1fr);
@@ -162,6 +171,7 @@ const STYLES = `
   ],
   template: TEMPLATE,
   styles: STYLES,
+  host: { '(document:click)': 'closeOnOutside($event)' },
 })
 export class AppLayout {
   readonly appName = input.required<string>();
@@ -176,10 +186,30 @@ export class AppLayout {
 
   private readonly authProvider = injectAuthProvider();
 
+  private readonly menuButton = viewChild.required('menuButton', {
+    read: ElementRef<HTMLElement>,
+  });
+  private readonly menu = viewChild('menu', { read: ElementRef<HTMLElement> });
+
   protected closeOnNarrow(): void {
     if (this.narrow?.matches) {
       this.menuOpen.set(false);
+      this.menuButton().nativeElement.focus();
     }
+  }
+
+  protected closeOnOutside(event: MouseEvent): void {
+    const path = event.composedPath();
+    const menu = this.menu()?.nativeElement;
+    if (
+      this.narrow?.matches !== true ||
+      !this.menuOpen() ||
+      (menu !== undefined && path.includes(menu)) ||
+      path.includes(this.menuButton().nativeElement)
+    ) {
+      return;
+    }
+    this.menuOpen.set(false);
   }
 
   protected async signOut(): Promise<void> {
