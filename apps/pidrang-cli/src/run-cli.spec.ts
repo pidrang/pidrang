@@ -8,7 +8,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { checkbox } from '@inquirer/prompts';
+import { checkbox, confirm } from '@inquirer/prompts';
 import {
   AppSetup,
   SchemaProviderDefinition,
@@ -22,6 +22,7 @@ import { CliContext, runCli } from './run-cli';
 vi.mock('@inquirer/prompts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@inquirer/prompts')>()),
   checkbox: vi.fn(),
+  confirm: vi.fn(),
 }));
 
 const SECRET = 'fake-secret-value';
@@ -141,6 +142,14 @@ const PLAN = {
   connection: {},
   tables: [{ table: 'products', actions: ['list', 'show'] }],
   signIn: true,
+};
+
+const TWO_TABLES = {
+  ...PLAN,
+  tables: [
+    { table: 'products', actions: ['list', 'show'] },
+    { table: 'orders', actions: ['list'] },
+  ],
 };
 
 describe('runCli', () => {
@@ -627,7 +636,6 @@ export const routes: Routes = [
     it.each([
       ['a page edited by hand', 'src/app/pages/resource-list-page.ts'],
       ['a helper from an older pidrang', 'src/app/pidrang/index.ts'],
-      ['resources.ts from other answers', 'src/app/resources.ts'],
     ])('writes nothing at all when %s is in the way', async (_, path) => {
       await put({ [path]: 'kept\n' });
       const plan = await planFile(PLAN);
@@ -826,7 +834,6 @@ export const routes: Routes = [
       expect(await runCli(['init', '--plan', plan], context())).toBe(1);
       expect(err.filter((line) => line.startsWith('  src/'))).toEqual([
         '  src/app/pages/resource-edit-page.ts: differs from what this pidrang version generates',
-        '  src/app/resources.ts: exists too, and is compared with what your answers generate once the files above are out of the way',
       ]);
       expect(provider.connectionFromPlan).not.toHaveBeenCalled();
     });
@@ -845,25 +852,124 @@ export const routes: Routes = [
       ]);
     });
 
-    it('fails a second run with other answers instead of mixing them', async () => {
-      await runCli(['init', '--plan', await planFile(PLAN)], context());
+    it('adds a table to resources.ts on a second run and writes nothing else', async () => {
+      expect(
+        await runCli(
+          ['init', '--plan', await planFile(PLAN)],
+          context(undefined, STRUCTURAL),
+        ),
+      ).toBe(0);
+      const first = await readFile(join(root, 'src/app/resources.ts'), 'utf8');
+      const other = await planFile(TWO_TABLES, 'other.json');
       const before = await snapshot();
-      const other = await planFile(
-        {
-          ...PLAN,
-          tables: [{ table: 'orders', actions: ['list'] }],
-        },
-        'other.json',
-      );
-      const withOther = await snapshot();
+      out = [];
 
-      expect(await runCli(['init', '--plan', other], context())).toBe(1);
-      expect(await snapshot()).toEqual(withOther);
-      expect(Object.keys(withOther).length).toBe(
-        Object.keys(before).length + 1,
+      expect(
+        await runCli(['init', '--plan', other], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const after = await snapshot();
+      const changed = Object.keys(after).filter(
+        (path) => after[path] !== before[path],
       );
+      expect(changed).toEqual(['src/app/resources.ts']);
+      expect(Object.keys(after)).toEqual(Object.keys(before));
+      const resources = after['src/app/resources.ts'];
+      expect(
+        resources.startsWith(first.slice(0, first.lastIndexOf('];'))),
+      ).toBe(true);
+      expect(resources).toContain("    name: 'orders',");
+      expect(out).toContain('Modified src/app/resources.ts');
+      expect(out).toContain(
+        'products is already in src/app/resources.ts, left as it is.',
+      );
+      expect(out.filter((line) => line.startsWith('Wrote '))).toEqual([]);
+    });
+
+    it('changes nothing when the same second run is repeated', async () => {
+      await runCli(
+        ['init', '--plan', await planFile(PLAN)],
+        context(undefined, STRUCTURAL),
+      );
+      const other = await planFile(TWO_TABLES, 'other.json');
+      await runCli(['init', '--plan', other], context(undefined, STRUCTURAL));
+      const before = await snapshot();
+      out = [];
+
+      expect(
+        await runCli(['init', '--plan', other], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      expect(await snapshot()).toEqual(before);
+      expect(out).toContain(
+        'products is already in src/app/resources.ts, left as it is.',
+      );
+      expect(out).toContain(
+        'orders is already in src/app/resources.ts, left as it is.',
+      );
+      expect(out).toContain('Nothing to write: every file already matches.');
+    });
+
+    it('keeps the Windows line endings of resources.ts when it adds a table', async () => {
+      await runCli(
+        ['init', '--plan', await planFile(PLAN)],
+        context(undefined, STRUCTURAL),
+      );
+      const path = join(root, 'src/app/resources.ts');
+      const crlf = (await readFile(path, 'utf8')).replace(/\n/g, '\r\n');
+      await writeFile(path, crlf, 'utf8');
+      const other = await planFile(TWO_TABLES, 'other.json');
+
+      expect(
+        await runCli(['init', '--plan', other], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const after = await readFile(path, 'utf8');
+      expect(after).not.toContain('\r\r\n');
+      expect(after.replace(/\r\n/g, '')).not.toContain('\n');
+      expect(after.startsWith(crlf.slice(0, crlf.lastIndexOf('];')))).toBe(
+        true,
+      );
+      expect(after).toContain("    name: 'orders',\r\n");
+
+      out = [];
+      expect(
+        await runCli(['init', '--plan', other], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+      expect(await readFile(path, 'utf8')).toBe(after);
+    });
+
+    it('asks to add the new table by hand when the app has no TypeScript', async () => {
+      await runCli(['init', '--plan', await planFile(PLAN)], context());
+      const first = await readFile(join(root, 'src/app/resources.ts'), 'utf8');
+      const other = await planFile(TWO_TABLES, 'other.json');
+
+      expect(await runCli(['init', '--plan', other], context())).toBe(0);
+
+      const after = await readFile(join(root, 'src/app/resources.ts'), 'utf8');
+      expect(after.endsWith(first)).toBe(true);
+      expect(after).toContain("// pidrang:     name: 'orders',");
+      expect(out).toContain(
+        'Needs a manual change src/app/resources.ts: TypeScript is not installed in this app',
+      );
+    });
+
+    it('leaves resources.ts untouched when another file is in the way', async () => {
+      await runCli(
+        ['init', '--plan', await planFile(PLAN)],
+        context(undefined, STRUCTURAL),
+      );
+      await put({ 'src/app/resource-routes.ts': 'mine\n' });
+      const other = await planFile(TWO_TABLES, 'other.json');
+      const before = await snapshot();
+
+      expect(
+        await runCli(['init', '--plan', other], context(undefined, STRUCTURAL)),
+      ).toBe(1);
+
+      expect(await snapshot()).toEqual(before);
       expect(err).toContain(
-        '  src/app/resources.ts: differs from what this pidrang version generates',
+        '  src/app/resource-routes.ts: differs from what this pidrang version generates',
       );
     });
 
@@ -892,8 +998,10 @@ export const routes: Routes = [
       expect(await listFiles('src/app')).toEqual([
         'src/app/app.config.ts',
         'src/app/app.routes.ts',
-        'src/app/resource-routes.ts',
       ]);
+      expect(await listFiles('admin/src/app')).toContain(
+        'admin/src/app/resource-routes.ts',
+      );
       expect(out.join('\n')).toContain('admin/src/app/app.routes.ts');
     });
 
@@ -1585,6 +1693,165 @@ export const routes: Routes = [
         "canMatchSignedIn(['orders'])",
       );
       expect(after['src/app/resource-routes.ts']).not.toContain("'products'");
+    });
+  });
+
+  describe('a second run on a new app whose tables need a signed-in user', () => {
+    const PRIVATE = { ...PLAN, readsNeedSignIn: true };
+    const run = async (plan: unknown, name: string) =>
+      runCli(
+        ['init', '--plan', await planFile(plan, name)],
+        context(undefined, STRUCTURAL),
+      );
+
+    it('changes nothing when the same private tables are asked again', async () => {
+      await put(newAppFiles());
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+      const before = await snapshot();
+
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+
+      expect(await snapshot()).toEqual(before);
+    });
+
+    it('adds the new private table to resources.ts and to the guard', async () => {
+      await put(newAppFiles());
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+
+      expect(
+        await run({ ...TWO_TABLES, readsNeedSignIn: true }, 'second.json'),
+      ).toBe(0);
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).toContain(
+        "canMatchSignedIn(['products', 'orders'])",
+      );
+      expect(after['src/app/resources.ts']).toContain("    name: 'orders',");
+      expect(out).toContain('Modified src/app/resource-routes.ts');
+    });
+
+    it('keeps the guard when a public table is added', async () => {
+      await put(newAppFiles());
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+      const routes = (await snapshot())['src/app/resource-routes.ts'];
+
+      expect(await run(TWO_TABLES, 'second.json')).toBe(0);
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).toBe(routes);
+      expect(after['src/app/resources.ts']).toContain("    name: 'orders',");
+    });
+
+    it('adds no guard to an app whose first run had none', async () => {
+      await put(newAppFiles());
+      expect(await run(PLAN, 'first.json')).toBe(0);
+
+      expect(
+        await run({ ...TWO_TABLES, readsNeedSignIn: true }, 'second.json'),
+      ).toBe(0);
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).not.toContain(
+        'canMatchSignedIn',
+      );
+      expect(after['src/app/resources.ts']).toContain("    name: 'orders',");
+      expect(err.join('\n')).toContain(
+        'pidrang only adds the guard to a new app',
+      );
+    });
+
+    it('asks whether a new table needs a signed-in user when the routes already guard some', async () => {
+      await put(newAppFiles());
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+      vi.mocked(checkbox).mockImplementation((async ({
+        message,
+      }: {
+        message: string;
+      }) =>
+        message.startsWith('Which tables')
+          ? ['products', 'orders']
+          : message.startsWith('Any fields')
+            ? []
+            : ['list']) as unknown as typeof checkbox);
+      vi.mocked(confirm).mockResolvedValue(true);
+
+      expect(
+        await runCli(
+          ['init', '--skip-install'],
+          context(undefined, STRUCTURAL),
+        ),
+      ).toBe(0);
+
+      expect(
+        vi.mocked(confirm).mock.calls.map(([question]) => question.message),
+      ).toEqual([expect.stringContaining('signed-in user')]);
+      expect((await snapshot())['src/app/resource-routes.ts']).toContain(
+        "canMatchSignedIn(['products', 'orders'])",
+      );
+    });
+
+    it('leaves the guard of another app alone when it adds a table with --project', async () => {
+      await put({
+        ...newAppFiles(),
+        'angular.json': JSON.stringify({
+          projects: {
+            shop: { projectType: 'application', sourceRoot: 'src' },
+            admin: { projectType: 'application', sourceRoot: 'admin/src' },
+          },
+        }),
+        'admin/src/app/app.config.ts': '',
+        'admin/src/app/app.routes.ts': '',
+      });
+      const first = await planFile(PRIVATE, 'first.json');
+      expect(
+        await runCli(
+          ['init', '--plan', first, '--project', 'shop'],
+          context(undefined, STRUCTURAL),
+        ),
+      ).toBe(0);
+      const shopRoutes = (await snapshot())['src/app/resource-routes.ts'];
+      expect(shopRoutes).toContain("canMatchSignedIn(['products'])");
+      const second = await planFile(
+        { ...TWO_TABLES, readsNeedSignIn: true },
+        'second.json',
+      );
+
+      expect(
+        await runCli(
+          ['init', '--plan', second, '--project', 'admin'],
+          context(undefined, STRUCTURAL),
+        ),
+      ).toBe(0);
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).toBe(shopRoutes);
+      expect(after['admin/src/app/resource-routes.ts']).not.toContain(
+        'canMatchSignedIn',
+      );
+    });
+
+    it('still stops on resource routes edited by hand', async () => {
+      await put(newAppFiles());
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+      const routes = (await snapshot())['src/app/resource-routes.ts'];
+      await put({ 'src/app/resource-routes.ts': `${routes}// mine\n` });
+      const second = await planFile(
+        { ...TWO_TABLES, readsNeedSignIn: true },
+        'second.json',
+      );
+      const before = await snapshot();
+
+      expect(
+        await runCli(
+          ['init', '--plan', second],
+          context(undefined, STRUCTURAL),
+        ),
+      ).toBe(1);
+
+      expect(await snapshot()).toEqual(before);
+      expect(err).toContain(
+        '  src/app/resource-routes.ts: differs from what this pidrang version generates',
+      );
     });
   });
 

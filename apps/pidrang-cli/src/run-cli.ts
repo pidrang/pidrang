@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join, posix, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
@@ -43,6 +43,8 @@ import {
 import { editAppHtml } from './edit-app-html';
 import { editAppComponent } from './edit-app-component';
 import { editAppSpec } from './edit-app-spec';
+import { editResources } from './edit-resources';
+import { existingSignedInGuards } from './existing-signed-in-guards';
 import { entryRedirect } from './entry-redirect';
 import {
   addEnvironmentFileReplacements,
@@ -139,8 +141,9 @@ function usage(providers: SchemaProviderDefinition[]): string {
     'app.routes.ts and app.html. When it replaces the welcome page, it also removes the welcome',
     'title test of app.spec.ts. It creates src/environments when the app has none. A file it',
     'writes is never overwritten: one that already exists with other content stops init before',
-    'any write. When a file cannot be edited safely, init adds a "pidrang:" comment that lists the',
-    'exact change to make.',
+    'any write. An existing resources.ts is edited instead: a second run appends the tables it does',
+    'not list yet and leaves the others as they are. When a file cannot be edited safely, init adds',
+    'a "pidrang:" comment that lists the exact change to make.',
     '',
     'Once the files are written, it offers to install the packages the generated code imports that the',
     'app does not have yet, then runs ng add @angular/material when Material is missing. The package',
@@ -190,22 +193,15 @@ function reportConflicts(
   context: CliContext,
   layout: AppLayout,
   plan: WritePlan,
-  unansweredResources = false,
 ): void {
-  const resourcesFile = `${layout.appDirectory}/resources.ts`;
   context.err(
     'pidrang init stopped before writing anything: these files already exist and cannot be kept as they are:',
   );
   plan.conflicts.forEach((conflict) =>
     context.err(`  ${conflict.path}: ${conflict.reason}`),
   );
-  if (unansweredResources) {
-    context.err(
-      `  ${resourcesFile}: exists too, and is compared with what your answers generate once the files above are out of the way`,
-    );
-  }
   context.err(
-    `\npidrang never overwrites a file. If the pages or helpers come from an older pidrang init, delete ${layout.appDirectory}/pages and ${layout.appDirectory}/pidrang together (the pages need the matching helpers) and run it again. If ${resourcesFile} lists other tables or actions, delete it or move your changes out of it first.`,
+    `\npidrang never overwrites a file. If the pages or helpers come from an older pidrang init, delete ${layout.appDirectory}/pages and ${layout.appDirectory}/pidrang together (the pages need the matching helpers) and run it again.`,
   );
 }
 
@@ -233,10 +229,12 @@ async function collectPlan(
   layout: AppLayout,
   planPath: string | undefined,
   isNewApp: boolean,
+  askReadsNeedSignIn: boolean,
 ): Promise<InitResult> {
   const options = {
     takenRoutes: layout.takenRoutes,
     isNewApp,
+    askReadsNeedSignIn,
     reportLeftOutColumns: context.out,
     warn: context.err,
   };
@@ -610,13 +608,7 @@ async function runInit(
   );
   const pagesPlan = await planWrites(context.cwd, pages);
   if (pagesPlan.conflicts.length > 0) {
-    const resourcesExist = await access(
-      join(context.cwd, layout.appDirectory, 'resources.ts'),
-    ).then(
-      () => true,
-      () => false,
-    );
-    reportConflicts(context, layout, pagesPlan, resourcesExist);
+    reportConflicts(context, layout, pagesPlan);
     return EXIT_FAILED;
   }
   const tooling = context.tooling ?? (await loadAppTooling(context.cwd));
@@ -632,19 +624,50 @@ async function runInit(
     htmlSource,
     tooling.welcomeTemplate,
   );
-  const generation = await collectPlan(context, layout, planPath, newApp);
+  const [routesFile] = relocateFiles(
+    [generateResourceRoutesFile()],
+    layout.appDirectory,
+  );
+  const existingRoutes = newApp
+    ? null
+    : await readOptional(context.cwd, routesFile.path);
+  const existingGuards =
+    existingRoutes === null
+      ? []
+      : (existingSignedInGuards(existingRoutes, !layout.signInRoute) ?? []);
+  const generation = await collectPlan(
+    context,
+    layout,
+    planPath,
+    newApp,
+    existingGuards.length > 0,
+  );
   const signIn = await planSignIn(context, layout, tooling, generation.signIn);
-  const guardedResources = signedInResources(generation, newApp, signIn);
+  const guardedResources =
+    existingGuards.length === 0
+      ? signedInResources(generation, newApp, signIn)
+      : [
+          ...existingGuards,
+          ...(signIn.written ? privateResources(generation) : []).filter(
+            (table) => !existingGuards.includes(table),
+          ),
+        ];
   const unguardedResources = privateResources(generation).filter(
     (table) => !guardedResources.includes(table),
   );
   if (unguardedResources.length > 0) {
     context.err(unguardedReadsMessage(unguardedResources, newApp, signIn));
   }
-  const resourceRoutes = generateResourceRoutesFile(
-    !layout.signInRoute,
-    guardedResources,
+  const [resourceRoutes] = relocateFiles(
+    [generateResourceRoutesFile(!layout.signInRoute, guardedResources)],
+    layout.appDirectory,
   );
+  const routesGuardEdit =
+    existingRoutes !== null &&
+    existingGuards.length > 0 &&
+    guardedResources.length > existingGuards.length
+      ? existingRoutes
+      : null;
   if (!newApp && generation.layout === 'sidebar') {
     context.err(
       `${htmlPath} or ${layout.routesFile} is no longer the one ng new writes, so pidrang did not add the navigation layout.`,
@@ -662,7 +685,7 @@ async function runInit(
   }
   const withLayout = componentSource !== null;
   const signInPath = signIn.written ? layout.signInPath : undefined;
-  const [resources] = relocateFiles(
+  const [generatedResources] = relocateFiles(
     [
       {
         path: 'src/app/resources.ts',
@@ -734,7 +757,43 @@ async function runInit(
       ? await readOptional(context.cwd, specPath)
       : null;
 
+  const existingResources = await readOptional(
+    context.cwd,
+    generatedResources.path,
+  );
+  const resourcesEdit =
+    existingResources === null
+      ? null
+      : editResources(
+          tooling.typescript,
+          generatedResources.path,
+          existingResources,
+          generatedResources.content,
+        );
+  resourcesEdit?.kept.forEach((table) =>
+    context.out(
+      `${table} is already in ${generatedResources.path}, left as it is.`,
+    ),
+  );
+
   const candidates: FileEditPlan[] = [
+    ...(existingResources === null || resourcesEdit === null
+      ? []
+      : editCandidate(
+          generatedResources.path,
+          existingResources,
+          resourcesEdit,
+        )),
+    ...(routesGuardEdit === null
+      ? []
+      : [
+          {
+            path: resourceRoutes.path,
+            before: routesGuardEdit,
+            after: resourceRoutes.content,
+            manual: false,
+          },
+        ]),
     ...editCandidate(layout.configFile, configSource, configEdit),
     ...editCandidate(layout.routesFile, routesSource, routesEdit),
     ...(htmlSource === null
@@ -780,9 +839,9 @@ async function runInit(
     ? relocateFiles([generateLayoutFile(tooling.layoutUi)], layout.appDirectory)
     : [];
   const plan = await planWrites(context.cwd, [
-    resources,
+    ...(existingResources === null ? [generatedResources] : []),
     ...pages,
-    resourceRoutes,
+    ...(routesGuardEdit === null ? [resourceRoutes] : []),
     ...environmentFilesToWrite,
     ...layoutFiles,
     ...(signIn.file === null ? [] : [signIn.file]),
