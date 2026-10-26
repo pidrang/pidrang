@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ViewEncapsulation } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthProvider, DataProvider, providePidrang } from '@pidrang/core';
@@ -22,6 +22,13 @@ const noopAuthProvider: AuthProvider = {
 
 @Component({ template: '' })
 class EmptyPage {}
+
+@Component({
+  imports: [AppLayout],
+  template: '<app-layout appName="Demo" />',
+  encapsulation: ViewEncapsulation.ShadowDom,
+})
+class ShadowHost {}
 
 interface Width {
   matches: boolean;
@@ -130,6 +137,77 @@ describe('AppLayout', () => {
       expect(menu(fixture)).toBeNull();
     });
   }
+
+  it('moves the focus back to the Menu button after a link closes the menu', async () => {
+    stubWidth({ matches: true });
+    const fixture = await render();
+    await clickMenuButton(fixture);
+
+    await clickLink(fixture, 'Products');
+
+    expect(document.activeElement).toBe(menuButton(fixture));
+  });
+
+  it('closes the menu on a tap outside it on a narrow screen', async () => {
+    stubWidth({ matches: true });
+    const fixture = await render();
+    await clickMenuButton(fixture);
+
+    fixture.nativeElement.querySelector('main').click();
+    await fixture.whenStable();
+
+    expect(menu(fixture)).toBeNull();
+  });
+
+  it('keeps the menu open on a tap inside it, and the Menu button still closes it', async () => {
+    stubWidth({ matches: true });
+    const fixture = await render();
+    await clickMenuButton(fixture);
+
+    menu(fixture)?.click();
+    await fixture.whenStable();
+
+    expect(menu(fixture)).not.toBeNull();
+
+    await clickMenuButton(fixture);
+
+    expect(menu(fixture)).toBeNull();
+  });
+
+  it('opens the menu from the Menu button inside a shadow root', async () => {
+    stubWidth({ matches: true });
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([{ path: '**', component: EmptyPage }]),
+        providePidrang({
+          dataProvider: noopDataProvider,
+          authProvider: noopAuthProvider,
+          resources: [{ name: 'products', label: 'Products' }],
+        }),
+      ],
+    });
+    const fixture = TestBed.createComponent(ShadowHost);
+    await fixture.whenStable();
+    const root = fixture.nativeElement.shadowRoot as ShadowRoot;
+    const button = root.querySelector<HTMLButtonElement>(
+      '[aria-controls="app-menu"]',
+    );
+
+    button?.click();
+    await fixture.whenStable();
+
+    expect(root.querySelector('#app-menu')).not.toBeNull();
+  });
+
+  it('keeps the menu open on a tap outside it on a wide screen', async () => {
+    stubWidth({ matches: false });
+    const fixture = await render();
+
+    fixture.nativeElement.querySelector('main').click();
+    await fixture.whenStable();
+
+    expect(menu(fixture)).not.toBeNull();
+  });
 
   it('keeps the menu open on load and after a link on a wide screen', async () => {
     stubWidth({ matches: false });
