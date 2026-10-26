@@ -8,6 +8,7 @@ export interface AppLayout {
   appDirectory: string;
   routesFile: string;
   configFile: string;
+  tsConfig?: string;
   takenRoutes: string[];
   bindsComponentInputs: boolean;
   signInPath: string;
@@ -89,18 +90,46 @@ export function displayName(name: string): string {
     .join(' ');
 }
 
+function insideWorkspace(path: string): string | null {
+  const normalized = posix.normalize(path.replace(/\\/g, '/'));
+  return normalized.startsWith('/') ||
+    normalized === '..' ||
+    normalized.startsWith('../')
+    ? null
+    : normalized;
+}
+
+function tsConfigOf(project: Record<string, unknown>): string | undefined {
+  const architect = project['architect'] ?? project['targets'];
+  const build = isObject(architect) ? architect['build'] : undefined;
+  if (!isObject(build)) {
+    return undefined;
+  }
+  const configurations = build['configurations'];
+  const names = build['defaultConfiguration'];
+  const chosen =
+    isObject(configurations) && typeof names === 'string'
+      ? names
+          .split(',')
+          .map((name) => configurations[name.trim()])
+          .reverse()
+      : [];
+  const tsConfig = [...chosen, build['options']]
+    .map((options) => (isObject(options) ? options['tsConfig'] : undefined))
+    .find((value) => typeof value === 'string');
+  return typeof tsConfig === 'string'
+    ? (insideWorkspace(tsConfig) ?? undefined)
+    : undefined;
+}
+
 function sourceRootOf(project: Record<string, unknown>): string | null {
   const root = typeof project['root'] === 'string' ? project['root'] : '';
   const sourceRoot =
     typeof project['sourceRoot'] === 'string'
       ? project['sourceRoot']
       : posix.join(root, 'src');
-  const normalized = posix.normalize(sourceRoot.replace(/\\/g, '/'));
-  if (
-    normalized.startsWith('/') ||
-    normalized === '..' ||
-    normalized.startsWith('../')
-  ) {
+  const normalized = insideWorkspace(sourceRoot);
+  if (normalized === null) {
     return null;
   }
   return normalized === '.' ? '' : normalized.replace(/\/$/, '');
@@ -204,6 +233,7 @@ export async function preflightApp(
     appDirectory,
     routesFile,
     configFile,
+    tsConfig: tsConfigOf(definition),
     takenRoutes: findTakenRoutes(routes ?? ''),
     bindsComponentInputs: (config ?? '').includes('withComponentInputBinding'),
     signInPath: `/${SIGN_IN_PAGE}`,
