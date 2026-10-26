@@ -94,7 +94,8 @@ function addSignedInGuard(
     .replace(GUARD_IMPORT_LINE, GUARD_IMPORT_WITH_SIGNED_IN)
     .replace(
       ACTION_GUARD,
-      `    canMatch: [\n      ${guard},\n      $1,\n    ],`,
+      (_, action: string) =>
+        `    canMatch: [\n      ${guard},\n      ${action},\n    ],`,
     );
 }
 

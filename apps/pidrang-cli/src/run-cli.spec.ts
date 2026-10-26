@@ -954,6 +954,29 @@ export const routes: Routes = [
       );
     });
 
+    it.each([
+      ['with TypeScript', STRUCTURAL],
+      ['without TypeScript', undefined],
+    ])(
+      'stops before writing when resources.ts is not one init wrote, %s',
+      async (_, tooling) => {
+        await put({
+          'src/app/resources.ts': "export const tables = ['products'];\n",
+        });
+        const plan = await planFile(PLAN);
+        const before = await snapshot();
+
+        expect(
+          await runCli(['init', '--plan', plan], context(undefined, tooling)),
+        ).toBe(1);
+
+        expect(await snapshot()).toEqual(before);
+        expect(err).toContain(
+          '  src/app/resources.ts: differs from what this pidrang version generates',
+        );
+      },
+    );
+
     it('leaves resources.ts untouched when another file is in the way', async () => {
       await runCli(
         ['init', '--plan', await planFile(PLAN)],
@@ -1729,6 +1752,97 @@ export const routes: Routes = [
       expect(after['src/app/resources.ts']).toContain("    name: 'orders',");
       expect(out).toContain('Modified src/app/resource-routes.ts');
     });
+
+    it('adds the new private table to the guard when the second plan leaves out the sign-in page', async () => {
+      await put(newAppFiles());
+      expect(await run(PRIVATE, 'first.json')).toBe(0);
+      const plan = await planFile(
+        { ...TWO_TABLES, signIn: false, readsNeedSignIn: true },
+        'second.json',
+      );
+      const before = await snapshot();
+      err = [];
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const after = await snapshot();
+      expect(after['src/app/resource-routes.ts']).toContain(
+        "canMatchSignedIn(['products', 'orders'])",
+      );
+      expect(
+        Object.keys(after).filter((path) => after[path] !== before[path]),
+      ).toEqual(['src/app/resource-routes.ts', 'src/app/resources.ts']);
+      expect(err.join('\n')).not.toContain('did not add the sign-in guard');
+    });
+
+    it('adds a table to an app whose first run wrote the navigation layout and changes nothing else', async () => {
+      await put(newAppFiles());
+      expect(await run({ ...PLAN, layout: 'sidebar' }, 'first.json')).toBe(0);
+      const html = join(root, 'src/app/app.html');
+      await writeFile(
+        html,
+        (await readFile(html, 'utf8')).replace(
+          /appName="[^"]*"/,
+          'appName="My shop"',
+        ),
+        'utf8',
+      );
+      const plan = await planFile(
+        { ...TWO_TABLES, layout: 'sidebar' },
+        'second.json',
+      );
+      const before = await snapshot();
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+
+      const after = await snapshot();
+      expect(
+        Object.keys(after).filter((path) => after[path] !== before[path]),
+      ).toEqual(['src/app/resources.ts']);
+      expect(err.join('\n')).not.toContain('did not add the navigation layout');
+    });
+
+    it.each([
+      [
+        'a commented-out layout',
+        '<!-- <app-layout appName="Shop" /> -->\n<main>mine</main>\n',
+      ],
+      ['its own app-layout component', '<app-layout appName="Shop" />\n'],
+    ])(
+      'still asks for the router outlet in an app whose app.html holds %s',
+      async (_, html) => {
+        await put(newAppFiles());
+        expect(await run(PLAN, 'first.json')).toBe(0);
+        await put({ 'src/app/app.html': html });
+
+        expect(await run(TWO_TABLES, 'second.json')).toBe(0);
+
+        expect((await snapshot())['src/app/app.html']).toContain('pidrang:');
+      },
+    );
+
+    it.each([
+      ['another element', { 'src/app/app.html': '<app-layout-shell />\n' }],
+      [
+        'a layout component edited by hand',
+        { 'src/app/layout/app-layout.ts': 'export class AppLayout {}\n' },
+      ],
+    ])(
+      'still asks for the router outlet after a layout run when app.html holds %s',
+      async (_, files) => {
+        await put(newAppFiles());
+        expect(await run({ ...PLAN, layout: 'sidebar' }, 'first.json')).toBe(0);
+        await put(files);
+
+        expect(await run(TWO_TABLES, 'second.json')).toBe(0);
+
+        expect((await snapshot())['src/app/app.html']).toContain('pidrang:');
+      },
+    );
 
     it('keeps the guard when a public table is added', async () => {
       await put(newAppFiles());

@@ -73,6 +73,49 @@ describe('preflightApp', () => {
     });
   });
 
+  it('reads the build tsconfig of the application', async () => {
+    await write({
+      'angular.json': JSON.stringify({
+        projects: {
+          shop: {
+            projectType: 'application',
+            sourceRoot: 'src',
+            architect: {
+              build: { options: { tsConfig: 'tsconfig.app.json' } },
+            },
+          },
+        },
+      }),
+    });
+
+    expect((await preflightApp(root)).tsConfig).toBe('tsconfig.app.json');
+  });
+
+  it('reads the build tsconfig of the default configuration first', async () => {
+    await write({
+      'angular.json': JSON.stringify({
+        projects: {
+          shop: {
+            projectType: 'application',
+            sourceRoot: 'src',
+            architect: {
+              build: {
+                defaultConfiguration: 'production,fr',
+                options: { tsConfig: 'tsconfig.json' },
+                configurations: {
+                  production: { tsConfig: 'tsconfig.app.json' },
+                  fr: { localize: ['fr'] },
+                },
+              },
+            },
+          },
+        },
+      }),
+    });
+
+    expect((await preflightApp(root)).tsConfig).toBe('tsconfig.app.json');
+  });
+
   it('sees whether the app already declares its own sign-in route', async () => {
     await write({
       'src/app/app.routes.ts':

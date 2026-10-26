@@ -558,6 +558,9 @@ function printInstallReport(
   );
 }
 
+const LAYOUT_HOST =
+  /^\s*<app-layout(?=[\s/>])[^<>]*(?:\/>|>\s*<\/app-layout>)\s*$/;
+
 const INSTALL_STATUS: Record<InstallOutcome, number> = {
   installed: EXIT_OK,
   present: EXIT_OK,
@@ -648,7 +651,7 @@ async function runInit(
       ? signedInResources(generation, newApp, signIn)
       : [
           ...existingGuards,
-          ...(signIn.written ? privateResources(generation) : []).filter(
+          ...privateResources(generation).filter(
             (table) => !existingGuards.includes(table),
           ),
         ];
@@ -668,7 +671,17 @@ async function runInit(
     guardedResources.length > existingGuards.length
       ? existingRoutes
       : null;
-  if (!newApp && generation.layout === 'sidebar') {
+  const [layoutFile] = relocateFiles(
+    [generateLayoutFile(tooling.layoutUi)],
+    layout.appDirectory,
+  );
+  const hasLayout =
+    LAYOUT_HOST.test((htmlSource ?? '').replace(/<!--[\s\S]*?-->/g, '')) &&
+    (await readOptional(context.cwd, layoutFile.path))?.replace(
+      /\r\n/g,
+      '\n',
+    ) === layoutFile.content;
+  if (!newApp && generation.layout === 'sidebar' && !hasLayout) {
     context.err(
       `${htmlPath} or ${layout.routesFile} is no longer the one ng new writes, so pidrang did not add the navigation layout.`,
     );
@@ -742,7 +755,7 @@ async function runInit(
     newApp ? entryRedirect(generation) : null,
   );
   const htmlEdit =
-    htmlSource === null
+    htmlSource === null || hasLayout
       ? { kind: 'unchanged' as const }
       : withLayout
         ? {
@@ -761,15 +774,17 @@ async function runInit(
     context.cwd,
     generatedResources.path,
   );
-  const resourcesEdit =
+  const edit =
     existingResources === null
       ? null
       : editResources(
           tooling.typescript,
+          { root: context.cwd, tsConfig: layout.tsConfig ?? null },
           generatedResources.path,
           existingResources,
           generatedResources.content,
         );
+  const resourcesEdit = edit?.kind === 'in-the-way' ? null : edit;
   resourcesEdit?.kept.forEach((table) =>
     context.out(
       `${table} is already in ${generatedResources.path}, left as it is.`,
@@ -839,7 +854,7 @@ async function runInit(
     ? relocateFiles([generateLayoutFile(tooling.layoutUi)], layout.appDirectory)
     : [];
   const plan = await planWrites(context.cwd, [
-    ...(existingResources === null ? [generatedResources] : []),
+    ...(resourcesEdit === null ? [generatedResources] : []),
     ...pages,
     ...(routesGuardEdit === null ? [resourceRoutes] : []),
     ...environmentFilesToWrite,
