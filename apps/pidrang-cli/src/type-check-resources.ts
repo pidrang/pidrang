@@ -10,6 +10,7 @@ export interface ResourcesTypeCheck {
   typed: boolean;
   fitsPidrang: boolean | null;
   exportedType: string | null;
+  anyTyped: boolean;
 }
 
 function parsedConfig(
@@ -38,6 +39,22 @@ function parsedConfig(
   return { options, fileNames };
 }
 
+function holdsAny(
+  typescript: TypeScriptApi,
+  checker: ts.TypeChecker,
+  type: ts.Type,
+): boolean {
+  if ((type.flags & typescript.TypeFlags.Any) !== 0) {
+    return true;
+  }
+  return (
+    (checker.isArrayType(type) || checker.isTupleType(type)) &&
+    checker
+      .getTypeArguments(type as ts.TypeReference)
+      .some((argument) => (argument.flags & typescript.TypeFlags.Any) !== 0)
+  );
+}
+
 function unusedPath(base: string): string {
   const name = (index: number) => `${base}${index === 0 ? '' : `-${index}`}.ts`;
   let index = 0;
@@ -60,7 +77,7 @@ export function typeCheckResources(
     [file, content],
     [
       probe,
-      `import type { PidrangConfig } from '@pidrang/core';\nimport { resources } from './${basename(file, '.ts')}';\nexport const probe: PidrangConfig['resources'] = resources;\n`,
+      `import type { PidrangConfig } from '@pidrang/core';\nimport { resources } from './${basename(file, '.ts')}.js';\nexport const probe: PidrangConfig['resources'] = resources;\n`,
     ],
   ]);
   const config = parsedConfig(typescript, root, tsConfig);
@@ -131,6 +148,9 @@ export function typeCheckResources(
     fitsPidrang: probeDiagnostics.some(coreMissing)
       ? null
       : probeDiagnostics.length === 0,
+    anyTyped:
+      exported !== undefined &&
+      holdsAny(typescript, checker, checker.getTypeOfSymbol(exported)),
     exportedType:
       exported === undefined
         ? null

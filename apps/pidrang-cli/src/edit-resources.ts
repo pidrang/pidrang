@@ -20,8 +20,6 @@ const UNCHECKED =
 const SUPPRESSION = /@ts-(?:nocheck|ignore|expect-error)\b/;
 const RETYPED =
   'adding the tables would change the type of resources, which code that reads it may not expect';
-const UNTYPED =
-  'resources.ts does not type-check, so pidrang cannot check the new tables against it';
 const ASSERTED =
   'the resources array has a type assertion, which would not check the new tables';
 const UNKNOWN_ELEMENT =
@@ -338,7 +336,7 @@ export function editResources(
     return { kind: 'in-the-way', kept: [] };
   }
   if (hasSyntaxError(typescript, source)) {
-    return manual(source, generated, 'resources.ts has a syntax error');
+    return { kind: 'in-the-way', kept: [] };
   }
   const check = (content: string) =>
     typeCheckResources(
@@ -351,8 +349,10 @@ export function editResources(
   const before = check(source);
   const array = exportedResources(typescript, file);
   if (
+    !before.typed ||
     before.fitsPidrang === false ||
-    (before.fitsPidrang === null && !startsAsGenerated(source, generated))
+    ((before.fitsPidrang === null || before.anyTyped) &&
+      !startsAsGenerated(source, generated))
   ) {
     return { kind: 'in-the-way', kept: [] };
   }
@@ -381,9 +381,6 @@ export function editResources(
   }
   if (suppressesErrors(typescript, file)) {
     return manual(source, generated, UNCHECKED);
-  }
-  if (!before.typed) {
-    return manual(source, generated, UNTYPED);
   }
 
   const elements = array.elements;

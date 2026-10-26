@@ -369,18 +369,18 @@ describe('RESOURCE_ROUTES_SNIPPET', () => {
     }
   });
 
-  it.each(['$&orders', '$1', "$'", '$$'])(
-    'writes a private table named %s as it is',
-    (name) => {
-      const routes = generateResourceRoutesFile(true, [name]).content;
+  it.each([
+    ['$&orders', "canMatchSignedIn(['$&orders'])"],
+    ['$1', "canMatchSignedIn(['$1'])"],
+    ["$'", "canMatchSignedIn(['$\\''])"],
+    ['$$', "canMatchSignedIn(['$$'])"],
+  ])('writes a private table named %s as it is', (name, guard) => {
+    const routes = generateResourceRoutesFile(true, [name]).content;
 
-      expect(routes.match(/canMatchSignedIn\(\[[^\]\n]*\]\)/g)).toEqual(
-        Array(4).fill(
-          `canMatchSignedIn(['${name.replace(/'/g, "\\'")}'])`,
-        ),
-      );
-    },
-  );
+    expect(routes.match(/canMatchSignedIn\(\[[^\]\n]*\]\)/g)).toEqual(
+      Array(4).fill(guard),
+    );
+  });
 
   it('leaves every resource route unguarded when no read needs a signed-in user', () => {
     const routes = generateResourceRoutesFile(true, []).content;
