@@ -1,6 +1,15 @@
 import { Page } from '@playwright/test';
 
-import { expect, expectations, publishableKey, rowIds, test } from './support';
+import {
+  NARROW,
+  expect,
+  expectMenuOverContent,
+  expectNoHorizontalScroll,
+  expectations,
+  publishableKey,
+  rowIds,
+  test,
+} from './support';
 
 function pageErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -91,4 +100,61 @@ test('signs in from the generated page, then creates and edits', async ({
   await page.goto(`/fixture_items/${id}`);
   await expect(page.locator('dd').nth(1)).toHaveText(`${name} edited`);
   expect(errors).toEqual([]);
+});
+
+test('opens the generated side menu over the page on a narrow screen', async ({
+  page,
+}) => {
+  const errors = pageErrors(page);
+  await page.setViewportSize(NARROW);
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/orders$/);
+  await rowIds(page);
+  await expectNoHorizontalScroll(page);
+
+  await expectMenuOverContent(page);
+  await page
+    .locator('#app-menu')
+    .getByRole('link', { name: 'Products' })
+    .click();
+
+  await expect(page).toHaveURL(/\/products$/);
+  await expect(page.locator('#app-menu')).toHaveCount(0);
+  expect(await rowIds(page)).toHaveLength(10);
+  await expectNoHorizontalScroll(page);
+  expect(errors).toEqual([]);
+});
+
+test('keeps the generated layout from scrolling sideways once signed in on a narrow screen', async ({
+  page,
+}) => {
+  await page.setViewportSize(NARROW);
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill(expectations.writer.email);
+  await page.getByLabel('Password').fill(expectations.writer.password);
+  await page.getByLabel('Password').press('Enter');
+  await expect(page).toHaveURL(/\/orders$/);
+  await expect(page.locator('mat-toolbar')).toContainText(
+    expectations.writer.email,
+  );
+  await rowIds(page);
+
+  await expectNoHorizontalScroll(page);
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await expect(page.locator('#app-menu')).toBeVisible();
+  await expectNoHorizontalScroll(page);
+});
+
+test('keeps the generated menu inside a narrow screen with a large root font', async ({
+  page,
+}) => {
+  await page.setViewportSize(NARROW);
+  await page.goto('/');
+  await rowIds(page);
+  await page.addStyleTag({ content: 'html { font-size: 32px; }' });
+
+  await page.getByRole('button', { name: 'Menu' }).click();
+
+  await expect(page.locator('#app-menu')).toBeVisible();
+  await expectNoHorizontalScroll(page);
 });
