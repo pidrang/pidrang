@@ -345,4 +345,23 @@ describe('SESSION_IDENTITY', () => {
     expect(session.error()).toBeInstanceOf(Error);
     expect(shared()()).toBeNull();
   });
+
+  it('keeps the latest answer when an older request resolves last', async () => {
+    const pending: ((identity: AuthIdentity | null) => void)[] = [];
+    const auth = subscribableAuthProvider(
+      () => new Promise((resolve) => pending.push(resolve)),
+    );
+    configure(auth.provider);
+
+    const sharedIdentity = shared();
+    auth.notify();
+    expect(pending).toHaveLength(2);
+
+    pending[1](null);
+    await Promise.resolve();
+    pending[0]({ id: '1', email: 'ada@example.com' });
+    await settle();
+
+    expect(sharedIdentity()).toBeNull();
+  });
 });
