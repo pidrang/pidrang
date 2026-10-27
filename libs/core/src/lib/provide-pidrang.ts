@@ -24,9 +24,15 @@ function watchIdentity(
   authProvider: AuthProvider,
 ): WritableSignal<AuthIdentity | null> {
   const identity = signal<AuthIdentity | null>(null);
+  let latestRequest = 0;
   const refresh = (): void => {
+    const request = ++latestRequest;
     authProvider.getIdentity().then(
-      (current) => identity.set(current),
+      (current) => {
+        if (request === latestRequest) {
+          identity.set(current);
+        }
+      },
       () => undefined,
     );
   };
