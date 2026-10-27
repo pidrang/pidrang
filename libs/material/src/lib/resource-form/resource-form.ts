@@ -123,7 +123,11 @@ export class ResourceForm<T extends Record<string, unknown>> {
   }
 
   protected fieldHint(field: Field): string | null {
-    if (!field.hasDefault || this.fieldTree(field.name)().dirty()) {
+    if (
+      this.mode() !== 'create' ||
+      !field.hasDefault ||
+      this.fieldTree(field.name)().dirty()
+    ) {
       return null;
     }
     return 'Leave unchanged to use the database default.';
