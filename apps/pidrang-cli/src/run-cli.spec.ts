@@ -222,6 +222,20 @@ describe('runCli', () => {
   }
 
   const output = () => [...out, ...err].join('\n');
+
+  async function installCore(): Promise<void> {
+    await put({
+      'node_modules/@pidrang/core/package.json': JSON.stringify({
+        name: '@pidrang/core',
+        types: 'index.d.ts',
+      }),
+      'node_modules/@pidrang/core/index.d.ts': [
+        'export interface Resource { name: string; [key: string]: unknown }',
+        'export interface PidrangConfig { resources: Resource[] }',
+        '',
+      ].join('\n'),
+    });
+  }
   const generatedPaths = [
     'src/app/resources.ts',
     ...generatePagesBundle().map((file) => file.path),
@@ -859,6 +873,7 @@ export const routes: Routes = [
           context(undefined, STRUCTURAL),
         ),
       ).toBe(0);
+      await installCore();
       const first = await readFile(join(root, 'src/app/resources.ts'), 'utf8');
       const other = await planFile(TWO_TABLES, 'other.json');
       const before = await snapshot();
@@ -891,6 +906,7 @@ export const routes: Routes = [
         ['init', '--plan', await planFile(PLAN)],
         context(undefined, STRUCTURAL),
       );
+      await installCore();
       const other = await planFile(TWO_TABLES, 'other.json');
       await runCli(['init', '--plan', other], context(undefined, STRUCTURAL));
       const before = await snapshot();
@@ -915,6 +931,7 @@ export const routes: Routes = [
         ['init', '--plan', await planFile(PLAN)],
         context(undefined, STRUCTURAL),
       );
+      await installCore();
       const path = join(root, 'src/app/resources.ts');
       const crlf = (await readFile(path, 'utf8')).replace(/\n/g, '\r\n');
       await writeFile(path, crlf, 'utf8');
@@ -955,11 +972,15 @@ export const routes: Routes = [
     });
 
     it.each([
-      ['with TypeScript', STRUCTURAL],
-      ['without TypeScript', undefined],
+      ['with TypeScript', STRUCTURAL, 'it does not export resources'],
+      [
+        'without TypeScript',
+        undefined,
+        'it is not the file pidrang init writes, and without TypeScript in this app pidrang cannot read it',
+      ],
     ])(
       'stops before writing when resources.ts is not one init wrote, %s',
-      async (_, tooling) => {
+      async (_, tooling, reason) => {
         await put({
           'src/app/resources.ts': "export const tables = ['products'];\n",
         });
@@ -971,11 +992,28 @@ export const routes: Routes = [
         ).toBe(1);
 
         expect(await snapshot()).toEqual(before);
-        expect(err).toContain(
-          '  src/app/resources.ts: differs from what this pidrang version generates',
-        );
+        expect(err).toContain(`  src/app/resources.ts: ${reason}`);
       },
     );
+
+    it('asks to install the packages when @pidrang/core is missing on a second run', async () => {
+      await runCli(
+        ['init', '--plan', await planFile(PLAN)],
+        context(undefined, STRUCTURAL),
+      );
+      const other = await planFile(TWO_TABLES, 'other.json');
+      const before = await snapshot();
+      err = [];
+
+      expect(
+        await runCli(['init', '--plan', other], context(undefined, STRUCTURAL)),
+      ).toBe(1);
+
+      expect(await snapshot()).toEqual(before);
+      expect(err).toContain(
+        '  src/app/resources.ts: @pidrang/core is not installed, so pidrang cannot check the tables it would add: install the packages of the app, then run init again',
+      );
+    });
 
     it('leaves resources.ts untouched when another file is in the way', async () => {
       await runCli(
@@ -1740,6 +1778,7 @@ export const routes: Routes = [
     it('adds the new private table to resources.ts and to the guard', async () => {
       await put(newAppFiles());
       expect(await run(PRIVATE, 'first.json')).toBe(0);
+      await installCore();
 
       expect(
         await run({ ...TWO_TABLES, readsNeedSignIn: true }, 'second.json'),
@@ -1756,6 +1795,7 @@ export const routes: Routes = [
     it('adds the new private table to the guard when the second plan leaves out the sign-in page', async () => {
       await put(newAppFiles());
       expect(await run(PRIVATE, 'first.json')).toBe(0);
+      await installCore();
       const plan = await planFile(
         { ...TWO_TABLES, signIn: false, readsNeedSignIn: true },
         'second.json',
@@ -1780,6 +1820,7 @@ export const routes: Routes = [
     it('adds a table to an app whose first run wrote the navigation layout and changes nothing else', async () => {
       await put(newAppFiles());
       expect(await run({ ...PLAN, layout: 'sidebar' }, 'first.json')).toBe(0);
+      await installCore();
       const html = join(root, 'src/app/app.html');
       await writeFile(
         html,
@@ -1817,6 +1858,7 @@ export const routes: Routes = [
       async (_, html) => {
         await put(newAppFiles());
         expect(await run(PLAN, 'first.json')).toBe(0);
+        await installCore();
         await put({ 'src/app/app.html': html });
 
         expect(await run(TWO_TABLES, 'second.json')).toBe(0);
@@ -1836,6 +1878,7 @@ export const routes: Routes = [
       async (_, files) => {
         await put(newAppFiles());
         expect(await run({ ...PLAN, layout: 'sidebar' }, 'first.json')).toBe(0);
+        await installCore();
         await put(files);
 
         expect(await run(TWO_TABLES, 'second.json')).toBe(0);
@@ -1847,6 +1890,7 @@ export const routes: Routes = [
     it('leaves the guard alone when resources.ts needs a manual change', async () => {
       await put(newAppFiles());
       expect(await run(PRIVATE, 'first.json')).toBe(0);
+      await installCore();
       const path = join(root, 'src/app/resources.ts');
       await writeFile(
         path,
@@ -1908,28 +1952,50 @@ export const routes: Routes = [
       expect(err.join('\n')).not.toContain('did not add them');
     });
 
-    it('writes no guard for a private table a new app cannot list yet', async () => {
+    it('guards the private tables of a new app even when resources.ts needs a manual change', async () => {
       await put(
         newAppFiles({
           'src/app/resources.ts':
             "import { Resource } from '@pidrang/core';\n\nexport const resources: Resource[] = [...[{ name: 'products' }]];\n",
         }),
       );
+      await installCore();
 
       expect(
         await run({ ...TWO_TABLES, readsNeedSignIn: true }, 'first.json'),
       ).toBe(0);
 
-      const routes = (await snapshot())['src/app/resource-routes.ts'];
-      expect(routes).not.toContain("'orders'");
-      expect(err.join('\n')).toContain(
-        'did not add them to the sign-in guard yet',
+      expect((await snapshot())['src/app/resource-routes.ts']).toContain(
+        "canMatchSignedIn(['products', 'orders'])",
       );
     });
+
+    it.each([
+      ['the same tables', PRIVATE],
+      ['a public table', TWO_TABLES],
+    ])(
+      'leaves resource routes a formatter turned to double quotes alone when it adds %s',
+      async (_, plan) => {
+        await put(newAppFiles());
+        expect(await run(PRIVATE, 'first.json')).toBe(0);
+        await installCore();
+        const path = join(root, 'src/app/resource-routes.ts');
+        const quoted = (await readFile(path, 'utf8')).replace(
+          /'((?:[^'\\]|\\.)*)'/g,
+          (_, body: string) => JSON.stringify(body),
+        );
+        await writeFile(path, quoted, 'utf8');
+
+        expect(await run(plan, 'second.json')).toBe(0);
+
+        expect(await readFile(path, 'utf8')).toBe(quoted);
+      },
+    );
 
     it('keeps the guard when a public table is added', async () => {
       await put(newAppFiles());
       expect(await run(PRIVATE, 'first.json')).toBe(0);
+      await installCore();
       const routes = (await snapshot())['src/app/resource-routes.ts'];
 
       expect(await run(TWO_TABLES, 'second.json')).toBe(0);
@@ -1942,6 +2008,7 @@ export const routes: Routes = [
     it('adds no guard to an app whose first run had none', async () => {
       await put(newAppFiles());
       expect(await run(PLAN, 'first.json')).toBe(0);
+      await installCore();
 
       expect(
         await run({ ...TWO_TABLES, readsNeedSignIn: true }, 'second.json'),
@@ -1960,6 +2027,7 @@ export const routes: Routes = [
     it('asks whether a new table needs a signed-in user when the routes already guard some', async () => {
       await put(newAppFiles());
       expect(await run(PRIVATE, 'first.json')).toBe(0);
+      await installCore();
       vi.mocked(checkbox).mockImplementation((async ({
         message,
       }: {

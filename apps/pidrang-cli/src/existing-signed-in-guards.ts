@@ -2,6 +2,24 @@ import { generateResourceRoutesFile } from '@pidrang/cli';
 
 const GUARD = 'canMatchSignedIn([';
 const QUOTED = /\s*'((?:[^'\\]|\\.)*)'\s*,?/y;
+const STRING = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g;
+
+function singleQuoted(literal: string): string {
+  const body = literal
+    .slice(1, -1)
+    .replace(
+      /\\(.)|(['"])/g,
+      (_, escaped: string | undefined, quote: string) =>
+        escaped === undefined
+          ? quote === "'"
+            ? "\\'"
+            : '"'
+          : escaped === '"'
+            ? '"'
+            : `\\${escaped}`,
+    );
+  return `'${body}'`;
+}
 
 function guardedNames(source: string): string[] {
   const start = source.indexOf(GUARD);
@@ -26,9 +44,12 @@ export function existingSignedInGuards(
   content: string,
   signInRoute: boolean,
 ): string[] | null {
-  const source = content.replace(/\r\n/g, '\n');
+  const source = content.replace(/\r\n/g, '\n').replace(STRING, singleQuoted);
   const names = guardedNames(source);
-  return generateResourceRoutesFile(signInRoute, names).content === source
+  return generateResourceRoutesFile(signInRoute, names).content.replace(
+    STRING,
+    singleQuoted,
+  ) === source
     ? names
     : null;
 }
