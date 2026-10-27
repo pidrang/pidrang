@@ -5,7 +5,9 @@ import { applyInsertions, lineIndent, stripLeadingLines } from './text-edit';
 import { findAll, parseSource, unwrapExpression } from './ts-source';
 import { typeCheckResources } from './type-check-resources';
 
-type ResourcesEdit = (FileEdit | { kind: 'in-the-way' }) & { kept: string[] };
+type ResourcesEdit = (FileEdit | { kind: 'in-the-way'; reason: string }) & {
+  kept: string[];
+};
 
 export interface ResourcesProject {
   root: string;
@@ -159,6 +161,10 @@ function exportsResources(
       ),
     ).includes('resources')
   );
+}
+
+function inTheWay(reason: string): ResourcesEdit {
+  return { kind: 'in-the-way', reason, kept: [] };
 }
 
 function startsAsGenerated(source: string, generated: string): boolean {
@@ -329,14 +335,16 @@ export function editResources(
   if (typescript === null) {
     return startsAsGenerated(source, generated)
       ? manual(source, generated, 'TypeScript is not installed in this app')
-      : { kind: 'in-the-way', kept: [] };
+      : inTheWay(
+          'it is not the file pidrang init writes, and without TypeScript in this app pidrang cannot read it',
+        );
   }
   const file = parseSource(typescript, path, source);
   if (!exportsResources(typescript, file)) {
-    return { kind: 'in-the-way', kept: [] };
+    return inTheWay('it does not export resources');
   }
   if (hasSyntaxError(typescript, source)) {
-    return { kind: 'in-the-way', kept: [] };
+    return inTheWay('it has a syntax error');
   }
   const check = (content: string) =>
     typeCheckResources(
@@ -348,13 +356,21 @@ export function editResources(
     );
   const before = check(source);
   const array = exportedResources(typescript, file);
-  if (
-    !before.typed ||
-    before.fitsPidrang === false ||
-    ((before.fitsPidrang === null || before.anyTyped) &&
-      !startsAsGenerated(source, generated))
-  ) {
-    return { kind: 'in-the-way', kept: [] };
+  if (before.fitsPidrang === null) {
+    return inTheWay(
+      '@pidrang/core is not installed, so pidrang cannot check the tables it would add: install the packages of the app, then run init again',
+    );
+  }
+  if (!before.typed) {
+    return inTheWay('it does not type-check');
+  }
+  if (before.fitsPidrang === false) {
+    return inTheWay('its resources export is not a list of Resource');
+  }
+  if (before.anyTyped && !startsAsGenerated(source, generated)) {
+    return inTheWay(
+      'its resources export is typed any, so pidrang cannot check it',
+    );
   }
   if (array === null) {
     return manual(source, generated, NOT_EXPORTED);

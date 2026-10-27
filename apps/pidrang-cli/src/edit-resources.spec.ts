@@ -445,13 +445,10 @@ export const resources: Resource[] = [
   ])('reports a resources.ts with %s as in the way', (_, source) => {
     expect(
       editResources(typescript, PROJECT, PATH, source, generated('orders')),
-    ).toEqual({ kind: 'in-the-way', kept: [] });
+    ).toMatchObject({ kind: 'in-the-way', kept: [] });
     expect(
       editResources(null, PROJECT, PATH, source, generated('orders')),
-    ).toEqual({
-      kind: 'in-the-way',
-      kept: [],
-    });
+    ).toMatchObject({ kind: 'in-the-way', kept: [] });
   });
 
   it.each([
@@ -527,7 +524,7 @@ export const resources: Resource[] = [
         "import { Resource } from '@pidrang/core';\n\nexport const resources: Resource['name'][] = ['products'];\n",
         generated('orders'),
       ),
-    ).toEqual({ kind: 'in-the-way', kept: [] });
+    ).toMatchObject({ kind: 'in-the-way', kept: [] });
   });
 
   it('changes nothing in a file that already is what the answers give, even without TypeScript', () => {
@@ -617,7 +614,7 @@ export const resources: Resource[] = [
     (_, source) => {
       expect(
         editResources(typescript, NO_CORE, PATH, source, generated('orders')),
-      ).toEqual({ kind: 'in-the-way', kept: [] });
+      ).toMatchObject({ kind: 'in-the-way', kept: [] });
     },
   );
 
@@ -639,7 +636,7 @@ export const resources: Resource[] = [
   ])('reports a resources.ts with %s as in the way', (_, source) => {
     expect(
       editResources(typescript, PROJECT, PATH, source, generated('orders')),
-    ).toEqual({ kind: 'in-the-way', kept: [] });
+    ).toMatchObject({ kind: 'in-the-way', kept: [] });
   });
 
   describe('in an app with @pidrang/core installed', () => {
@@ -677,7 +674,7 @@ export const resources: Resource[] = [
           "export const resources = { logo: '/assets/logo.svg' };\n",
           generated('orders'),
         ),
-      ).toEqual({ kind: 'in-the-way', kept: [] });
+      ).toMatchObject({ kind: 'in-the-way', kept: [] });
     });
 
     it('asks for a manual change when the appended table breaks the inferred type pidrang reads', () => {
@@ -736,7 +733,7 @@ export const resources: Resource[] = [
             "export const resources: readonly Resource[] = [{ name: 'products' }];\n",
           generated('orders'),
         ),
-      ).toEqual({ kind: 'in-the-way', kept: [] });
+      ).toMatchObject({ kind: 'in-the-way', kept: [] });
     });
 
     it.each(['null', 'undefined'])(
@@ -756,7 +753,7 @@ export const resources: Resource[] = [
             `export const resources = ${value};\n`,
             generated('orders'),
           ),
-        ).toEqual({ kind: 'in-the-way', kept: [] });
+        ).toMatchObject({ kind: 'in-the-way', kept: [] });
       },
     );
 
@@ -796,7 +793,7 @@ export const resources: Resource[] = [
           source,
           generated('orders'),
         ),
-      ).toEqual({ kind: 'in-the-way', kept: [] });
+      ).toMatchObject({ kind: 'in-the-way', kept: [] });
     });
 
     it('appends to a list whose type only mentions the word any', () => {
@@ -827,7 +824,7 @@ export const resources: Resource[] = [
           "export const resources = { logo: '/logo.svg' };\n",
           generated('orders'),
         ),
-      ).toEqual({ kind: 'in-the-way', kept: [] });
+      ).toMatchObject({ kind: 'in-the-way', kept: [] });
     });
 
     it('asks for a manual change when the new table breaks a file that reads resources', async () => {
@@ -950,7 +947,7 @@ export const resources: Resource[] = [
           source,
           generated('orders'),
         ),
-      ).toEqual({ kind: 'in-the-way', kept: [] });
+      ).toMatchObject({ kind: 'in-the-way', kept: [] });
       expect(
         editResources(
           typescript,

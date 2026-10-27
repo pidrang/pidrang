@@ -46,6 +46,21 @@ describe('existingSignedInGuards', () => {
     expect(existingSignedInGuards(content, true)).toEqual(['products']);
   });
 
+  it('reads resource routes a formatter turned to double quotes', () => {
+    const content = generateResourceRoutesFile(true, [
+      'products',
+      "o'clock",
+    ]).content.replace(/'((?:[^'\\]|\\.)*)'/g, (_, body: string) =>
+      JSON.stringify(body.replace(/\\'/g, "'")),
+    );
+    expect(content).not.toContain("'products'");
+
+    expect(existingSignedInGuards(content, true)).toEqual([
+      'products',
+      "o'clock",
+    ]);
+  });
+
   it.each([
     [
       'edited by hand',

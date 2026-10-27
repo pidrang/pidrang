@@ -636,10 +636,11 @@ async function runInit(
   const existingRoutes = newApp
     ? null
     : await readOptional(context.cwd, routesFile.path);
-  const existingGuards =
+  const recognizedGuards =
     existingRoutes === null
-      ? []
-      : (existingSignedInGuards(existingRoutes, !layout.signInRoute) ?? []);
+      ? null
+      : existingSignedInGuards(existingRoutes, !layout.signInRoute);
+  const existingGuards = recognizedGuards ?? [];
   const generation = await collectPlan(
     context,
     layout,
@@ -790,6 +791,7 @@ async function runInit(
   );
 
   const listed = (table: string) =>
+    newApp ||
     existingGuards.includes(table) ||
     resourcesEdit === null ||
     resourcesEdit.kind === 'edited' ||
@@ -878,15 +880,23 @@ async function runInit(
     ? relocateFiles([generateLayoutFile(tooling.layoutUi)], layout.appDirectory)
     : [];
   const plan = await planWrites(context.cwd, [
-    ...(resourcesEdit === null ? [generatedResources] : []),
+    ...(existingResources === null ? [generatedResources] : []),
     ...pages,
-    ...(routesGuardEdit === null ? [guardedRoutes] : []),
+    ...(routesGuardEdit === null && recognizedGuards === null
+      ? [guardedRoutes]
+      : []),
     ...environmentFilesToWrite,
     ...layoutFiles,
     ...(signIn.file === null ? [] : [signIn.file]),
   ]);
   const editPlan = await planEdits(context.cwd, candidates);
-  const conflicts = [...plan.conflicts, ...editPlan.conflicts];
+  const conflicts = [
+    ...(edit?.kind === 'in-the-way'
+      ? [{ path: generatedResources.path, reason: edit.reason }]
+      : []),
+    ...plan.conflicts,
+    ...editPlan.conflicts,
+  ];
   if (conflicts.length > 0) {
     reportConflicts(context, layout, { ...plan, conflicts });
     return EXIT_FAILED;
