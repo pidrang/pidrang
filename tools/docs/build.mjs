@@ -186,6 +186,25 @@ function assertSourceLinks() {
   }
 }
 
+function assertGithubLinksExist() {
+  const missing = [];
+  const githubLink =
+    /https:\/\/github\.com\/pidrang\/pidrang\/blob\/main\/([A-Za-z0-9_./-]+\.md)/g;
+  for (const file of listFiles(sourceCopyDirectory).filter((name) =>
+    name.endsWith('.md'),
+  )) {
+    const content = readFileSync(join(sourceCopyDirectory, file), 'utf8');
+    for (const [, path] of content.matchAll(githubLink)) {
+      if (!existsSync(resolve(root, path))) {
+        missing.push(`${file} links to missing ${path}`);
+      }
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(`Dead GitHub links:\n${missing.join('\n')}`);
+  }
+}
+
 function assertBuiltPage() {
   const index = join(outputDirectory, 'index.html');
   if (!existsSync(index)) {
@@ -226,6 +245,7 @@ for (const file of listFiles(sourceCopyDirectory).filter((name) =>
 
 assertLinksStayLocal(sourceCopyDirectory);
 assertSourceLinks();
+assertGithubLinksExist();
 
 writeFileSync(join(sourceCopyDirectory, 'index.md'), landingPage);
 
