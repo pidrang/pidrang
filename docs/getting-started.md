@@ -4,9 +4,12 @@ This guide takes a new Angular app to a working admin panel backed by Supabase: 
 
 ## Prerequisites
 
-- An Angular 22 application using standalone APIs and the router (`ng new my-admin`).
+- Node.js 22.22.3 or a later 22.x, 24.15.0 or a later 24.x, or 26 and later. `pidrang init` checks it and stops with a plain message on anything else.
+- An Angular 22.1 or a later 22.x application using standalone APIs and the router (`ng new my-admin`).
 - A Supabase project with at least one table that has an `id` primary key column. Pidrang assumes `id` on every table; composite or differently named keys are not supported.
 - The project URL and the publishable key (formerly anon, `sb_publishable_...`), shown by the Connect button at the top of the Supabase dashboard.
+
+Two working examples show the result: [demo-material](https://pidrang.dev/demo-material/) and [demo-tailwind](https://pidrang.dev/demo-tailwind/), the same three resources on the two UI layers, listed at [pidrang.dev/demos](https://pidrang.dev/demos/).
 
 ## 1. Install
 
@@ -56,7 +59,7 @@ Create a Supabase client once and hand it to both providers. `providePidrang` is
 
 ```ts
 import { ApplicationConfig } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { providePidrang } from '@pidrang/core';
 import { provideSupabaseAuthProvider, provideSupabaseDataProvider } from '@pidrang/supabase';
 import { createClient } from '@supabase/supabase-js';
@@ -68,7 +71,7 @@ const client = createClient('https://YOUR-PROJECT.supabase.co', 'YOUR-PUBLISHABL
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideRouter(appRoutes),
+    provideRouter(appRoutes, withComponentInputBinding()),
     providePidrang({
       dataProvider: provideSupabaseDataProvider({ client }),
       authProvider: provideSupabaseAuthProvider({ client }),
@@ -78,7 +81,7 @@ export const appConfig: ApplicationConfig = {
 };
 ```
 
-`authProvider` is optional. Without it, `injectAuthProvider()` throws a descriptive error if something asks for it.
+`withComponentInputBinding()` is what carries the `:resource` and `:id` segments to the pages' inputs; without it the pages render blank. `authProvider` is optional. Without it, `injectAuthProvider()` throws a descriptive error if something asks for it.
 
 ## 4. Build a list page
 
@@ -116,7 +119,7 @@ export class ResourceListPage {
 }
 ```
 
-Route it with a `:resource` segment and enable input binding so the route parameter reaches the `resource` input:
+Route it with a `:resource` segment:
 
 ```ts
 import { Route } from '@angular/router';
@@ -125,11 +128,7 @@ import { ResourceListPage } from './resource-list-page';
 export const appRoutes: Route[] = [{ path: ':resource', component: ResourceListPage }];
 ```
 
-```ts
-provideRouter(appRoutes, withComponentInputBinding());
-```
-
-Open `/products` and the table renders one column per non-hidden field.
+Input binding is enabled in `app.config.ts` above; the route parameter would not reach the `resource` input without it. Open `/products` and the table renders one column per non-hidden field.
 
 To page, sort or filter, pass a params function as the second argument. Returning `undefined` from it skips loading. Without pagination, `getList` returns the first 10 rows. `current` and `pageSize` must be positive integers, each sorter needs a `field` and an `order` of `asc` or `desc`, and filters must fit their operator; anything else is rejected before a request is sent. `ListResult.total` holds the full row count, so you can build a pager.
 
@@ -166,7 +165,7 @@ Filters combine with AND. The operators are `eq`, `ne`, `lt`, `lte`, `gt`, `gte`
 }
 ```
 
-The template uses `routerLink`, so add `RouterLink` from `@angular/router` to the `imports` of the component. Deleting is irreversible, so ask for confirmation and surface a failure (for example a Row Level Security rejection) instead of letting the promise reject silently.
+The template uses `routerLink`, so add `RouterLink` from `@angular/router` to the `imports` of the component. Deleting is irreversible, so ask for confirmation and surface a failure (for example a Row Level Security rejection) instead of letting the promise reject silently. The method belongs to the page of step 4; add `import { injectDataProvider } from '@pidrang/core';` and `import { signal } from '@angular/core';` to its imports.
 
 ```ts
 private readonly dataProvider = injectDataProvider();
@@ -233,7 +232,7 @@ export class ResourceCreatePage {
 A sign-in page calls `authProvider.login({ email, password })` and `logout()`:
 
 ```ts
-import { inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { injectAuthProvider } from '@pidrang/core';
 
 @Component({ selector: 'app-sign-in-page', template: '' })

@@ -46,10 +46,31 @@ hero:
       link: https://github.com/${repository}
 ---
 
+## What it is
+
+Pidrang is a headless admin framework for Angular: a \`Resource\` describes a table and its fields, a data provider reads and writes it, and a UI layer renders the list, the forms and the actions. Nothing is generated per table, so a new table is a few lines.
+
+Pre-1.0: the public API may change between minor versions.
+
+## Install
+
+\`\`\`bash
+npm install @pidrang/core @pidrang/supabase @pidrang/material @supabase/supabase-js
+ng add @angular/material
+npx pidrang init
+\`\`\`
+
+## See it running
+
+- [demo-material](https://pidrang.dev/demo-material/): the same three resources on Angular Material.
+- [demo-tailwind](https://pidrang.dev/demo-tailwind/): the same three resources on Tailwind CSS.
+- [pidrang.dev/demos](https://pidrang.dev/demos/): both demos.
+
 ## The guide
 
 - [Getting started](getting-started): from a new Angular app to a working list, create and edit flow.
 - [Authentication](authentication): signing users in, and what the Row Level Security policies decide.
+- [UI layers](ui-layers/): the same components on Angular Material and Tailwind, and which one to pick.
 - [Architecture](architecture): how the core, the data providers and the UI layers fit together.
 - [Data providers](data-providers): connect Pidrang to your own backend.
 
@@ -57,7 +78,6 @@ hero:
 
 - [Core](reference/core): the contracts, the providers and the injected helpers.
 - [Components](reference/components): ResourceTable and ResourceForm, with both UI layers.
-- [UI layers](ui-layers/): the same components on Angular Material and Tailwind, and which one to pick.
 - [CLI](reference/cli): commands, options, the plan file, exit codes and the files init writes.
 
 ## For maintainers
@@ -66,9 +86,6 @@ hero:
 - [Releasing](releasing): the release process.
 - [Demo artifacts](demo-artifacts): how the demos are built and deployed.
 
-## Edit a page
-
-Every page links to its markdown source on GitHub. The site is rebuilt by the Docs artifacts workflow, then deployed by a pull request in pidrang.github.io.
 `;
 
 function git(...args) {

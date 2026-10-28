@@ -29,8 +29,15 @@ export default {
     siteTitle: 'Pidrang docs',
     nav: [
       { text: 'Getting started', link: '/getting-started' },
-      { text: 'Architecture', link: '/architecture' },
-      { text: 'Data providers', link: '/data-providers' },
+      {
+        text: 'Reference',
+        items: [
+          { text: 'Core', link: '/reference/core' },
+          { text: 'Components', link: '/reference/components' },
+          { text: 'UI layers', link: '/ui-layers/' },
+          { text: 'CLI', link: '/reference/cli' },
+        ],
+      },
       {
         text: 'Maintainers',
         items: [
@@ -39,6 +46,7 @@ export default {
           { text: 'Demo artifacts', link: '/demo-artifacts' },
         ],
       },
+      { text: 'Demos', link: 'https://pidrang.dev/demos/' },
     ],
     sidebar: [
       {
