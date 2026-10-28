@@ -55,14 +55,14 @@ When the connection attempt fails, the wizard repeats the question with the reje
 | File | What lands there | When |
 |------|-----------------|------|
 | `src/app/resources.ts` | `export const resources: Resource[] = [...]` — one entry per selected table with name, label, fields (inferred from introspection), actions booleans, optional `defaultSorters`, `hiddenFields`, `readOnly`, `nullable`, `hasDefault`. | Every run. Edited in-place on subsequent runs. |
-| `src/app/resource-routes.ts` | Generic routes `:resource`, `:resource/create`, `:resource/:id/edit`, `:resource/:id` pointing to generated pages, with `canMatch` guards. | Every run. Edited in-place. |
+| `src/app/resource-routes.ts` | Generic routes `:resource`, `:resource/create`, `:resource/:id/edit`, `:resource/:id` pointing to generated pages, with `canMatch` guards. | Every run. Regenerated; an existing guard list is extended in place. |
 | `src/app/pages/resource-list-page.ts` | List page using `injectResourceList`, `ResourceTable`, with actions projected. | New app only (conflict on existing). |
 | `src/app/pages/resource-create-page.ts` | Create page using `ResourceForm`, calls `dataProvider.create`. | Same as list page. |
 | `src/app/pages/resource-show-page.ts` | Show page displaying fields and links to edit/delete. | Same as list page. |
 | `src/app/pages/resource-edit-page.ts` | Edit page using `ResourceForm`, calls `dataProvider.update`, with a Delete button calling `deleteProvider.delete`. | Same as list page. |
 | `src/app/pidrang/...` | Helpers: `provide-sign-in-path`, `can-match-signed-in`, route utils, etc. | Same as list page. |
 | `src/app/layout/app-layout.ts` | Navigation layout component with header and sidebar menu. | Only when layout is `"sidebar"` on a new app. |
-| `src/app/pages/sign-in-page.ts` | Sign-in page component. | Only when `signIn` is true on a new app, or via `generate auth`. |
+| `src/app/pages/sign-in-page.ts` | Sign-in page component. | New app: when you accept the sign-in question. Existing app in an interactive run: always. Existing app driven by a plan: when the plan sets `signIn: true`. Omitted when `app.routes.ts` already declares the route. `pidrang generate auth` writes it on demand. |
 | `app.config.ts` | Adds `providePidrang()`, provides `provideSignInPath()` if configured. | Every run. |
 | `app.routes.ts` | Appends the resource routes import, entry redirect for new apps. | Every run. |
 | `angular.json` | Adds environment file replacements when `src/environments/` did not exist. | New app only. |
@@ -176,7 +176,7 @@ Source: `libs/cli/src/lib/wizard.ts` lines 43–55 (`providerReadsNeedSignIn`), 
 
 ## The sign-in page
 
-`init` generates the sign-in page at `src/app/pages/sign-in-page.ts` when the user accepts (new app) or when the plan sets `signIn: true` (existing app). The page links to the login method provided by the app.
+`init` writes the sign-in page at `src/app/pages/sign-in-page.ts` in three cases: on a new app when you accept the sign-in question, on an existing app in an interactive run where it is always written and the question is not asked, and on an existing app driven by a plan whose `signIn` is `true`. The page links to the login method provided by the app.
 
 `pidrang generate auth` writes the same page when `app.routes.ts` has no existing sign-in route and `app.config.ts` does not call `provideSignInPath` with another path.
 
@@ -186,7 +186,8 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 435–443 (instruction printed w
 
 ## Changing what it wrote
 
-- Generated files are ordinary application files. You can edit them freely — `init` will refuse to overwrite any file whose content differs from what it expects.
+- Generated files are ordinary application files. You can edit them freely.
+- `init` refuses to overwrite a generated file whose content differs from what it expects, and lists it instead.
 - To regenerate the generic pages (list, create, show, edit), delete `src/app/pages` and `src/app/pidrang` together, then run `init` again. Individual page regeneration is not supported.
 - The helpers under `src/app/pidrang/` are called by the generated pages and the layout module, so deleting them breaks the build even when `resources.ts` is correct.
 - `pnpm run sync:pages` and `sync:layout` serve the demo repositories in this codebase; they are not meant for consumer applications.
