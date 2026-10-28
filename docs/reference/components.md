@@ -1,6 +1,6 @@
 # Components reference
 
-Switching between layers is a change of import and element name. Setup details per layer are documented alongside their respective pages in a subsequent release. Source: `libs/core/src/lib/field-presentation.ts`, `docs/design-notes.md` line 87.
+Switching between layers is a change of import and element name. Each layer's setup is in [Angular Material](../ui-layers/material.md) and [Tailwind CSS](../ui-layers/tailwind.md).
 
 ## The four components
 
@@ -34,7 +34,7 @@ Inputs and outputs:
 | `fields` | `Field[]` | Yes | Fields to render — one input per editable (non-`readOnly`) field. Source: same file, line 58. |
 | `value` | `T` | Yes | Draft values bound through a linkedSignal never mutating the caller's input. Source: same file, line 59. |
 | `pending` | `boolean` | No (default `false`) | While true the form disables submit and ignores further submissions. Source: same file, line 60. |
-| `(save)` | `EventEmitter<Partial<T>>` | — | Emits when the user submits — only fields actually changed, filtered through `buildResourcePayload`. Source: same file, line 61. |
+| `(save)` | `` `output<Partial<T>>()` `` | — | Emits when the user submits — only fields actually changed, filtered through `buildResourcePayload`. Source: same file, line 61. |
 
 Behaviour:
 

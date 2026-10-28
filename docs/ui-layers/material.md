@@ -38,13 +38,16 @@ This sets violet as the primary palette, Roboto as typography, and zero density 
 
 ## Where the stylesheet goes
 
-Add the stylesheet path under `"styles"` in `angular.json` or in the `files` field of `app.config.ts`:
+Declare both stylesheets under `"styles"` in the `build` options of the project in `angular.json` (or in its `project.json`), the application stylesheet first and the theme second:
 
 ```json
-"styles": ["src/styles.scss"]
+"styles": [
+  "src/styles.css",
+  "src/theme.scss"
+]
 ```
 
-Source: `apps/demo-material/project.json` `"styles"` field.
+Source: `apps/demo-material/project.json` lines 23–26.
 
 ## Selector
 

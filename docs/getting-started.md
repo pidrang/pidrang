@@ -232,7 +232,7 @@ export class ResourceCreatePage {
 A sign-in page calls `authProvider.login({ email, password })` and `logout()`:
 
 ```ts
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { injectAuthProvider } from '@pidrang/core';
 
 @Component({ selector: 'app-sign-in-page', template: '' })

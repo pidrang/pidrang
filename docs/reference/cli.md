@@ -68,7 +68,7 @@ When the connection attempt fails, the wizard repeats the question with the reje
 | `angular.json` | Adds environment file replacements when `src/environments/` did not exist. | New app only. |
 | `src/environments/environment.ts` | Supabase URL and publishable key. | New app only. |
 
-The guide section at `docs/getting-started.md` lines 280–287 expands on how it wires the app itself. The resource routes guard every `:resource` action with both `canMatchResourceAction(...)` and `canMatchSignedIn([...])` when the corresponding tables need a signed-in user. A file it writes is never overwritten: one that already exists with other content stops `init` before any write. An existing `resources.ts` is edited instead: a second run appends the tables it does not list yet and leaves the others as they are.
+How it wires the app itself is described in [Generating resources](../getting-started.md#generating-resources). The resource routes guard every `:resource` action with both `canMatchResourceAction(...)` and `canMatchSignedIn([...])` when the corresponding tables need a signed-in user. A file it writes is never overwritten: one that already exists with other content stops `init` before any write. An existing `resources.ts` is edited instead: a second run appends the tables it does not list yet and leaves the others as they are.
 
 Sources: `libs/cli/src/lib/generate-pages-bundle.ts` (`PAGES_UI_LAYER_PACKAGES`, lines 70–73), `libs/cli/src/lib/generated-pages.ts` (page file list), `libs/cli/src/lib/generate-resources-file.ts` (resources.ts generation), `libs/cli/src/lib/build-sign-in-page.ts` (sign-in page generation), `libs/cli/src/lib/generate-layout-module.ts` (layout generation), `apps/pidrang-cli/src/edit-app-config.ts`, `apps/pidrang-cli/src/edit-app-routes.ts`.
 
@@ -150,7 +150,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 69–71 (`EXIT_OK`, `EXIT_FAILED
 
 ## A second run
 
-`resources.ts` is edited: tables listed in the new plan are replaced (new columns added, hidden/unset flags cleared), tables not yet listed are appended, tables already listed are left as they are. A file with different content stops `init` before any write, listing the conflicted paths. The layout of a first-run app is preserved: a second run on an existing app never sets the layout to `"sidebar"`. When a file cannot be edited safely, `init` adds a `// pidrang:` comment that lists the exact change to make.
+`resources.ts` is edited: tables not yet listed are appended, tables already listed are left as they are. A file with different content stops `init` before any write, listing the conflicted paths. The layout of a first-run app is preserved: a second run on an existing app never sets the layout to `"sidebar"`. When a file cannot be edited safely, `init` adds a `// pidrang:` comment that lists the exact change to make.
 
 Guard updates: a guard already written receives new private tables appended to its list. Guards for tables not seen in `resources.ts` are held back until those tables are listed.
 
@@ -180,7 +180,7 @@ Source: `libs/cli/src/lib/wizard.ts` lines 43–55 (`providerReadsNeedSignIn`), 
 
 `pidrang generate auth` writes the same page when `app.routes.ts` has no existing sign-in route and `app.config.ts` does not call `provideSignInPath` with another path.
 
-The helper `provideSignInPath('/your-sign-in-route')` — generated as `src/app/pidrang/provide-sign-in-path.ts` — wires the layout link and the page placeholders to your actual sign-in path. It rejects an empty string, dots, absolute URLs, encoded characters, or the placeholder `/your-sign-in-route` itself. Replace it with the path inside your app. When the first segment of that path is a resource name, the resource must be listed in `resources.ts` before the sign-in route, otherwise two competing `:resource` routes collide.
+`init` writes its own `sign-in` route into `resource-routes.ts`, above the `:resource` routes. When `app.routes.ts` already declares a first segment named `sign-in`, it writes no sign-in route and leaves yours in place. A table whose name is already a route declared in `app.routes.ts` is refused, so the `:resource` routes cannot take the sign-in path. Source: `libs/cli/src/lib/generate-pages-bundle.ts` lines 5-11 and 97-110 (sign-in route placement), `apps/pidrang-cli/src/preflight-app.ts` lines 180-182 (`declaresSignInRoute`), `libs/cli/src/lib/wizard.ts` lines 77-86 (`routeNameProblem`).
 
 Source: `apps/pidrang-cli/src/run-cli.ts` lines 435–443 (instruction printed without provider), `libs/demo-shared/src/lib/provide-sign-in-path.ts` (validation logic).
 

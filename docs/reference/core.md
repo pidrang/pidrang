@@ -43,14 +43,14 @@ Source: `libs/core/src/lib/resource-list.ts` lines 11–27.
 
 ## Reading the session
 
-`injectAuthSession(): AuthSessionRef` — loads the identity once, subscribes to session change notifications, updates on its own after login/logout, and never throws.
+`injectAuthSession(): AuthSessionRef` — loads the identity once, subscribes to session change notifications and updates on its own after login/logout. It throws when no `authProvider` was passed to `providePidrang()`, because it calls `injectAuthProvider()` first.
 
 | Member | Type | Meaning |
 |--------|------|---------|
 | `value` | `Signal<AuthIdentity \| null \| undefined>` | `undefined` during initial load, `null` when signed out, `AuthIdentity` when signed in. Updates after each `login()`/`logout()`. Source: `libs/core/src/lib/auth-session.ts` lines 25–36 (`linkedSignal` computation). |
 | `error` | `Signal<Error \| undefined>` | Provider failure during load. Check this alongside `value`. |
 | `isLoading` | `Signal<boolean>` | True between `reload()` calls until `getIdentity()` settles. |
-| `reload()` | `() => void` | Force a refresh. Call after `login()`/`logout()` if you want immediate feedback. |
+| `reload()` | `() => void` | Force a reload of the identity. With `@pidrang/supabase` you do not need it after `login()`/`logout()`: the provider pushes the change through `onSessionChange`. |
 
 Source: `libs/core/src/lib/auth-session-ref.ts` lines 5–10 (interface definition); `auth-session.ts` lines 16–51 (implementation).
 
@@ -172,6 +172,19 @@ Source: `libs/core/src/lib/data-provider.ts` lines 4–13; `libs/core/src/lib/cr
 `interface AuthIdentity`: `{ id: string; email?: string }`. Source: same file, lines 6–9.
 
 See [Authentication and permissions](../authentication.md) for a walkthrough.
+
+## Form payloads
+
+`ResourceForm` builds what it emits with these helpers; a hand-written form can use them too.
+
+| Export | Signature | What it does |
+|--------|-----------|--------------|
+| `ResourceFormMode` | `'create' \| 'edit'` | The mode `ResourceForm` and `shouldBlockSubmit` switch on. |
+| `buildResourcePayload<T>` | `(mode: ResourceFormMode, fields: Field[], draft: T, isDirty: (name: string) => boolean): Record<string, unknown>` | Keeps only the fields that changed (and are not `readOnly`), so the server's default applies to the rest. |
+| `shouldBlockSubmit` | `(mode: ResourceFormMode, dirty: boolean, invalid: boolean): boolean` | Blocks an invalid create immediately; in edit it blocks only once the field is touched and invalid. |
+| `normalizeResourceValue<T>` | `(fields: Field[], value: T): T` | Turns a record into the draft the form binds to. |
+
+Source: `libs/core/src/lib/resource-form-payload.ts` lines 4, 34, 50 and 65. Where the components call them: [Components reference](./components.md).
 
 ## Errors
 

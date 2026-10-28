@@ -18,14 +18,14 @@ Without it, `injectAuthProvider()` throws a descriptive error if anything asks f
 
 ## Read the session
 
-`injectAuthSession(): AuthSessionRef` loads the identity once and keeps it up to date after each login or logout. It never throws.
+`injectAuthSession(): AuthSessionRef` loads the identity once and keeps it up to date after each login or logout. It throws when no `authProvider` was passed to `providePidrang()`.
 
 | Member | Type | Meaning |
 |--------|------|---------|
 | `value()` | `AuthIdentity \| null \| undefined` | `undefined` during initial load, `null` when signed out, `AuthIdentity` when signed in. Updates automatically after login or logout. Source: `libs/core/src/lib/auth-session.ts` lines 25–36. |
 | `error()` | `Error \| undefined` | A provider failure during the initial identity load. Check this alongside `value()`. |
 | `isLoading` | `boolean` | True between reloads until the identity settles. |
-| `reload()` | `() => void` | Force a refresh. Call after login/logout if you want immediate feedback in the UI. |
+| `reload()` | `() => void` | Force a reload of the identity. With `@pidrang/supabase` the provider already pushes login and logout changes. |
 
 See [Core reference — Reading the session](./reference/core.md#reading-the-session) for details on `AuthSessionRef` and `AuthIdentity`.
 
@@ -34,7 +34,7 @@ See [Core reference — Reading the session](./reference/core.md#reading-the-ses
 A sign-in page calls `authProvider.login({ email, password })` and `authProvider.logout()`:
 
 ```ts
-import { inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { injectAuthProvider } from '@pidrang/core';
 
 @Component({ selector: 'app-sign-in-page', template: '' })
@@ -49,7 +49,7 @@ export class SignInPage {
 
 See the [Core reference — Authentication](./reference/core.md#authentication) for the `AuthProvider` interface contract.
 
-When `pidrang init` generates a new app, it also creates a minimal sign-in page at `/sign-in` and writes `provideSignInPath('/sign-in')` into `app.config.ts`. Run `pidrang generate auth` to create that page later. The generated pages say "sign in" as plain text until you call `provideSignInPath`, see [The sign-in page](./reference/cli.md#the-sign-in-page).
+When `pidrang init` generates a new app, it also creates a minimal sign-in page at `/sign-in` and writes `provideSignInPath('/sign-in')` into `app.config.ts`. Run `pidrang generate auth` to create that page later. The generated pages show "You may need to sign in" as plain text until you call `provideSignInPath`, see [The sign-in page](./reference/cli.md#the-sign-in-page).
 
 ## Link your sign-in page
 
@@ -74,8 +74,6 @@ Without a sign-in path configured, the generated pages show "You may need to sig
 Source: `libs/demo-shared/src/lib/provide-sign-in-path.ts`, `parse-sign-in-path.ts`, `sign-in-url.ts`.
 
 ## Row Level Security
-
-`@pidrang/supabase` performs no authorization of its own. Every guarantee comes from the Row Level Security policies on your Supabase project, and Pidrang neither configures nor verifies them.
 
 Enable RLS on every table you expose:
 
@@ -125,7 +123,7 @@ See [Core reference — Errors](./reference/core.md#errors) for the full `Pidran
 
 ### You may need to sign in
 
-The generated pages display this text when `SIGN_IN_PATH` is `null` (no call to `provideSignInPath`). Add `provideSignInPath('/your-path')` to `app.config.ts` to turn the text into a link. Without the helper, the page renders nothing below any content you placed manually before replacing it with `<router-outlet />`.
+The generated pages display this text when `SIGN_IN_PATH` is `null` (no call to `provideSignInPath`). Add `provideSignInPath('/your-path')` to `app.config.ts` to turn the text into a link. Without the helper, the sign-in prompt stays plain text and is not a link.
 
 ### A permission error while signed in
 
