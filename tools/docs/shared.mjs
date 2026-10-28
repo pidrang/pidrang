@@ -1,4 +1,4 @@
-import { dirname, join, normalize, resolve, sep } from 'node:path';
+import { dirname, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -60,7 +60,8 @@ export function rewriteLink(link, file = '') {
   const page = resolved.endsWith('.md')
     ? resolved.slice(0, -'.md'.length)
     : resolved;
-  return `${page}${suffix}`;
+  const pagePath = relative(directory, page).split(sep).join('/');
+  return `${pagePath}${suffix}`;
 }
 
 export function rewriteLinks(markdown, file) {

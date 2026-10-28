@@ -149,23 +149,6 @@ function assertNoPrivilegedContent(directory) {
   }
 }
 
-function assertLinksStayLocal(directory) {
-  const problems = [];
-  for (const file of listFiles(directory).filter((name) => name.endsWith('.md'))) {
-    const content = readFileSync(join(directory, file), 'utf8');
-    content.split('\n').forEach((line, index) => {
-      if (/\]\(\.\.\//.test(line)) {
-        problems.push(`${file}:${index + 1}: ${line.trim()}`);
-      }
-    });
-  }
-  if (problems.length > 0) {
-    throw new Error(
-      `Links leaving docs/ were not rewritten:\n${problems.join('\n')}`,
-    );
-  }
-}
-
 function assertSourceLinks() {
   const missing = [];
   const localLink = /\]\(([^)\s#:]+\.md)(?:#[^)\s]*)?\)/g;
@@ -202,6 +185,43 @@ function assertGithubLinksExist() {
   }
   if (missing.length > 0) {
     throw new Error(`Dead GitHub links:\n${missing.join('\n')}`);
+  }
+}
+
+function assertLocalLinksResolve() {
+  const missing = [];
+  const attribute = /(?:href|src)="([^"]+)"/g;
+  for (const file of listFiles(outputDirectory).filter((name) =>
+    name.endsWith('.html'),
+  )) {
+    const content = readFileSync(join(outputDirectory, file), 'utf8');
+    for (const [, link] of content.matchAll(attribute)) {
+      if (
+        !link.startsWith('/docs/') &&
+        !link.startsWith('./') &&
+        !link.startsWith('../')
+      ) {
+        continue;
+      }
+      const path = link.split('#')[0].split('?')[0];
+      if (!path) {
+        continue;
+      }
+      const resolved = path.startsWith('/docs/')
+        ? resolve(outputDirectory, path.slice('/docs/'.length))
+        : resolve(join(outputDirectory, dirname(file)), path);
+      if (
+        existsSync(resolved) ||
+        existsSync(`${resolved}.html`) ||
+        existsSync(join(resolved, 'index.html'))
+      ) {
+        continue;
+      }
+      missing.push(`${file}: ${link}`);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(`Dead local links:\n${missing.join('\n')}`);
   }
 }
 
@@ -243,7 +263,6 @@ for (const file of listFiles(sourceCopyDirectory).filter((name) =>
   writeFileSync(path, rewriteLinks(readFileSync(path, 'utf8'), file));
 }
 
-assertLinksStayLocal(sourceCopyDirectory);
 assertSourceLinks();
 assertGithubLinksExist();
 
@@ -263,14 +282,15 @@ execFileSync(
   { cwd: root, stdio: 'inherit' },
 );
 
-assertBuiltPage();
-assertNoPrivilegedContent(outputDirectory);
-
 const customStylesheet = join(outputDirectory, 'custom.css');
 cpSync(join(VITEPRESS_DIRECTORY, 'custom.css'), customStylesheet);
 if (!existsSync(customStylesheet)) {
   throw new Error('custom.css is missing from the build');
 }
+
+assertBuiltPage();
+assertLocalLinksResolve();
+assertNoPrivilegedContent(outputDirectory);
 
 const metadata = {
   schema: 1,
