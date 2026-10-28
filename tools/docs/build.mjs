@@ -54,6 +54,8 @@ hero:
 
 ## Reference
 
+- [Core](reference/core): the contracts, the providers and the injected helpers.
+- [Components](reference/components): ResourceTable and ResourceForm, with both UI layers.
 - [CLI](reference/cli): commands, options, the plan file, exit codes and the files init writes.
 
 ## For maintainers

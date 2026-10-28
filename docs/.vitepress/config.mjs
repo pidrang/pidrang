@@ -51,7 +51,11 @@ export default {
       },
       {
         text: 'Reference',
-        items: [{ text: 'CLI', link: '/reference/cli' }],
+        items: [
+          { text: 'Core', link: '/reference/core' },
+          { text: 'Components', link: '/reference/components' },
+          { text: 'CLI', link: '/reference/cli' },
+        ],
       },
       {
         text: 'Maintainers',
