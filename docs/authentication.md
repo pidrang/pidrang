@@ -49,7 +49,7 @@ export class SignInPage {
 
 See the [Core reference — Authentication](./reference/core.md#authentication) for the `AuthProvider` interface contract.
 
-When `pidrang init` generates a new app, it also creates a minimal sign-in page at `/sign-in` and writes `provideSignInPath('/sign-in')` into `app.config.ts`. Run `pidrang generate auth` to create that page later. The generated pages show "You may need to sign in" as plain text until you call `provideSignInPath`, see [The sign-in page](./reference/cli.md#the-sign-in-page).
+When `pidrang init` sets up a new app, it asks whether to create a minimal sign-in page at `/sign-in`; on accept (the default) it writes the page and `provideSignInPath('/sign-in')` into `app.config.ts`. Run `pidrang generate auth` to create that page later; see [The sign-in page](./reference/cli.md#the-sign-in-page) for every case where it is written.
 
 ## Link your sign-in page
 
@@ -69,7 +69,7 @@ When `pidrang init` generates a new app, it also creates a minimal sign-in page 
 
 A well-formed path to a route that does not exist is not detected by `provideSignInPath`; that is the responsibility of your router configuration.
 
-Without a sign-in path configured, the generated pages show "You may need to sign in" as plain text rather than a link. This is intentional: no sign-in page is a valid setup, and nothing throws when `SIGN_IN_PATH` is missing.
+Without a sign-in path configured, the "You may need to sign in" prompt that follows  in" as plain text rather than a link. This is intentional: no sign-in page is a valid setup, and nothing throws when `SIGN_IN_PATH` is missing.
 
 Source: `libs/demo-shared/src/lib/provide-sign-in-path.ts`, `parse-sign-in-path.ts`, `sign-in-url.ts`.
 
@@ -123,7 +123,8 @@ See [Core reference — Errors](./reference/core.md#errors) for the full `Pidran
 
 ### You may need to sign in
 
-The generated pages display this text when `SIGN_IN_PATH` is `null` (no call to `provideSignInPath`). Add `provideSignInPath('/your-path')` to `app.config.ts` to turn the text into a link. Without the helper, the sign-in prompt stays plain text and is not a link.
+The generated list, create and edit pages display this prompt after a write is refused because the user is not signed in: a delete on the list page, a create on the create page, an update on the edit page.
+The show page never shows it, and a read refused by Row Level Security displays the row-lN_IN_PATH` is `null` (no call to `provideSignInPath`) the "sign in" words stay plain text; add `provideSignInPath('/your-path')` to `app.config.ts` to turn them into a link.
 
 ### A permission error while signed in
 

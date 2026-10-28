@@ -41,7 +41,7 @@ The wizard asks these questions in order:
 | 2 | `Supabase project URL, from the Connect button at the top of the Supabase dashboard:` | — | Always first for Supabase. Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`, line 38. |
 | 3 | `How should pidrang read your table definitions?` | `service-role` | Always after the URL. Choices: Secret key (sb_secret_), Direct database connection (host, user, password), GraphQL with the publishable key. Source: same file, line 486. |
 | 4 | `Which tables should pidrang scaffold?` | — | After connection is resolved. Multi-select checkbox over available tables. Source: `libs/cli/src/lib/wizard.ts`, line 168. |
-| 5 _(per table)_ | `Which actions should "<table>" support?` | All checked | After selecting tables. Checkbox with disabled unavailable actions. Source: `libs/cli/src/lib/wizard.ts`, lines 321–329. |
+| 5 _(per table)_ | `Which actions should "<table>" support?` | All checked | After selecting tables. Checkbox with disabled unavailable actions. Source: `libs/cli/src/lib/wizard.ts` lines 305–312 (`actionsMessage`, label at line 321–329. |
 | 6 _(per table)_ | `Any fields to hide from the list/edit views for "<table>"? (optional)` | — | Per table. Checkbox listing introspected fields. Source: `libs/cli/src/lib/wizard.ts`, lines 332–338. |
 | 7 | `Generate a navigation layout? It adds a header with your app name and a sign in/out link, and a side menu of the resources.` | `true` | New app only; always `"none"` for existing apps. Source: `libs/cli/src/lib/wizard.ts`, lines 21–25. |
 | 8 | `Generate a sign-in page at /sign-in? The app needs one to sign in and write data.` | `true` | New app only; always `true` for existing apps. Source: `libs/cli/src/lib/wizard.ts`, lines 29–32. |
@@ -166,7 +166,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 676–697 (layout conditions), `
 
 ## When the tables need a signed-in user
 
-Tables marked with `readsNeedSignIn: true` receive a `canMatchSignedIn([...])` guard on all their actions. Without the guard, those tables' list and show pages display the text "You may need to sign in" as a placeholder until `provideSignInPath` is wired.
+Tables marked with `readsNeedSignIn: true` receive a `canMatchSignedIn([...])` guard on all their actions. The guard redirects an anonymous visitor to the sign-in path when `provideSignInPath` configured one; without it, the navigation goes through. The generated pages show a "You may need to sign in" prompt only after a write is refused for lack of sign-in: a delete on the list page, a create onn the edit page. The show page never shows it. With `provideSignInPath` the words "sign in" are a link; without it they stay plain text.
 
 For new apps: init asks once ("Do your tables need a signed-in user to be read?") and applies the answer globally. The new app opens on the sign-in page when `readsNeedSignIn` is true. For existing apps: a new run appends private tables already listed in `resources.ts` to the existing guard. Tables not yet listed are held back with an error message referencing where to add them manually.
 
