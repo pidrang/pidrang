@@ -49,6 +49,7 @@ hero:
 ## The guide
 
 - [Getting started](getting-started): from a new Angular app to a working list, create and edit flow.
+- [Authentication](authentication): signing users in, and what the Row Level Security policies decide.
 - [Architecture](architecture): how the core, the data providers and the UI layers fit together.
 - [Data providers](data-providers): connect Pidrang to your own backend.
 

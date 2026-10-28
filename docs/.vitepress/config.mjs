@@ -45,6 +45,7 @@ export default {
         text: 'Guide',
         items: [
           { text: 'Getting started', link: '/getting-started' },
+          { text: 'Authentication', link: '/authentication' },
           { text: 'Architecture', link: '/architecture' },
           { text: 'Data providers', link: '/data-providers' },
         ],

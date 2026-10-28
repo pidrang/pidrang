@@ -230,18 +230,27 @@ export class ResourceCreatePage {
 
 ## 7. Sign in
 
-`injectAuthProvider()` reads the provider passed to `providePidrang()`. Without one, it throws a descriptive error.
+A sign-in page calls `authProvider.login({ email, password })` and `logout()`:
 
 ```ts
+import { inject } from '@angular/core';
 import { injectAuthProvider } from '@pidrang/core';
 
-const authProvider = injectAuthProvider();
-await authProvider.login({ email, password });
+@Component({ selector: 'app-sign-in-page', template: '' })
+export class SignInPage {
+  private readonly authProvider = injectAuthProvider();
+
+  protected async login(email: string, password: string): Promise<void> {
+    await this.authProvider.login({ email, password });
+  }
+}
 ```
+
+See [Authentication and permissions](./authentication.md) for the full walkthrough.
 
 ## Row Level Security
 
-`@pidrang/supabase` performs no authorization of its own. Every guarantee comes from the RLS policies on your Supabase project, and Pidrang neither configures nor verifies them. A table with RLS disabled is readable and writable by anyone holding the anon key, which ships to every browser. Enable RLS on each table you expose and write explicit policies before deploying.
+`@pidrang/supabase` performs no authorization. Every guarantee comes from your Supabase RLS policies — see [Row Level Security](./authentication.md#row-level-security).
 
 ## Choosing a UI layer
 
@@ -265,9 +274,9 @@ The URL changes but a page stays blank: `provideRouter` has no `withComponentInp
 
 `/products` opens the not-found route: `...resourceRoutes` is missing from `routes`, or sits below a `**` route, which matches everything. It belongs at the top of the array, with your fixed paths after it.
 
-The table is empty: see [Troubleshooting](#troubleshooting) below for common causes including RLS and empty tables.
+The table is empty: see [Authentication troubleshooting](./authentication.md#troubleshooting) — RLS on read-only tables, missing guards, or an unsigned-in user on a private table.
 
-Saving says you may need to sign in, or returns a permission error: see [Troubleshooting](#troubleshooting) below for common causes including unauthenticated writes.
+Saving says you may need to sign in, or returns a permission error: see [Authentication troubleshooting](./authentication.md#troubleshooting) — plain text sign-in prompt when `provideSignInPath` is not configured, or RLS denying access after login.
 
 Requests fail with an invalid API key or do not reach Supabase: `supabaseUrl` and `supabasePublishableKey` in `src/environments/environment.ts` are still the placeholders, point to another project, or hold a key that was rotated. Both values are shown by the Connect button at the top of your project's Supabase dashboard; use the publishable key (formerly anon), never the secret key or the database password.
 
