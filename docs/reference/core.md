@@ -16,9 +16,9 @@ Everything is exported by `@pidrang/core`, which depends only on `@angular/core`
 
 | Function | Returns | Throws when | Source |
 |----------|---------|------------|--------|
-| `injectDataProvider(): DataProvider` | The configured `DataProvider`. | Never — `DATA_PROVIDER` is required. | `libs/core/src/lib/inject-pidrang.ts` lines 8–9. |
+| `injectDataProvider(): DataProvider` | The configured `DataProvider`. | When `providePidrang()` was not called — Angular's DI error (no provider for `DATA_PROVIDER`). | `libs/core/src/lib/inject-pidrang.ts` lines 8–9. |
 | `injectAuthProvider(): AuthProvider` | The configured `AuthProvider`. | When no auth provider was passed to `providePidrang()`. Error message: `Pidrang: no auth provider configured, pass authProvider to providePidrang()`. Source: same file, lines 12–17. |
-| `injectResources(): Resource[]` | The registered resources array. | Never — `RESOURCES` is required. | Same file, lines 20–21. |
+| `injectResources(): Resource[]` | The registered resources array. | When `providePidrang()` was not called — Angular's DI error (no provider for `RESOURCES`). | Same file, lines 20–21. |
 | `injectResource(name: string): Resource` | The single resource matching `name`. | When no resource has that name. Error message: `Pidrang: no resource registered with name "<name>"`. Source: same file, lines 24–29. |
 
 All functions use Angular's `inject()` and must be called in an injection context (component constructor, field initializer, factory).
@@ -63,7 +63,7 @@ Source: `libs/core/src/lib/auth-session-ref.ts` lines 5–10 (interface definiti
 | `name` | `string` | — | Table name, resource name, and URL segment. Must not collide with existing routes. Source: `libs/core/src/lib/resource.ts` line 5. |
 | `label` | `string` | Derived from `name` | Display label for titles, menu items, headers. Generated from the table name by `readable-label.ts` in the CLI: split on `_`, `-`, `.`, case boundaries, capitalize first word, lowercase others. |
 | `fields` | `Field[]` | — | Typed field definitions rendered by `ResourceForm` and `ResourceTable`. Source: same file, line 7. |
-| `defaultSorters` | `ListParams['sorters']` | `[ { field: 'id', order: 'asc' } ]` | Order applied when the page has no user-set sort. The CLI adds `{ field: 'created_at', order: 'desc' }, { field: 'id', order: 'asc' }` when a `timestamp` or `date` `created_at` column exists. Source: `libs/cli/src/lib/generate-resources-file.ts` lines 51–61. |
+| `defaultSorters` | `ListParams['sorters']` | `[ { field: 'id', order: 'asc' } ]` | Order applied when the page has no user-set sort. The CLI adds `{ field: 'created_at', order: 'desc' }, { field: 'id', order: 'asc' }` when a `timestamp` or `date` `created_at` column exists. Source: `libs/cli/src/lib/generate-resources-file.ts` lines 51–61. The `id` default itself comes from `libs/demo-shared/src/lib/resource-list-state.ts` line 96, copied into the generated list page at `libs/cli/src/lib/generated-pages.ts` line 72. |
 | `list` | `boolean` | `true` | Enable/disable the generic list page and its route. Source: `libs/core/src/lib/resource.ts` line 10. |
 | `create` | `boolean` | `true` | Enable/disable create. Source: same file, line 11. |
 | `show` | `boolean` | `true` | Enable/disable show. Source: same file, line 12. |
@@ -104,6 +104,8 @@ Source: `libs/core/src/lib/auth-session-ref.ts` lines 5–10 (interface definiti
 
 Source: `libs/core/src/lib/field-presentation.ts` lines 3–48 (`INPUT_TYPE_BY_FIELD_TYPE`, `FORMAT_PATTERN_BY_FIELD_TYPE`, `TEXT_INPUT_BOUND_FIELD_TYPES`).
 
+Five helpers turn a `Field` into what a form renders; both UI layers call them instead of keeping their own copy. `inputTypeForField(field): string` returns the `INPUT_TYPE_BY_FIELD_TYPE` lookup. `formatPatternForField(field): RegExp | undefined` returns the validation pattern for the type, `undefined` where there is none. `formatHintForField(field): string` returns the hint shown under the input. `fieldRequiresValueWhenEmpty(field): boolean` is true for `date`, `timestamp`, `time` and `numeric` when the field is not `nullable`. `isTextInputBoundField(field): boolean` is true when the type binds a plain text input. Source: same file, lines 50–70.
+
 ## List params
 
 `interface ListParams`:
@@ -114,6 +116,8 @@ Source: `libs/core/src/lib/field-presentation.ts` lines 3–48 (`INPUT_TYPE_BY_F
 | `pagination?.pageSize` | `number` | Rows per page. |
 | `sorters?` | `{ field: string; order: 'asc' \| 'desc' }[]` | Sort fields and direction. |
 | `filters?` | `readonly Filter[] \| Record<string, FilterValue \| null \| undefined>` | AND-combined filters; shorthand object syntax maps values to `eq`. Values are normalized (`libs/core/src/lib/normalize-filters.ts`) and unsupported operators are rejected (`libs/core/src/lib/reject-unsupported-filters.ts`). Anything else is rejected before a request is sent. |
+
+Three helpers apply those rules before any request. `normalizeFilters(filters: ListParams['filters']): Filter[]` returns `[]` for `undefined` or `null`, copies an array, turns the shorthand record into `{ field, operator: 'eq', value }` members (a `null` value becomes the `null` operator), and throws on a single filter object or a value that is not a plain object. `rejectUnsupportedFilters(filters, supported)` throws ``Unsupported filter operator "<operator>" on field "<field>"`` for an operator the backend cannot express. `validateListParams(params)` rejects a malformed page number, sorter or filter. Sources: `libs/core/src/lib/normalize-filters.ts` line 16, `libs/core/src/lib/reject-unsupported-filters.ts` lines 4–7, `libs/core/src/lib/validate-list-params.ts` line 83.
 
 `interface ListResult<T>`:
 

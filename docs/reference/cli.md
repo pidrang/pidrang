@@ -38,7 +38,7 @@ The wizard asks these questions in order:
 | Order | Question | Default | When asked |
 |-------|----------|---------|------------|
 | 1 | `Which data source do you want to scaffold from?` | — | Only when more than one provider is registered. Source: `libs/cli/src/lib/wizard.ts`, line 271. |
-| 2 | `Supabase project URL, from the Connect button at the top of the Supabase dashboard:` | — | Always first for Supabase. Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`, line 39. |
+| 2 | `Supabase project URL, from the Connect button at the top of the Supabase dashboard:` | — | Always first for Supabase. Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`, line 38. |
 | 3 | `How should pidrang read your table definitions?` | `service-role` | Always after the URL. Choices: Secret key (sb_secret_), Direct database connection (host, user, password), GraphQL with the publishable key. Source: same file, line 486. |
 | 4 | `Which tables should pidrang scaffold?` | — | After connection is resolved. Multi-select checkbox over available tables. Source: `libs/cli/src/lib/wizard.ts`, line 168. |
 | 5 _(per table)_ | `Which actions should "<table>" support?` | All checked | After selecting tables. Checkbox with disabled unavailable actions. Source: `libs/cli/src/lib/wizard.ts`, lines 321–329. |
@@ -54,7 +54,7 @@ When the connection attempt fails, the wizard repeats the question with the reje
 
 | File | What lands there | When |
 |------|-----------------|------|
-| `src/app/resources.ts` | `export const resources: Resource[] = [...]` — one entry per selected table with name, label, fields (inferred from introspection), actions booleans, optional `defaultSorters`, `hiddenFields`, `readOnly`, `nullable`, `hasDefault`. | Every run. Edited in-place on subsequent runs. |
+| `src/app/resources.ts` | `export const resources: Resource[] = [...]` — one entry per selected table: `{ name, label, fields, defaultSorters?, list, create, show, edit, delete }`. Each field is `{ name, label, type, hidden?, readOnly?, nullable?, hasDefault? }`, inferred from introspection; a field named in the plan file's `hiddenFields` is written with `hidden: true`. `defaultSorters` is written only when a `timestamp` or `date` `created_at` column exists. | Every run. Edited in-place on subsequent runs. |
 | `src/app/resource-routes.ts` | Generic routes `:resource`, `:resource/create`, `:resource/:id/edit`, `:resource/:id` pointing to generated pages, with `canMatch` guards. | Every run. Regenerated; an existing guard list is extended in place. |
 | `src/app/pages/resource-list-page.ts` | List page using `injectResourceList`, `ResourceTable`, with actions projected. | New app only (conflict on existing). |
 | `src/app/pages/resource-create-page.ts` | Create page using `ResourceForm`, calls `dataProvider.create`. | Same as list page. |

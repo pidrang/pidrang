@@ -24,7 +24,7 @@ Without it, `injectAuthProvider()` throws a descriptive error if anything asks f
 |--------|------|---------|
 | `value()` | `AuthIdentity \| null \| undefined` | `undefined` during initial load, `null` when signed out, `AuthIdentity` when signed in. Updates automatically after login or logout. Source: `libs/core/src/lib/auth-session.ts` lines 25–36. |
 | `error()` | `Error \| undefined` | A provider failure during the initial identity load. Check this alongside `value()`. |
-| `isLoading` | `boolean` | True between reloads until the identity settles. |
+| `isLoading()` | `Signal<boolean>` | True between reloads until the identity settles. |
 | `reload()` | `() => void` | Force a reload of the identity. With `@pidrang/supabase` the provider already pushes login and logout changes. |
 
 See [Core reference — Reading the session](./reference/core.md#reading-the-session) for details on `AuthSessionRef` and `AuthIdentity`.
