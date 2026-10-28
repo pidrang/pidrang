@@ -6,7 +6,6 @@ export default {
     'Documentation for Pidrang, the headless admin framework for Angular.',
   lang: 'en-US',
   appearance: 'dark',
-  // VitePress checks links relative to base; tools/docs/build.mjs checks them on the sources instead
   outDir: 'dist',
   ignoreDeadLinks: true,
   head: [
@@ -30,23 +29,49 @@ export default {
     siteTitle: 'Pidrang docs',
     nav: [
       { text: 'Getting started', link: '/getting-started' },
-      { text: 'Architecture', link: '/architecture' },
-      { text: 'Data providers', link: '/data-providers' },
+      {
+        text: 'Reference',
+        items: [
+          { text: 'Core', link: '/reference/core' },
+          { text: 'Components', link: '/reference/components' },
+          { text: 'UI layers', link: '/ui-layers/' },
+          { text: 'CLI', link: '/reference/cli' },
+        ],
+      },
       {
         text: 'Maintainers',
         items: [
           { text: 'Design notes', link: '/design-notes' },
           { text: 'Releasing', link: '/releasing' },
+          { text: 'Demo artifacts', link: '/demo-artifacts' },
         ],
       },
+      { text: 'Demos', link: 'https://pidrang.dev/demos/' },
     ],
     sidebar: [
       {
         text: 'Guide',
         items: [
           { text: 'Getting started', link: '/getting-started' },
+          { text: 'Authentication', link: '/authentication' },
           { text: 'Architecture', link: '/architecture' },
           { text: 'Data providers', link: '/data-providers' },
+        ],
+      },
+      {
+        text: 'UI layers',
+        items: [
+          { text: 'Overview', link: '/ui-layers/' },
+          { text: 'Angular Material', link: '/ui-layers/material' },
+          { text: 'Tailwind CSS', link: '/ui-layers/tailwind' },
+        ],
+      },
+      {
+        text: 'Reference',
+        items: [
+          { text: 'Core', link: '/reference/core' },
+          { text: 'Components', link: '/reference/components' },
+          { text: 'CLI', link: '/reference/cli' },
         ],
       },
       {
@@ -54,12 +79,13 @@ export default {
         items: [
           { text: 'Design notes', link: '/design-notes' },
           { text: 'Releasing', link: '/releasing' },
+          { text: 'Demo artifacts', link: '/demo-artifacts' },
         ],
       },
     ],
     search: { provider: 'local' },
     editLink: {
-      pattern: 'https://github.com/pidrang/pidrang/edit/main/dist/docs-src/:path',
+      pattern: 'https://github.com/pidrang/pidrang/edit/main/docs/:path',
       text: 'Edit this page on GitHub',
     },
     socialLinks: [],

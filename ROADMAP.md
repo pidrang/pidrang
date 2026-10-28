@@ -11,7 +11,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 | 5   | `@pidrang/material` — first real UI layer (List/Create/Show/Edit/Delete bound to core's resource state) | Done    |
 | 6   | `@pidrang/cli` — table → `Resource` → working CRUD generation                                           | Done    |
 | 7   | `@pidrang/tailwind` — second UI layer (Tailwind CSS utility classes, no component library)              | Done    |
-| 8   | `primeng`, `rest`, `graphql` packages, without changing core                                            | Planned |
+| 8   | `ng-zorro`, `rest`, `graphql` packages, without changing core                                             | Planned |
 
 ## Phase 1 — `@pidrang/core`
 
@@ -70,7 +70,7 @@ Progress tracker for Pidrang. See `CLAUDE.md` for the architecture rules and per
 
 ## Phase 8 — later, without core changes
 
-- `@pidrang/primeng`, `@pidrang/rest`, `@pidrang/graphql`, `@pidrang/strapi`
+- `@pidrang/ng-zorro`, `@pidrang/rest`, `@pidrang/graphql`, `@pidrang/strapi`
 - Each new data provider must pass `describeDataProviderConformance` from `libs/provider-conformance` (see `docs/data-providers.md`)
 
 ## Not scheduled as a phase, still needed

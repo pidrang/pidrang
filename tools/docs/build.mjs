@@ -8,13 +8,12 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import {
   docsPath,
   origin,
   outputDirectory,
-  pages,
   repository,
   rewriteLinks,
   root,
@@ -47,20 +46,47 @@ hero:
       link: https://github.com/${repository}
 ---
 
+## What it is
+
+Pidrang is a headless admin framework for Angular: a \`Resource\` describes a table and its fields, a data provider reads and writes it, and a UI layer renders the list, the forms and the actions. Nothing is generated per table, so a new table is a few lines.
+
+Pre-1.0: the public API may change between minor versions.
+
+## Install
+
+\`\`\`bash
+npm install @pidrang/core @pidrang/supabase @pidrang/material @supabase/supabase-js
+ng add @angular/material
+npx pidrang init
+\`\`\`
+
+## See it running
+
+- [demo-material](https://pidrang.dev/demo-material/): the same three resources on Angular Material.
+- [demo-tailwind](https://pidrang.dev/demo-tailwind/): the same three resources on Tailwind CSS.
+- [pidrang.dev/demos](https://pidrang.dev/demos/): both demos.
+
 ## The guide
 
 - [Getting started](getting-started): from a new Angular app to a working list, create and edit flow.
+- [Authentication](authentication): signing users in, and what the Row Level Security policies decide.
+- [UI layers](ui-layers/): the same components on Angular Material and Tailwind, and which one to pick.
 - [Architecture](architecture): how the core, the data providers and the UI layers fit together.
 - [Data providers](data-providers): connect Pidrang to your own backend.
+
+## Reference
+
+- [Core](reference/core): the contracts, the providers and the injected helpers.
+- [Components](reference/components): ResourceTable and ResourceForm, with both UI layers.
+- [UI layers](ui-layers/): the same components on Angular Material and Tailwind, and which one to pick.
+- [CLI](reference/cli): commands, options, the plan file, exit codes and the files init writes.
 
 ## For maintainers
 
 - [Design notes](design-notes): the reason behind every non-obvious choice.
 - [Releasing](releasing): the release process.
+- [Demo artifacts](demo-artifacts): how the demos are built and deployed.
 
-## Edit a page
-
-Every page links to its markdown source on GitHub. The site is rebuilt by the Docs artifacts workflow, then deployed by a pull request in pidrang.github.io.
 `;
 
 function git(...args) {
@@ -74,6 +100,17 @@ function listFiles(directory, relative = '') {
       const path = relative ? `${relative}/${entry.name}` : entry.name;
       return entry.isDirectory() ? listFiles(directory, path) : [path];
     });
+}
+
+function sourcePages() {
+  return [
+    'index',
+    ...listFiles(sourceDirectory)
+      .filter((file) => file.endsWith('.md'))
+      .map((file) => file.slice(0, -'.md'.length))
+      .filter((page) => page !== 'index')
+      .sort(),
+  ];
 }
 
 function privilegedTokens(content) {
@@ -112,38 +149,79 @@ function assertNoPrivilegedContent(directory) {
   }
 }
 
-function assertLinksStayLocal(directory) {
-  const problems = [];
-  for (const file of listFiles(directory).filter((name) => name.endsWith('.md'))) {
-    const content = readFileSync(join(directory, file), 'utf8');
-    content.split('\n').forEach((line, index) => {
-      if (/\]\(\.\.\//.test(line)) {
-        problems.push(`${file}:${index + 1}: ${line.trim()}`);
-      }
-    });
-  }
-  if (problems.length > 0) {
-    throw new Error(
-      `Links leaving docs/ were not rewritten:\n${problems.join('\n')}`,
-    );
-  }
-}
-
 function assertSourceLinks() {
   const missing = [];
   const localLink = /\]\(([^)\s#:]+\.md)(?:#[^)\s]*)?\)/g;
   for (const file of listFiles(sourceCopyDirectory).filter((name) =>
     name.endsWith('.md'),
   )) {
+    const fileDir = dirname(file);
     const content = readFileSync(join(sourceCopyDirectory, file), 'utf8');
     for (const [, link] of content.matchAll(localLink)) {
-      if (!existsSync(join(sourceCopyDirectory, link))) {
+      const resolved = resolve(sourceCopyDirectory, fileDir, link);
+      if (!existsSync(resolved)) {
         missing.push(`${file} links to missing ${link}`);
       }
     }
   }
   if (missing.length > 0) {
     throw new Error(`Dead links in docs/:\n${missing.join('\n')}`);
+  }
+}
+
+function assertGithubLinksExist() {
+  const missing = [];
+  const githubLink =
+    /https:\/\/github\.com\/pidrang\/pidrang\/blob\/main\/([A-Za-z0-9_./-]+\.md)/g;
+  for (const file of listFiles(sourceCopyDirectory).filter((name) =>
+    name.endsWith('.md'),
+  )) {
+    const content = readFileSync(join(sourceCopyDirectory, file), 'utf8');
+    for (const [, path] of content.matchAll(githubLink)) {
+      if (!existsSync(resolve(root, path))) {
+        missing.push(`${file} links to missing ${path}`);
+      }
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(`Dead GitHub links:\n${missing.join('\n')}`);
+  }
+}
+
+function assertLocalLinksResolve() {
+  const missing = [];
+  const attribute = /(?:href|src)="([^"]+)"/g;
+  for (const file of listFiles(outputDirectory).filter((name) =>
+    name.endsWith('.html'),
+  )) {
+    const content = readFileSync(join(outputDirectory, file), 'utf8');
+    for (const [, link] of content.matchAll(attribute)) {
+      if (
+        !link.startsWith('/docs/') &&
+        !link.startsWith('./') &&
+        !link.startsWith('../')
+      ) {
+        continue;
+      }
+      const path = link.split('#')[0].split('?')[0];
+      if (!path) {
+        continue;
+      }
+      const resolved = path.startsWith('/docs/')
+        ? resolve(outputDirectory, path.slice('/docs/'.length))
+        : resolve(join(outputDirectory, dirname(file)), path);
+      if (
+        existsSync(resolved) ||
+        existsSync(`${resolved}.html`) ||
+        existsSync(join(resolved, 'index.html'))
+      ) {
+        continue;
+      }
+      missing.push(`${file}: ${link}`);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(`Dead local links:\n${missing.join('\n')}`);
   }
 }
 
@@ -156,7 +234,7 @@ function assertBuiltPage() {
   if (!html.includes('href="/docs/assets/') && !html.includes('src="/docs/assets/')) {
     throw new Error('index.html does not reference /docs/assets/');
   }
-  for (const page of pages) {
+  for (const page of sourcePages()) {
     if (!existsSync(join(outputDirectory, `${page}.html`))) {
       throw new Error(`${page}.html is missing`);
     }
@@ -185,8 +263,8 @@ for (const file of listFiles(sourceCopyDirectory).filter((name) =>
   writeFileSync(path, rewriteLinks(readFileSync(path, 'utf8'), file));
 }
 
-assertLinksStayLocal(sourceCopyDirectory);
 assertSourceLinks();
+assertGithubLinksExist();
 
 writeFileSync(join(sourceCopyDirectory, 'index.md'), landingPage);
 
@@ -204,14 +282,15 @@ execFileSync(
   { cwd: root, stdio: 'inherit' },
 );
 
-assertBuiltPage();
-assertNoPrivilegedContent(outputDirectory);
-
 const customStylesheet = join(outputDirectory, 'custom.css');
 cpSync(join(VITEPRESS_DIRECTORY, 'custom.css'), customStylesheet);
 if (!existsSync(customStylesheet)) {
   throw new Error('custom.css is missing from the build');
 }
+
+assertBuiltPage();
+assertLocalLinksResolve();
+assertNoPrivilegedContent(outputDirectory);
 
 const metadata = {
   schema: 1,
@@ -228,7 +307,7 @@ const metadata = {
   docs: {
     path: docsPath,
     url: `${origin}${docsPath}`,
-    pages,
+    pages: sourcePages(),
   },
 };
 
