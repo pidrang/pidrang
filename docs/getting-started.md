@@ -15,7 +15,7 @@ npm install @pidrang/core @pidrang/supabase @pidrang/material @supabase/supabase
 ng add @angular/material
 ```
 
-`@pidrang/material` is one of two UI layers. To use Tailwind instead, install `@pidrang/tailwind` and skip `@angular/material`; see [Choosing a UI layer](#choosing-a-ui-layer).
+`@pidrang/material` is one of two UI layers. To use Tailwind instead, install `@pidrang/tailwind` and skip `@angular/material`; see [UI layers](./ui-layers/index.md).
 
 When you generate the app with [`pidrang init`](#generating-resources), it offers to run these commands for you.
 
@@ -245,19 +245,7 @@ await authProvider.login({ email, password });
 
 ## Choosing a UI layer
 
-| Package             | Styling                  | Notes                                                                              |
-| ------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
-| `@pidrang/material` | Angular Material         | Requires `@angular/material` and a Material theme.                                 |
-| `@pidrang/tailwind` | Tailwind utility classes | Ships no CSS. Add the library to your Tailwind build so its classes are generated. |
-
-Both expose the same `ResourceTable` and `ResourceForm` inputs and outputs. Each adapter has its own selectors, `pidrang-material-resource-table`/`pidrang-material-resource-form` and `pidrang-tailwind-resource-table`/`pidrang-tailwind-resource-form`, so an app can use both, and switching is a change of import and of the element name. For Tailwind, add a `@source` line pointing at the installed package in your global stylesheet:
-
-```css
-@import 'tailwindcss';
-@source '../node_modules/@pidrang/tailwind';
-```
-
-Adjust the relative path to where your stylesheet sits. See [`apps/demo-tailwind`](../apps/demo-tailwind) for a working setup.
+`@pidrang/material` and `@pidrang/tailwind` expose the same components, with different styling. Material needs a Material theme; Tailwind ships no CSS and needs a `@source` line in your global stylesheet. See [UI layers](./ui-layers/index.md), and [Angular Material](./ui-layers/material.md) or [Tailwind CSS](./ui-layers/tailwind.md) for the setup of each one.
 
 ## Generating resources
 

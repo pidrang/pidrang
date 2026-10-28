@@ -48,3 +48,7 @@ Behaviour:
 | Submit blocked while invalid. In create mode, blocking starts immediately; in edit mode only after the field is touched and dirty + invalid. | Depends on `shouldBlockSubmit(mode, dirty, invalid)`. Source: `libs/core/src/lib/resource-form-payload.ts` lines 50–56. |
 
 `ResourceForm` is remounted per resource and per record (via `@for (r of [key]; track r)` keyed on resource name or `` `${resource()}:${id()}` ``) so Signal Forms do not carry stale dirty state across navigations. Source: `docs/design-notes.md` line 95.
+
+## Choosing a layer
+
+[UI layers](../ui-layers/index.md) compares Material and Tailwind and says what the generator writes for each one.

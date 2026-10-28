@@ -8,7 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import {
   docsPath,
@@ -56,6 +56,7 @@ hero:
 
 - [Core](reference/core): the contracts, the providers and the injected helpers.
 - [Components](reference/components): ResourceTable and ResourceForm, with both UI layers.
+- [UI layers](ui-layers/): the same components on Angular Material and Tailwind, and which one to pick.
 - [CLI](reference/cli): commands, options, the plan file, exit codes and the files init writes.
 
 ## For maintainers
@@ -152,9 +153,11 @@ function assertSourceLinks() {
   for (const file of listFiles(sourceCopyDirectory).filter((name) =>
     name.endsWith('.md'),
   )) {
+    const fileDir = dirname(file);
     const content = readFileSync(join(sourceCopyDirectory, file), 'utf8');
     for (const [, link] of content.matchAll(localLink)) {
-      if (!existsSync(join(sourceCopyDirectory, link))) {
+      const resolved = resolve(sourceCopyDirectory, fileDir, link);
+      if (!existsSync(resolved)) {
         missing.push(`${file} links to missing ${link}`);
       }
     }

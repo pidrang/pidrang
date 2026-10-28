@@ -50,6 +50,14 @@ export default {
         ],
       },
       {
+        text: 'UI layers',
+        items: [
+          { text: 'Overview', link: '/ui-layers/' },
+          { text: 'Angular Material', link: '/ui-layers/material' },
+          { text: 'Tailwind CSS', link: '/ui-layers/tailwind' },
+        ],
+      },
+      {
         text: 'Reference',
         items: [
           { text: 'Core', link: '/reference/core' },
