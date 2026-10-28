@@ -5,7 +5,7 @@ export default {
   description:
     'Documentation for Pidrang, the headless admin framework for Angular.',
   lang: 'en-US',
-  appearance: 'dark',
+  appearance: 'force-dark',
   outDir: 'dist',
   ignoreDeadLinks: true,
   head: [
