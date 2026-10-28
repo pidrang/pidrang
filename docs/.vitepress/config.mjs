@@ -6,7 +6,6 @@ export default {
     'Documentation for Pidrang, the headless admin framework for Angular.',
   lang: 'en-US',
   appearance: 'dark',
-  // VitePress checks links relative to base; tools/docs/build.mjs checks them on the sources instead
   outDir: 'dist',
   ignoreDeadLinks: true,
   head: [
@@ -37,6 +36,7 @@ export default {
         items: [
           { text: 'Design notes', link: '/design-notes' },
           { text: 'Releasing', link: '/releasing' },
+          { text: 'Demo artifacts', link: '/demo-artifacts' },
         ],
       },
     ],
@@ -50,16 +50,21 @@ export default {
         ],
       },
       {
+        text: 'Reference',
+        items: [{ text: 'CLI', link: '/reference/cli' }],
+      },
+      {
         text: 'Maintainers',
         items: [
           { text: 'Design notes', link: '/design-notes' },
           { text: 'Releasing', link: '/releasing' },
+          { text: 'Demo artifacts', link: '/demo-artifacts' },
         ],
       },
     ],
     search: { provider: 'local' },
     editLink: {
-      pattern: 'https://github.com/pidrang/pidrang/edit/main/dist/docs-src/:path',
+      pattern: 'https://github.com/pidrang/pidrang/edit/main/docs/:path',
       text: 'Edit this page on GitHub',
     },
     socialLinks: [],

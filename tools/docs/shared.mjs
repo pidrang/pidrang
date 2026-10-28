@@ -19,14 +19,6 @@ export const base = '/docs/';
 
 export const docsPath = '/docs/';
 
-export const pages = [
-  'getting-started',
-  'architecture',
-  'data-providers',
-  'design-notes',
-  'releasing',
-];
-
 const GITHUB_BLOB = `https://github.com/${repository}/blob/${branch}`;
 
 const GITHUB_TREE = `https://github.com/${repository}/tree/${branch}`;

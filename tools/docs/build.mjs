@@ -14,7 +14,6 @@ import {
   docsPath,
   origin,
   outputDirectory,
-  pages,
   repository,
   rewriteLinks,
   root,
@@ -53,10 +52,15 @@ hero:
 - [Architecture](architecture): how the core, the data providers and the UI layers fit together.
 - [Data providers](data-providers): connect Pidrang to your own backend.
 
+## Reference
+
+- [CLI](reference/cli): commands, options, the plan file, exit codes and the files init writes.
+
 ## For maintainers
 
 - [Design notes](design-notes): the reason behind every non-obvious choice.
 - [Releasing](releasing): the release process.
+- [Demo artifacts](demo-artifacts): how the demos are built and deployed.
 
 ## Edit a page
 
@@ -74,6 +78,17 @@ function listFiles(directory, relative = '') {
       const path = relative ? `${relative}/${entry.name}` : entry.name;
       return entry.isDirectory() ? listFiles(directory, path) : [path];
     });
+}
+
+function sourcePages() {
+  return [
+    'index',
+    ...listFiles(sourceDirectory)
+      .filter((file) => file.endsWith('.md'))
+      .map((file) => file.slice(0, -'.md'.length))
+      .filter((page) => page !== 'index')
+      .sort(),
+  ];
 }
 
 function privilegedTokens(content) {
@@ -156,7 +171,7 @@ function assertBuiltPage() {
   if (!html.includes('href="/docs/assets/') && !html.includes('src="/docs/assets/')) {
     throw new Error('index.html does not reference /docs/assets/');
   }
-  for (const page of pages) {
+  for (const page of sourcePages()) {
     if (!existsSync(join(outputDirectory, `${page}.html`))) {
       throw new Error(`${page}.html is missing`);
     }
@@ -228,7 +243,7 @@ const metadata = {
   docs: {
     path: docsPath,
     url: `${origin}${docsPath}`,
-    pages,
+    pages: sourcePages(),
   },
 };
 
