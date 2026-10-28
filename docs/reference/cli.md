@@ -9,7 +9,7 @@
 | `pidrang init [--plan <file>] [--project <name>] [--skip-install]` | Scaffolds Resource definitions and CRUD pages into an Angular app. Run it from the workspace root. |
 | `pidrang generate auth [--project <name>]` | Writes the sign-in page the pages and the layout link to, when the app has none. |
 
-Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 103–151.
+Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 102–156.
 
 ## Options
 
@@ -158,7 +158,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 772–810 (resources edit, guard
 
 ## A new app and an existing app
 
-On a new app, `init` replaces the welcome page, generates the full page bundle (list, create, show, edit), creates the layout module with a sidebar, writes the sign-in page (when requested), and configures `app.html` to host the layout. On an existing app it only adds the resource routes to `app.routes.ts` and edits `resources.ts`.
+On a new app, `init` replaces the welcome page, generates the full page bundle (list, create, show, edit), creates the layout module with a sidebar, writes the sign-in page (when requested), and configures `app.html` to host the layout. On an existing app it adds the resource routes to `app.routes.ts` and edits `resources.ts` and `app.config.ts`, writes the sign-in page (always in an interactive run, or when the plan sets `signIn: true`), and leaves the pages it finds in place.
 
 The layout feature (`app-layout.ts`) is gated on four conditions met together: the app must be new (`ng new`'s `app.html` has not been changed), `app.html` must contain only `<app-layout>`, `app.ts` must match the `ng new` template, and the layout must be requested (`sidebar`). When any condition fails, `init` reports the missing files and skips the layout. An existing app kept its own `app.html` and never receives a layout.
 

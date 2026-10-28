@@ -4,7 +4,7 @@ Pidrang authorises nothing on its own. Every guarantee comes from the Row Level 
 
 ## Configure an auth provider
 
-Pass a `AuthProvider` to `providePidrang`:
+Pass an `AuthProvider` to `providePidrang`:
 
 ```ts
 providePidrang({
@@ -87,7 +87,7 @@ Demo policies for the three shared demo tables are defined in `pidrang/supabase`
 
 ## Guards on the generated routes
 
-`canMatchSignedIn(resources: readonly string[]): CanMatchFn` guards resource routes by checking whether the user is signed in. When `authProvider.getIdentity()` returns `null`, navigation through a guarded segment redirects to the sign-in path.
+`canMatchSignedIn(resources: readonly string[]): CanMatchFn` guards resource routes by checking whether the user is signed in. When `authProvider.getIdentity()` returns `null`, navigation through a guarded segment redirects to the sign-in path. The guard lets the navigation through without redirecting in four cases: no `AuthProvider` is configured (`AUTH_PROVIDER` is absent), no sign-in path is provided (see `provideSignInPath`), the first segment is not one of the guarded resources, or `getIdentity()` rejects.
 
 `pidrang init` adds `canMatchSignedIn([...])` to the routes of any table marked as needing a signed-in user:
 

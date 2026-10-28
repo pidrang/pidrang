@@ -39,7 +39,7 @@ Two notes:
 - The resource name may be a function (e.g. a route parameter signal); changing the return value reloads automatically.
 - When `params` returns `undefined`, loading is skipped entirely per `resource()`'s own convention.
 
-Source: `libs/core/src/lib/resource-list.ts` lines 11–27.
+Source: `libs/core/src/lib/resource-list.ts` lines 11–28.
 
 ## Reading the session
 
@@ -167,9 +167,9 @@ Source: `libs/core/src/lib/data-provider.ts` lines 4–13; `libs/core/src/lib/cr
 | Member | Type | What it does |
 |--------|------|-------------|
 | `login(params)` | `(params: LoginParams) => Promise<void>` | Authenticates the user with `email` + `password`. On success the session signal updates automatically. Source: `libs/core/src/lib/auth-provider.ts` line 12. |
-| `logout()` | `() => Promise<void>` | Signs out. Session becomes `null`. Source: same file, line 13. |
-| `getIdentity()` | `() => Promise<AuthIdentity \| null>` | Loads the current identity. Called once at startup and on each `reload()`. Source: same file, line 14. |
-| `onSessionChange?(listener)` | `(listener: () => void) => () => void` | Optional subscription to session events. Returns an unsubscribe function. Source: same file, line 15. |
+| `logout()` | `() => Promise<void>` | Signs out. Session becomes `null`. Source: same file, line 14. |
+| `getIdentity()` | `() => Promise<AuthIdentity \| null>` | Loads the current identity. Called once at startup and on each `reload()`. Source: same file, line 16. |
+| `onSessionChange?(listener)` | `(listener: () => void) => () => void` | Optional subscription to session events. Returns an unsubscribe function. Source: same file, line 18. |
 
 `interface LoginParams`: `{ email: string; password: string }`. Source: `libs/core/src/lib/auth-provider.ts` lines 1–4.
 
