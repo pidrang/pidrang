@@ -164,21 +164,38 @@ describe('ResourceForm', () => {
     expect(saved).toEqual([{ name: 'USB-C dock v2' }]);
   });
 
-  it('shows a hint on an untouched field with a server default, on create', async () => {
-    TestBed.configureTestingModule({ imports: [ResourceForm] });
+  it.each([
+    ['create', false, true],
+    ['create', true, false],
+    ['edit', false, false],
+    ['edit', true, false],
+  ] as const)(
+    'shows the server-default hint on %s with touched %s: %s',
+    async (mode, touched, showsHint) => {
+      TestBed.configureTestingModule({ imports: [ResourceForm] });
 
-    const fixture = TestBed.createComponent(ResourceForm);
-    fixture.componentRef.setInput('mode', 'create');
-    fixture.componentRef.setInput('fields', [
-      { name: 'status', type: 'text', hasDefault: true },
-    ]);
-    fixture.componentRef.setInput('value', { status: '' });
-    await fixture.whenStable();
+      const fixture = TestBed.createComponent(ResourceForm);
+      fixture.componentRef.setInput('mode', mode);
+      fixture.componentRef.setInput('fields', [
+        { name: 'status', type: 'text', hasDefault: true },
+      ]);
+      fixture.componentRef.setInput('value', { status: 'draft' });
+      await fixture.whenStable();
 
-    expect(fixture.nativeElement.textContent).toContain(
-      'Leave unchanged to use the database default.',
-    );
-  });
+      if (touched) {
+        const input: HTMLInputElement =
+          fixture.nativeElement.querySelector('input');
+        input.value = 'published';
+        input.dispatchEvent(new Event('input'));
+        await fixture.whenStable();
+      }
+
+      const text: string = fixture.nativeElement.textContent;
+      expect(
+        text.includes('Leave unchanged to use the database default.'),
+      ).toBe(showsHint);
+    },
+  );
 
   it('sends an explicit falsy value for a touched field that has a server default', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
