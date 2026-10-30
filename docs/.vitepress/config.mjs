@@ -1,10 +1,21 @@
+const origin = 'https://pidrang.dev';
+const socialCard = `${origin}/assets/social/social-card.png`;
+
+// cleanUrls serves index.md as its folder; the canonical must match the sitemap
+function canonicalUrl(relativePath) {
+  const clean = relativePath
+    .replace(/(^|\/)index\.md$/, '$1')
+    .replace(/\.md$/, '');
+  return `${origin}/docs/${clean}`;
+}
+
 export default {
   base: '/docs/',
   cleanUrls: true,
   title: 'Pidrang',
   description:
     'Documentation for Pidrang, the headless admin framework for Angular.',
-  lang: 'en-US',
+  lang: 'en',
   appearance: 'force-dark',
   outDir: 'dist',
   ignoreDeadLinks: true,
@@ -53,6 +64,7 @@ export default {
         text: 'Guide',
         items: [
           { text: 'Getting started', link: '/getting-started' },
+          { text: 'Write the pages yourself', link: '/manual-setup' },
           { text: 'Authentication', link: '/authentication' },
           { text: 'Architecture', link: '/architecture' },
           { text: 'Data providers', link: '/data-providers' },
@@ -94,5 +106,24 @@ export default {
         'MIT licensed. Inspired by Refine. Not affiliated with Angular or Refine.',
       copyright: 'Pidrang',
     },
+  },
+  transformHead({ pageData }) {
+    if (pageData.relativePath === '404.md') {
+      return [];
+    }
+    const url = canonicalUrl(pageData.relativePath);
+    const title = pageData.title || 'Pidrang documentation';
+    const description = pageData.description ?? '';
+    return [
+      ['link', { rel: 'canonical', href: url }],
+      ['meta', { property: 'og:type', content: 'website' }],
+      ['meta', { property: 'og:site_name', content: 'Pidrang' }],
+      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:description', content: description }],
+      ['meta', { property: 'og:url', content: url }],
+      ['meta', { property: 'og:image', content: socialCard }],
+      ['meta', { property: 'og:image:alt', content: 'Pidrang social card' }],
+      ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ];
   },
 };

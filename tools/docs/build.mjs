@@ -32,6 +32,8 @@ const JWT = /eyJ[A-Za-z0-9_-]{10,}\.([A-Za-z0-9_-]{10,})\.[A-Za-z0-9_-]{10,}/g;
 
 const landingPage = `---
 layout: home
+title: Documentation
+description: "Pidrang documentation: getting started, architecture, data providers, UI layers, reference and maintainer notes."
 
 hero:
   name: Pidrang
@@ -68,7 +70,8 @@ npx pidrang init
 
 ## The guide
 
-- [Getting started](getting-started): from a new Angular app to a working list, create and edit flow.
+- [Getting started](getting-started): generate the admin with \`pidrang init\`, on a new or an existing Angular app.
+- [Write the pages yourself](manual-setup): the same list, create, edit and sign-in pages, built by hand.
 - [Authentication](authentication): signing users in, and what the Row Level Security policies decide.
 - [UI layers](ui-layers/): the same components on Angular Material and Tailwind, and which one to pick.
 - [Architecture](architecture): how the core, the data providers and the UI layers fit together.
@@ -90,6 +93,53 @@ npx pidrang init
 
 function git(...args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+}
+
+// First prose paragraph of a page, as plain text, for the meta description
+function firstProse(markdown) {
+  const body = markdown
+    .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '')
+    .replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, '');
+  for (const block of body.split(/\r?\n\s*\r?\n/)) {
+    const raw = block.trim();
+    if (!raw || /^(#|>|\||`{3}|:::|<|[-*+] |\d+\. )/.test(raw)) {
+      continue;
+    }
+    const text = raw
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (text.length >= 60 && !text.endsWith(':')) {
+      return text;
+    }
+  }
+  return null;
+}
+
+function clamp(text, limit) {
+  if (text.length <= limit) {
+    return text;
+  }
+  const cut = text.slice(0, limit);
+  const space = cut.lastIndexOf(' ');
+  return `${cut.slice(0, space > 0 ? space : limit)}...`;
+}
+
+// VitePress reuses the site description otherwise; the sources keep no front matter
+function withDescription(markdown) {
+  if (/^---\r?\n[\s\S]*?\bdescription:/m.test(markdown)) {
+    return markdown;
+  }
+  const prose = firstProse(markdown);
+  if (!prose) {
+    return markdown;
+  }
+  const line = `description: ${JSON.stringify(clamp(prose, 155))}`;
+  return /^---\r?\n/.test(markdown)
+    ? markdown.replace(/^---\r?\n/, `---\n${line}\n`)
+    : `---\n${line}\n---\n\n${markdown}`;
 }
 
 function listFiles(directory, relative = '') {
@@ -259,7 +309,10 @@ for (const file of listFiles(sourceCopyDirectory).filter((name) =>
   name.endsWith('.md'),
 )) {
   const path = join(sourceCopyDirectory, file);
-  writeFileSync(path, rewriteLinks(readFileSync(path, 'utf8'), file));
+  writeFileSync(
+    path,
+    withDescription(rewriteLinks(readFileSync(path, 'utf8'), file)),
+  );
 }
 
 assertSourceLinks();
