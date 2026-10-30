@@ -14,7 +14,7 @@ providePidrang({
 });
 ```
 
-Without it, `injectAuthProvider()` throws a descriptive error if anything asks for it. See step 3 of [Getting started](./getting-started.md) for the full wiring.
+Without it, `injectAuthProvider()` throws a descriptive error if anything asks for it. `pidrang init` writes this into `app.config.ts`; see step 3 of [Write the pages yourself](./manual-setup.md) for the full wiring by hand.
 
 ## Read the session
 
@@ -31,21 +31,20 @@ See [Core reference — Reading the session](./reference/core.md#reading-the-ses
 
 ## Sign in and out
 
-A sign-in page calls `authProvider.login({ email, password })` and `authProvider.logout()`:
+A sign-in page calls `authProvider.login({ email, password })`; `authProvider.logout()` signs out. Both return a promise that rejects when the provider refuses, so show the failure:
 
 ```ts
-import { Component } from '@angular/core';
-import { injectAuthProvider } from '@pidrang/core';
-
-@Component({ selector: 'app-sign-in-page', template: '' })
-export class SignInPage {
-  private readonly authProvider = injectAuthProvider();
-
-  protected async login(email: string, password: string): Promise<void> {
+protected async submit(email: string, password: string): Promise<void> {
+  try {
     await this.authProvider.login({ email, password });
+    await this.router.navigateByUrl('/');
+  } catch (error) {
+    this.error.set(error instanceof Error ? error.message : String(error));
   }
 }
 ```
+
+A complete page, with its form, is in step 7 of [Write the pages yourself](./manual-setup.md).
 
 See the [Core reference — Authentication](./reference/core.md#authentication) for the `AuthProvider` interface contract.
 
