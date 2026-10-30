@@ -1,251 +1,81 @@
 # Getting started
 
-This guide takes a new Angular app to a working admin panel backed by Supabase: a list page, a create form and per-row actions, all driven by one `Resource` definition.
+Pidrang turns the tables of a Supabase project into an Angular admin: a list, create, show and edit page for each table, with sign-in. `pidrang init` reads your schema and generates it. This page sets up a new app, then an existing one; to write the pages by hand instead, see [Write the pages yourself](./manual-setup.md).
 
 ## Prerequisites
 
 - Node.js 22.22.3 or a later 22.x, 24.15.0 or a later 24.x, or 26 and later. `pidrang init` checks it and stops with a plain message on anything else.
-- An Angular 22.1 or a later 22.x application using standalone APIs and the router (`ng new my-admin`).
+- An Angular 22.1 or a later 22.x application using standalone APIs and the router, as `ng new` creates it.
 - A Supabase project with at least one table that has an `id` primary key column. Pidrang assumes `id` on every table; composite or differently named keys are not supported.
 - The project URL and the publishable key (formerly anon, `sb_publishable_...`), shown by the Connect button at the top of the Supabase dashboard.
 
 Two working examples show the result: [demo-material](https://pidrang.dev/demo-material/) and [demo-tailwind](https://pidrang.dev/demo-tailwind/), the same three resources on the two UI layers, listed at [pidrang.dev/demos](https://pidrang.dev/demos/).
 
-## 1. Install
+## Choose your path
+
+- **New app**: an app just created by `ng new`. `init` generates and wires everything, including a layout with a menu of the tables.
+- **Existing app**: an app with its own pages and routes. `init` adds the pages and the routes next to yours, and leaves the entry of the app to you.
+- **No CLI**: [Write the pages yourself](./manual-setup.md) with the same components.
+
+`init` treats an app as new when `src/app/app.html` still holds the welcome page of `ng new` and `app.routes.ts` declares no route. Anything else is an existing app.
+
+## New app
 
 ```bash
-npm install @pidrang/core @pidrang/supabase @pidrang/material @supabase/supabase-js
-ng add @angular/material
+ng new my-admin
+cd my-admin
+npx pidrang init
 ```
 
-`@pidrang/material` is one of two UI layers. To use Tailwind instead, install `@pidrang/tailwind` and skip `@angular/material`; see [UI layers](./ui-layers/index.md).
+`init` asks, in order:
 
-When you generate the app with [`pidrang init`](#generating-resources), it offers to run these commands for you.
+1. The project URL of your Supabase project.
+2. How to read your table definitions: the secret key, a direct database connection, or GraphQL with the publishable key. The secret key and the database password are used to read the schema only; `init` does not write them into the app.
+3. The tables to scaffold, the actions each one supports (list, create, show, edit, delete) and the fields to hide.
+4. Whether to add the navigation layout and the sign-in page, both yes by default, and whether your tables need a signed-in user to be read.
+5. Whether to install the packages the app is missing among `@pidrang/core`, `@pidrang/supabase`, `@supabase/supabase-js` and `@pidrang/material`, and to run `ng add @angular/material`.
 
-## 2. Describe your resources
+It writes `src/environments/environment.ts` and `environment.development.ts` with your project URL and a placeholder for the key. Replace `supabasePublishableKey` in both with the publishable key of the project: the app runs in the browser, so never put the secret key or the database password there.
 
-A `Resource` names a table and lists its typed fields. UI layers render tables and forms from `fields`, so you never hand-write a column or an input.
-
-```ts
-import { Resource } from '@pidrang/core';
-
-export const resources: Resource[] = [
-  {
-    name: 'products',
-    fields: [
-      { name: 'id', type: 'text', readOnly: true },
-      { name: 'name', type: 'text' },
-      { name: 'price', type: 'number' },
-      { name: 'in_stock', label: 'In stock', type: 'boolean' },
-      {
-        name: 'created_at',
-        label: 'Created at',
-        type: 'timestamp',
-        readOnly: true,
-        hasDefault: true,
-      },
-    ],
-  },
-];
+```bash
+ng serve
 ```
 
-`name` must match the Supabase table name. Field types are `'text'`, `'number'`, `'boolean'`, `'date'`, `'timestamp'`, `'time'` and `'numeric'`. `date`, `timestamp`, `time` and `numeric` are kept as plain strings end to end, never converted through `Date` or `Number`, so a calendar date, a zoned time or a `bigint`/high-precision `numeric` value round-trips without losing anything. `label` overrides the column header and form label; `hidden: true` marks a field a generic list or edit page should skip. `readOnly: true` keeps a field out of create/edit forms entirely — use it for a primary key or any column the database generates. An untouched field is left out of what gets saved — on create and on edit alike — so the server's own default or `NULL` applies instead of a client-side placeholder. The one exception is a `boolean` or `number` without `hasDefault` on create: an unchecked box is a real `false` and a `0` in a number input is a real `0`, so the value shown is sent. `hasDefault: true` also shows a hint ("Leave unchanged to use the database default.") on create so the user knows a blank field isn't actually going to be sent blank, and exempts the field from the "required" check below while it's still untouched. `nullable: true` lets a `timestamp`/`time`/`numeric`/`date` field be cleared (sent as `null`) rather than blocked as invalid when empty — without it, a non-nullable one of those four types blocks submit with an inline hint if left empty (once touched, or once a submit is attempted). `list`, `create`, `show`, `edit` and `delete` are optional flags, enabled when omitted; set one to `false` to hide that action and refuse its route in the generic pages. `defaultSorters` sets the order of the generic list page, with the same shape as the `sorters` of `ListParams` (for example `[{ field: 'created_at', order: 'desc' }, { field: 'id', order: 'asc' }]` to show the newest rows first); without it, the list is sorted by `id`.
+Open `http://localhost:4200`. The app opens on the list of the first table you picked, or on the sign-in page when your tables need a signed-in user to be read. The menu of the layout lists the tables, and its Sign in link opens `/sign-in`.
 
-Instead of writing this by hand, the `pidrang init` CLI can introspect your Supabase schema and generate `resources.ts` for you. See [Generating resources](#generating-resources).
+What `init` wrote:
 
-## 3. Register Pidrang
+- `src/app/resources.ts`: one `Resource` per table, with its typed fields. Edit it to rename a label, hide a field or turn an action off.
+- `src/app/resource-routes.ts`: the routes `:resource`, `:resource/create`, `:resource/:id` and `:resource/:id/edit`, with their guards, and the `sign-in` route.
+- `src/app/pages/` and `src/app/pidrang/`: the List, Create, Show, Edit and sign-in pages, and the helpers they call.
+- `src/app/layout/`: the navigation layout.
+- `app.config.ts`, `app.routes.ts` and `app.html`, edited to register Pidrang, add the routes and host the layout.
 
-Create a Supabase client once and hand it to both providers. `providePidrang` is the only place that touches Angular DI.
+The pages are rendered with Angular Material. The layout follows the UI layer of the app: Tailwind when `package.json` declares `@pidrang/tailwind`, Angular Material otherwise. Every file and every option is in [the CLI reference](./reference/cli.md).
 
-```ts
-import { ApplicationConfig } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
-import { providePidrang } from '@pidrang/core';
-import { provideSupabaseAuthProvider, provideSupabaseDataProvider } from '@pidrang/supabase';
-import { createClient } from '@supabase/supabase-js';
+## Existing app
 
-import { appRoutes } from './app.routes';
-import { resources } from './resources';
+From the workspace root of the app:
 
-const client = createClient('https://YOUR-PROJECT.supabase.co', 'YOUR-PUBLISHABLE-KEY');
-
-export const appConfig: ApplicationConfig = {
-  providers: [
-    provideRouter(appRoutes, withComponentInputBinding()),
-    providePidrang({
-      dataProvider: provideSupabaseDataProvider({ client }),
-      authProvider: provideSupabaseAuthProvider({ client }),
-      resources,
-    }),
-  ],
-};
+```bash
+npx pidrang init
 ```
 
-`withComponentInputBinding()` is what carries the `:resource` and `:id` segments to the pages' inputs; without it the pages render blank. `authProvider` is optional. Without it, `injectAuthProvider()` throws a descriptive error if something asks for it.
+It asks the same questions, except the layout, which an existing app never gets, and the sign-in page, which it writes unless `app.routes.ts` already declares a `sign-in` route. Then it:
 
-## 4. Build a list page
+- Writes `resources.ts`, `resource-routes.ts`, the pages and the helpers, as on a new app. A file that already exists with other content stops `init` before it writes anything, and lists the paths: move or rename yours, then run it again.
+- Adds `...resourceRoutes` at the top of the routes array of `app.routes.ts`, and registers Pidrang and `withComponentInputBinding()` in `app.config.ts`.
+- Replaces the welcome page of `app.html` with `<router-outlet />`, and leaves a template that already has an outlet as it is.
+- Writes the environment files when the app has none. When it has, `init` prints the `supabaseUrl` and `supabasePublishableKey` lines to add to `src/environments/environment.ts`.
 
-`injectResourceList` wraps `DataProvider.getList` in Angular's native `resource()`, so `value()`, `isLoading()`, `error()` and `reload()` are all signals. Passing a function as the resource name lets one component serve every resource from a route parameter.
+When a file cannot be edited safely, `init` adds a `pidrang` comment at its top that lists the exact change to make.
 
-```ts
-import { Component, computed, input } from '@angular/core';
-import { injectResourceList, injectResources } from '@pidrang/core';
-import { ResourceTable } from '@pidrang/material';
+Two things stay with you:
 
-type Row = { id: string } & Record<string, unknown>;
+- **The entry of the app.** Your own `''` route keeps opening your home page. When the app has none, `init` prints the redirect to add above your other routes, for example `{ path: '', pathMatch: 'full', redirectTo: '/products' }`. The generated pages are at `/<table>` either way.
+- **The sign-in guard.** For the tables that need a signed-in user to be read, `init` adds the guard only on a new app, or extends the one an earlier run wrote. On an existing app it names those tables instead; see [Guards on the generated routes](./authentication.md#guards-on-the-generated-routes).
 
-@Component({
-  selector: 'app-resource-list-page',
-  imports: [ResourceTable],
-  template: `
-    <h1>{{ resource() }}</h1>
-
-    @if (list.isLoading()) {
-      <p>Loading...</p>
-    }
-    @if (list.error(); as error) {
-      <p>{{ error.message }}</p>
-    }
-
-    <pidrang-material-resource-table [fields]="fields()" [data]="list.value()?.data ?? []" />
-  `,
-})
-export class ResourceListPage {
-  readonly resource = input.required<string>();
-
-  private readonly resources = injectResources();
-  protected readonly list = injectResourceList<Row>(() => this.resource());
-  protected readonly fields = computed(() => this.resources.find((resource) => resource.name === this.resource())?.fields?.filter((field) => !field.hidden) ?? []);
-}
-```
-
-Route it with a `:resource` segment:
-
-```ts
-import { Route } from '@angular/router';
-import { ResourceListPage } from './resource-list-page';
-
-export const appRoutes: Route[] = [{ path: ':resource', component: ResourceListPage }];
-```
-
-Input binding is enabled in `app.config.ts` above; the route parameter would not reach the `resource` input without it. Open `/products` and the table renders one column per non-hidden field.
-
-To page, sort or filter, pass a params function as the second argument. Returning `undefined` from it skips loading. Without pagination, `getList` returns the first 10 rows. `current` and `pageSize` must be positive integers, each sorter needs a `field` and an `order` of `asc` or `desc`, and filters must fit their operator; anything else is rejected before a request is sent. `ListResult.total` holds the full row count, so you can build a pager.
-
-```ts
-injectResourceList<Row>(
-  () => this.resource(),
-  () => ({
-    pagination: { current: this.page(), pageSize: 20 },
-    sorters: [{ field: 'created_at', order: 'desc' }],
-    filters: [
-      { field: 'in_stock', operator: 'eq', value: true },
-      { field: 'name', operator: 'contains', value: 'mouse' },
-    ],
-  }),
-);
-```
-
-Filters combine with AND. The operators are `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `in`, `contains` (case-insensitive, text columns only) and `null`; each operator only accepts its own value type, so `filters: [{ field: 'tags', operator: 'in', value: 'x' }]` does not compile; the shorthand `filters: { in_stock: true }` still works for equality. See [Writing a data provider](./data-providers.md#filters) for the exact semantics.
-
-## 5. Per-row actions
-
-`ResourceTable` projects an `#actions` template as a trailing column with an `Actions` header. The row is available as the implicit context variable. A data field may itself be named `actions`: it gets its own column next to the projected one.
-
-```html
-<pidrang-material-resource-table [fields]="fields()" [data]="list.value()?.data ?? []">
-  <ng-template #actions let-row>
-    <a [routerLink]="['/', resource(), row.id, 'edit']">Edit</a>
-    <button type="button" (click)="remove(row.id)">Delete</button>
-  </ng-template>
-</pidrang-material-resource-table>
-
-@if (deleteError(); as message) {
-<p role="alert">{{ message }}</p>
-}
-```
-
-The template uses `routerLink`, so add `RouterLink` from `@angular/router` to the `imports` of the component. Deleting is irreversible, so ask for confirmation and surface a failure (for example a Row Level Security rejection) instead of letting the promise reject silently. The method belongs to the page of step 4; add `import { injectDataProvider } from '@pidrang/core';` and `import { signal } from '@angular/core';` to its imports.
-
-```ts
-private readonly dataProvider = injectDataProvider();
-protected readonly deleteError = signal<string | null>(null);
-
-protected async remove(id: string): Promise<void> {
-  if (!confirm('Delete this record?')) {
-    return;
-  }
-  try {
-    await this.dataProvider.delete(this.resource(), { id });
-    this.deleteError.set(null);
-    this.list.reload();
-  } catch (error) {
-    this.deleteError.set(error instanceof Error ? error.message : String(error));
-  }
-}
-```
-
-The list pages of `apps/demo-material` and `apps/demo-tailwind`, and the pages `pidrang init` generates, go further: they block repeated clicks while a delete is in flight, keep deletes of that resource blocked across visits until it settles and, when you come back before it settles, say how it ended, keep the row on failure, and use the `PidrangError` `category` to ask the user to sign in on `unauthenticated` or say the user is not allowed on `forbidden`. The sign-in prompt is plain text unless your app calls `provideSignInPath`, see [The sign-in page](./reference/cli.md#the-sign-in-page).
-
-`DataProvider` exposes `getList`, `getOne`, `create`, `update` and `delete`. Each takes the resource name and a params object (`{ id }`, `{ data }` or `{ id, data }`).
-
-## 6. Create and edit forms
-
-`ResourceForm` renders one input per field, built on Angular Signal Forms. It never mutates the `value` you pass in; it emits a payload through `save`, which only ever contains a field you actually changed — on create as much as on edit — so the server's own default or `NULL` applies to anything left alone, and a precise `numeric` or a zoned `timestamp` round-trips unchanged instead of being re-serialized. The required `[mode]` input is `'create'` or `'edit'`: on edit, `save` does not emit at all when nothing was changed, since there would be nothing to `PATCH`; on create it still emits (possibly an empty object), since creating a row from nothing but defaults is a normal thing to do.
-
-```ts
-import { Component, computed, inject, input } from '@angular/core';
-import { Router } from '@angular/router';
-import { injectDataProvider, injectResources } from '@pidrang/core';
-import { ResourceForm } from '@pidrang/material';
-
-@Component({
-  selector: 'app-resource-create-page',
-  imports: [ResourceForm],
-  template: `
-    <h1>Create {{ resource() }}</h1>
-    <pidrang-material-resource-form mode="create" [fields]="fields()" [value]="initialValue()" (save)="submit($event)" />
-  `,
-})
-export class ResourceCreatePage {
-  readonly resource = input.required<string>();
-
-  private readonly dataProvider = injectDataProvider();
-  private readonly router = inject(Router);
-  private readonly resources = injectResources();
-
-  protected readonly fields = computed(() => this.resources.find((resource) => resource.name === this.resource())?.fields?.filter((field) => !field.readOnly) ?? []);
-
-  protected readonly initialValue = computed(() => Object.fromEntries(this.fields().map((field) => [field.name, field.type === 'number' ? 0 : field.type === 'boolean' ? false : ''])));
-
-  protected async submit(data: Record<string, unknown>): Promise<void> {
-    await this.dataProvider.create(this.resource(), { data });
-    await this.router.navigate(['/', this.resource()]);
-  }
-}
-```
-
-`readOnly: true` (on `id`, or on any column the database generates or defaults, like `created_at` above) keeps that field out of the form entirely, on both create and edit. Bind `[pending]` to a signal that is `true` while the save runs: the form then disables its submit button and ignores further submits, so a double click cannot create two rows. An edit page is the same component with `mode="edit"`, fed with `dataProvider.getOne(resource, { id })` as the initial value and `dataProvider.update(resource, { id, data })` on save. The complete List, Create, Show and Edit pages live in [`apps/demo-material`](../apps/demo-material/src/app/pages). They go further: the flag is held per record (per resource for a create) across visits, a page that comes back while a save runs waits for it and then says whether it finished or failed, a request with no answer after 30 seconds shows a message above a disabled form, on every page of that record, until the server answers and the page says how that save ended, and a save whose next page does not open says it was saved. See [the save lock](./design-notes.md#the-save-lock-keeps-only-running-saves-with-a-30-second-timeout) for how it works and its limits.
-
-## 7. Sign in
-
-A sign-in page calls `authProvider.login({ email, password })` and `logout()`:
-
-```ts
-import { Component } from '@angular/core';
-import { injectAuthProvider } from '@pidrang/core';
-
-@Component({ selector: 'app-sign-in-page', template: '' })
-export class SignInPage {
-  private readonly authProvider = injectAuthProvider();
-
-  protected async login(email: string, password: string): Promise<void> {
-    await this.authProvider.login({ email, password });
-  }
-}
-```
-
-See [Authentication and permissions](./authentication.md) for the full walkthrough.
+To add a table later, run `init` again: see [A second run](./reference/cli.md#a-second-run).
 
 ## Row Level Security
 
@@ -255,13 +85,7 @@ See [Authentication and permissions](./authentication.md) for the full walkthrou
 
 `@pidrang/material` and `@pidrang/tailwind` expose the same components, with different styling. Material needs a Material theme; Tailwind ships no CSS and needs a `@source` line in your global stylesheet. See [UI layers](./ui-layers/index.md), and [Angular Material](./ui-layers/material.md) or [Tailwind CSS](./ui-layers/tailwind.md) for the setup of each one.
 
-## Generating resources
-
-`pidrang init` reads your Supabase schema, writes `resources.ts`, the resource routes and the generic List, Create, Show and Edit pages, wires the app itself and offers to install the packages it needs. It asks for the project URL first, then how to read your table definitions, then the tables and their actions; `--plan` answers the questions from a JSON file instead.
-
-Every question, option, exit code and generated file is in [the CLI reference](./reference/cli.md). To add a table to an app init already set up, run it again: see [A second run](./reference/cli.md#a-second-run).
-
-### Troubleshooting
+## Troubleshooting
 
 The app still shows the Angular welcome page: `app.html` still holds it. Init replaces that template with `<router-outlet />` or the navigation layout; if you had already changed the file and it has no outlet, the page renders nothing below your content, so add `<router-outlet />` where the pages should appear.
 
@@ -281,6 +105,7 @@ Requests fail with an invalid API key or do not reach Supabase: `supabaseUrl` an
 
 ## Next steps
 
+- [Write the pages yourself](./manual-setup.md): the same pages built by hand, step by step.
 - [Architecture](./architecture.md): how core, the data providers and the UI layers fit together.
 - [`ROADMAP.md`](../ROADMAP.md): what is planned.
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md): how to contribute.

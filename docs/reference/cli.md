@@ -56,19 +56,19 @@ When the connection attempt fails, the wizard repeats the question with the reje
 |------|-----------------|------|
 | `src/app/resources.ts` | `export const resources: Resource[] = [...]` — one entry per selected table: `{ name, label, fields, defaultSorters?, list, create, show, edit, delete }`. Each field is `{ name, label, type, hidden?, readOnly?, nullable?, hasDefault? }`, inferred from introspection; a field named in the plan file's `hiddenFields` is written with `hidden: true`. `defaultSorters` is written only when a `timestamp` or `date` `created_at` column exists. | Every run. Edited in-place on subsequent runs. |
 | `src/app/resource-routes.ts` | Generic routes `:resource`, `:resource/create`, `:resource/:id/edit`, `:resource/:id` pointing to generated pages, with `canMatch` guards. | Every run. Regenerated; an existing guard list is extended in place. |
-| `src/app/pages/resource-list-page.ts` | List page using `injectResourceList`, `ResourceTable`, with actions projected. | New app only (conflict on existing). |
-| `src/app/pages/resource-create-page.ts` | Create page using `ResourceForm`, calls `dataProvider.create`. | Same as list page. |
-| `src/app/pages/resource-show-page.ts` | Show page displaying fields and links to edit/delete. | Same as list page. |
-| `src/app/pages/resource-edit-page.ts` | Edit page using `ResourceForm`, calls `dataProvider.update`, with a Delete button calling `deleteProvider.delete`. | Same as list page. |
-| `src/app/pidrang/...` | Helpers: `provide-sign-in-path`, `can-match-signed-in`, route utils, etc. | Same as list page. |
+| `src/app/pages/resource-list-page.ts` | List page using `injectResourceList`, `ResourceTable`, with actions projected. | Every run, on a new or an existing app. A file already there with other content stops `init` before any write. |
+| `src/app/pages/resource-create-page.ts` | Create page using `ResourceForm`, calls `dataProvider.create`. | Same as the list page. |
+| `src/app/pages/resource-show-page.ts` | Show page displaying fields and links to edit/delete. | Same as the list page. |
+| `src/app/pages/resource-edit-page.ts` | Edit page using `ResourceForm`, calls `dataProvider.update`, with a Delete button calling `deleteProvider.delete`. | Same as the list page. |
+| `src/app/pidrang/...` | Helpers: `provide-sign-in-path`, `can-match-signed-in`, route utils, etc. | Same as the list page. |
 | `src/app/layout/app-layout.ts` | Navigation layout component with header and sidebar menu. | Only when layout is `"sidebar"` on a new app. |
 | `src/app/pages/sign-in-page.ts` | Sign-in page component. | New app: when you accept the sign-in question. Existing app in an interactive run: always. Existing app driven by a plan: when the plan sets `signIn: true`. Omitted when `app.routes.ts` already declares the route. `pidrang generate auth` writes it on demand. |
 | `app.config.ts` | Adds `providePidrang()`, provides `provideSignInPath()` if configured. | Every run. |
 | `app.routes.ts` | Appends the resource routes import, entry redirect for new apps. | Every run. |
-| `angular.json` | Adds environment file replacements when `src/environments/` did not exist. | New app only. |
-| `src/environments/environment.ts` | Supabase URL and publishable key. | New app only. |
+| `angular.json` | Adds environment file replacements. | When the app had neither `environment.ts` nor `environment.development.ts`, on a new or an existing app. |
+| `src/environments/environment.ts` and `environment.development.ts` | Supabase URL and a placeholder for the publishable key. | Same as `angular.json`. Otherwise `init` prints the lines to add. |
 
-How it wires the app itself is described in [Generating resources](../getting-started.md#generating-resources). The resource routes guard every `:resource` action with both `canMatchResourceAction(...)` and `canMatchSignedIn([...])` when the corresponding tables need a signed-in user. A file it writes is never overwritten: one that already exists with other content stops `init` before any write. An existing `resources.ts` is edited instead: a second run appends the tables it does not list yet and leaves the others as they are.
+How it wires the app itself is described in [Getting started](../getting-started.md#existing-app). The resource routes guard every `:resource` action with both `canMatchResourceAction(...)` and `canMatchSignedIn([...])` when the corresponding tables need a signed-in user. A file it writes is never overwritten: one that already exists with other content stops `init` before any write. An existing `resources.ts` is edited instead: a second run appends the tables it does not list yet and leaves the others as they are.
 
 Sources: `libs/cli/src/lib/generate-pages-bundle.ts` (`PAGES_UI_LAYER_PACKAGES`, lines 70–73), `libs/cli/src/lib/generated-pages.ts` (page file list), `libs/cli/src/lib/generate-resources-file.ts` (resources.ts generation), `libs/cli/src/lib/build-sign-in-page.ts` (sign-in page generation), `libs/cli/src/lib/generate-layout-module.ts` (layout generation), `apps/pidrang-cli/src/edit-app-config.ts`, `apps/pidrang-cli/src/edit-app-routes.ts`.
 
@@ -158,7 +158,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 772–810 (resources edit, guard
 
 ## A new app and an existing app
 
-On a new app, `init` replaces the welcome page, generates the full page bundle (list, create, show, edit), creates the layout module with a sidebar, writes the sign-in page (when requested), and configures `app.html` to host the layout. On an existing app it adds the resource routes to `app.routes.ts` and edits `resources.ts` and `app.config.ts`, writes the sign-in page (always in an interactive run, or when the plan sets `signIn: true`), and leaves the pages it finds in place.
+On a new app, `init` replaces the welcome page, generates the full page bundle (list, create, show, edit), creates the layout module with a sidebar, writes the sign-in page (when requested), and configures `app.html` to host the layout. On an existing app it adds the resource routes to `app.routes.ts` and edits `resources.ts` and `app.config.ts`, writes the same pages and helpers as on a new app, and the sign-in page (always in an interactive run, or when the plan sets `signIn: true`). A page already there with other content stops `init` before any write. It adds no layout and no entry redirect: when `app.routes.ts` has no `''` route, it prints the redirect to add.
 
 The layout feature (`app-layout.ts`) is gated on four conditions met together: the app must be new (`ng new`'s `app.html` has not been changed), `app.html` must contain only `<app-layout>`, `app.ts` must match the `ng new` template, and the layout must be requested (`sidebar`). When any condition fails, `init` reports the missing files and skips the layout. An existing app kept its own `app.html` and never receives a layout.
 
