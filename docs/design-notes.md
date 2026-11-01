@@ -278,11 +278,13 @@ A second run must not undo what the app already set up: running the Material sch
 
 ### A new app opens on its first list
 
-`apps/pidrang-cli/src/edit-app-routes.ts` (`isNewApp`, `declaresEntryRoute`), `entry-redirect.ts`, `run-cli.ts`
+`apps/pidrang-cli/src/edit-app-routes.ts` (`isNewApp`, `declaresEntryRoute`), `entry-redirect.ts`, `edit-resources.ts` (`existingEntryActions`), `run-cli.ts`
 
 `ng new` leaves `/` on an empty view once the welcome template is gone, so a new app showed nothing until the user typed a resource URL (#125). Init now redirects `''` to the first generated page, but only on a new app: an `app.routes.ts` that exports an empty `routes` array and an `app.html` that still holds the welcome template. An app with its own routes decides what it opens on, so init only prints the redirect line there, and not even that when `app.routes.ts` already declares a `''` route. Without `typescript`, the empty array and the `''` route are found with a pattern instead of the syntax tree.
 
-The target is the list of the first table that has one, and the create page of the first table that has one only when no table has a list: a form is a poor first screen when a list exists further down. Tables keep the order the provider lists them in. When those reads need a signed-in user, the routes of that table are guarded instead, see [A new app whose tables need a signed-in user opens on the sign-in page](#a-new-app-whose-tables-need-a-signed-in-user-opens-on-the-sign-in-page).
+The target is the list of the first table that has one, and the create page of the first table that has one only when no table has a list: a form is a poor first screen when a list exists further down. Tables keep the order the provider lists them in.
+
+The pages that exist are the ones `resources.ts` enables at the end of the run, not the answers: a resource already in the file is kept as it is, so a kept `{ name: 'products', list: false }` has no list even when this run selects one, and `/products` would show "resource unavailable" (#145). The choice therefore reads `list` and `create` from each kept resource, like `isResourceActionEnabled` does (omitted or `true` is on, `false` is off), and takes the answers only for the tables this run adds. Only the tables of this run are candidates, in the same order; a resource of the file that this run does not touch is never the target. A flag that is not a literal (`list: SHOW_LISTS`), or a table that is not in the file after the run (`resources.ts` could only get a `// pidrang:` comment, on this run or on a rerun before the change is made), leaves the choice open when no earlier table settles it: init then adds no redirect and says why, with the line to write. The message an app with its own routes gets follows the same choice. When those reads need a signed-in user, the routes of that table are guarded instead, see [A new app whose tables need a signed-in user opens on the sign-in page](#a-new-app-whose-tables-need-a-signed-in-user-opens-on-the-sign-in-page).
 
 ### A new app whose tables need a signed-in user opens on the sign-in page
 

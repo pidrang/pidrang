@@ -249,6 +249,62 @@ function resourceName(
   return named[0].initializer.text;
 }
 
+export type ActionState = 'enabled' | 'disabled' | 'unknown';
+
+export interface EntryActions {
+  list: ActionState;
+  create: ActionState;
+}
+
+function actionState(
+  typescript: TypeScriptApi,
+  element: ts.ObjectLiteralExpression,
+  action: keyof EntryActions,
+): ActionState {
+  const properties = element.properties.filter(
+    (property) => propertyName(typescript, property) === action,
+  );
+  if (properties.length === 0) {
+    return 'enabled';
+  }
+  if (
+    properties.length > 1 ||
+    !typescript.isPropertyAssignment(properties[0])
+  ) {
+    return 'unknown';
+  }
+  const value = unwrapExpression(typescript, properties[0].initializer);
+  if (value.kind === typescript.SyntaxKind.TrueKeyword) {
+    return 'enabled';
+  }
+  return value.kind === typescript.SyntaxKind.FalseKeyword
+    ? 'disabled'
+    : 'unknown';
+}
+
+export function existingEntryActions(
+  typescript: TypeScriptApi,
+  path: string,
+  raw: string,
+): Map<string, EntryActions> {
+  const file = parseSource(typescript, path, raw.replace(/\r\n/g, '\n'));
+  const actions = new Map<string, EntryActions>();
+  for (const element of exportedResources(typescript, file)?.elements ?? []) {
+    const name = resourceName(typescript, element);
+    if (
+      name !== null &&
+      !actions.has(name) &&
+      typescript.isObjectLiteralExpression(element)
+    ) {
+      actions.set(name, {
+        list: actionState(typescript, element, 'list'),
+        create: actionState(typescript, element, 'create'),
+      });
+    }
+  }
+  return actions;
+}
+
 function hasSyntaxError(typescript: TypeScriptApi, source: string): boolean {
   const { diagnostics } = typescript.transpileModule(source, {
     reportDiagnostics: true,

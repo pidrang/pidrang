@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import * as typescript from 'typescript';
 import { TablePlan, generateResourcesFile } from '@pidrang/cli';
-import { editResources } from './edit-resources';
+import { editResources, existingEntryActions } from './edit-resources';
 
 const NO_CORE = { root: join(tmpdir(), 'pidrang-no-app'), tsConfig: null };
 const PROJECT: { root: string; tsConfig: string | null } = {
@@ -961,5 +961,75 @@ export const resources: Resource[] = [
         reason: expect.stringMatching(/^the array would not type-check/),
       });
     });
+  });
+});
+
+describe('existingEntryActions', () => {
+  const read = (body: string) =>
+    existingEntryActions(
+      typescript,
+      'src/app/resources.ts',
+      `${IMPORT}\nexport const resources: Resource[] = [\n${body}\n];\n`,
+    );
+
+  it.each([
+    ['omitted', '', 'enabled'],
+    ['true', 'list: true, create: true,', 'enabled'],
+    ['false', 'list: false, create: false,', 'disabled'],
+    [
+      'false behind as const',
+      'list: false as const, create: (false),',
+      'disabled',
+    ],
+    ['a constant', 'list: SHOW, create: SHOW,', 'unknown'],
+    ['an expression', 'list: !HIDE, create: 1 > 0,', 'unknown'],
+    ['a shorthand property', 'list, create,', 'unknown'],
+  ])('reads list and create set to %s', (_, flags, state) => {
+    expect(read(`  { name: 'products', ${flags} },`).get('products')).toEqual({
+      list: state,
+      create: state,
+    });
+  });
+
+  it('reads each flag on its own', () => {
+    expect(
+      read("  { name: 'products', list: false },").get('products'),
+    ).toEqual({ list: 'disabled', create: 'enabled' });
+  });
+
+  it('reads the first resource of a name, as the app finds it', () => {
+    expect(
+      read("  { name: 'products', list: false },\n  { name: 'products' },").get(
+        'products',
+      ),
+    ).toEqual({ list: 'disabled', create: 'enabled' });
+  });
+
+  it('reads the generated file like the plan it came from', () => {
+    const tables: TablePlan[] = [
+      {
+        table: 'products',
+        actions: ['show', 'create'],
+        fields: [{ name: 'id', type: 'number' }],
+        hiddenFields: [],
+      },
+    ];
+    expect(
+      existingEntryActions(
+        typescript,
+        'src/app/resources.ts',
+        generateResourcesFile({ providerId: 'fake', tables }),
+      ).get('products'),
+    ).toEqual({ list: 'disabled', create: 'enabled' });
+  });
+
+  it('reads Windows line endings', () => {
+    expect(
+      existingEntryActions(
+        typescript,
+        'src/app/resources.ts',
+        `${IMPORT}\nexport const resources: Resource[] = [\r\n  { name: 'products', list: false },\r\n];\r\n`,
+      ).get('products'),
+    ).toEqual({ list: 'disabled', create: 'enabled' });
   });
 });

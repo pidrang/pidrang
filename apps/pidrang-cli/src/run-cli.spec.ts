@@ -1979,6 +1979,149 @@ export const routes: Routes = [
     });
   });
 
+  describe('where / opens when resources.ts is already there', () => {
+    const RESOURCES = 'src/app/resources.ts';
+    const handWritten = (body: string, before = '') =>
+      `import { Resource } from '@pidrang/core';\n${before}\nexport const resources: Resource[] = [\n${body}\n];\n`;
+    const run = async (plan: unknown) =>
+      runCli(
+        ['init', '--plan', await planFile(plan)],
+        context(undefined, STRUCTURAL),
+      );
+    const UNDECIDED =
+      'pidrang did not choose the page / opens: it cannot tell from src/app/resources.ts whether "products" has the page it would open.';
+
+    it('skips a kept resource whose list is turned off', async () => {
+      await put(
+        newAppFiles({
+          [RESOURCES]: handWritten("  { name: 'products', list: false },"),
+        }),
+      );
+      await installCore();
+
+      expect(await run(TWO_TABLES)).toBe(0);
+
+      const routes = (await snapshot())['src/app/app.routes.ts'];
+      expect(routes).toContain(
+        "{ path: '', pathMatch: 'full', redirectTo: '/orders' }",
+      );
+      expect(routes).not.toContain("redirectTo: '/products'");
+    });
+
+    it('opens the create page a kept resource leaves on when its list is off', async () => {
+      await put(
+        newAppFiles({
+          [RESOURCES]: handWritten("  { name: 'products', list: false },"),
+        }),
+      );
+      await installCore();
+
+      expect(await run(PLAN)).toBe(0);
+
+      expect((await snapshot())['src/app/app.routes.ts']).toContain(
+        "{ path: '', pathMatch: 'full', redirectTo: '/products/create' }",
+      );
+    });
+
+    it('opens the list a kept resource enables although the answers leave it out', async () => {
+      await put(
+        newAppFiles({ [RESOURCES]: handWritten("  { name: 'products' },") }),
+      );
+      await installCore();
+
+      expect(
+        await run({
+          ...PLAN,
+          tables: [{ table: 'products', actions: ['show'] }],
+        }),
+      ).toBe(0);
+
+      expect((await snapshot())['src/app/app.routes.ts']).toContain(
+        "{ path: '', pathMatch: 'full', redirectTo: '/products' }",
+      );
+    });
+
+    it('adds no redirect and says why when it cannot read the list of a kept resource', async () => {
+      await put(
+        newAppFiles({
+          [RESOURCES]: handWritten(
+            "  { name: 'products', list: SHOW_LISTS },",
+            'const SHOW_LISTS = false;\n',
+          ),
+        }),
+      );
+      await installCore();
+
+      expect(await run(TWO_TABLES)).toBe(0);
+
+      expect((await snapshot())['src/app/app.routes.ts']).not.toContain(
+        'redirectTo',
+      );
+      expect(output()).toContain(UNDECIDED);
+      expect(output()).toContain(
+        "  { path: '', pathMatch: 'full', redirectTo: '/<resource>' },",
+      );
+    });
+
+    it('adds no redirect when it can only leave the tables in a comment', async () => {
+      await put(
+        newAppFiles({
+          [RESOURCES]: handWritten("  { name: 'orders' },", '// @ts-nocheck\n'),
+        }),
+      );
+      await installCore();
+
+      expect(await run(TWO_TABLES)).toBe(0);
+
+      const after = await snapshot();
+      expect(after[RESOURCES].startsWith('// pidrang:')).toBe(true);
+      expect(after['src/app/app.routes.ts']).not.toContain('redirectTo');
+      expect(output()).toContain(UNDECIDED);
+    });
+
+    it('adds no redirect on a rerun while the comment is still there', async () => {
+      await put(
+        newAppFiles({
+          [RESOURCES]: handWritten("  { name: 'orders' },", '// @ts-nocheck\n'),
+        }),
+      );
+      await installCore();
+      expect(await run(TWO_TABLES)).toBe(0);
+      await put({ 'src/app/app.routes.ts': NG_ROUTES });
+      out = [];
+
+      expect(await run(TWO_TABLES)).toBe(0);
+
+      expect((await snapshot())['src/app/app.routes.ts']).not.toContain(
+        'redirectTo',
+      );
+      expect(output()).toContain(UNDECIDED);
+    });
+
+    it('suggests the list a kept resource leaves on to an app with its own routes', async () => {
+      await put({
+        'src/app/app.html': NG_HTML,
+        'src/app/app.routes.ts': `import { Routes } from '@angular/router';
+
+import { SignInPage } from './sign-in-page';
+
+export const routes: Routes = [
+  { path: 'sign-in', component: SignInPage },
+];
+`,
+        [RESOURCES]: handWritten("  { name: 'products', list: false },"),
+      });
+      await installCore();
+
+      expect(await run(TWO_TABLES)).toBe(0);
+
+      expect(output()).toContain(
+        "  { path: '', pathMatch: 'full', redirectTo: '/orders' },",
+      );
+      expect(output()).not.toContain("redirectTo: '/products'");
+    });
+  });
+
   describe('a second run on a new app whose tables need a signed-in user', () => {
     const PRIVATE = { ...PLAN, readsNeedSignIn: true };
     const run = async (plan: unknown, name: string) =>

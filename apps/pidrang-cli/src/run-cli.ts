@@ -43,10 +43,19 @@ import {
 import { editAppHtml } from './edit-app-html';
 import { editAppComponent } from './edit-app-component';
 import { editAppSpec } from './edit-app-spec';
-import { editResources } from './edit-resources';
+import {
+  EntryActions,
+  editResources,
+  existingEntryActions,
+} from './edit-resources';
 import { recognizeResourceRoutes } from './recognize-resource-routes';
 import { addSignInRoute } from './add-sign-in-route';
-import { entryRedirect } from './entry-redirect';
+import {
+  EntryActionsOf,
+  EntryTarget,
+  entryRedirect,
+  plannedEntryActions,
+} from './entry-redirect';
 import {
   addEnvironmentFileReplacements,
   environmentFiles,
@@ -305,12 +314,29 @@ async function planSignIn(
   };
 }
 
+function printUndecidedEntry(
+  context: CliContext,
+  resourcesPath: string,
+  table: string,
+): void {
+  context.out('');
+  context.out(
+    `pidrang did not choose the page / opens: it cannot tell from ${resourcesPath} whether ${JSON.stringify(table)} has the page it would open. To open a generated page, add this route above the others in your routes, pointing at a page your resources enable:`,
+  );
+  context.out(`  { path: '', pathMatch: 'full', redirectTo: '/<resource>' },`);
+}
+
 function printExistingAppNotice(
   context: CliContext,
   layout: AppLayout,
-  planned: string | null,
+  resourcesPath: string,
+  entry: EntryTarget,
 ): void {
-  if (planned === null) {
+  if (entry.kind === 'unknown') {
+    printUndecidedEntry(context, resourcesPath, entry.table);
+    return;
+  }
+  if (entry.kind === 'none') {
     return;
   }
   context.out('');
@@ -318,8 +344,39 @@ function printExistingAppNotice(
     `The app already has its own pages and routes, so pidrang only added the resource routes to ${layout.routesFile}. To open the first generated page, add this route above the others:`,
   );
   context.out(
-    `  { path: '', pathMatch: 'full', redirectTo: ${quote(planned)} },`,
+    `  { path: '', pathMatch: 'full', redirectTo: ${quote(entry.path)} },`,
   );
+}
+
+function entryActionsAfterRun(
+  tooling: AppTooling,
+  resources: GeneratedFile,
+  existingResources: string | null,
+  edit: ReturnType<typeof editResources> | null,
+): EntryActionsOf {
+  if (existingResources === null) {
+    return plannedEntryActions;
+  }
+  if (edit === null || (edit.kind !== 'edited' && edit.kind !== 'unchanged')) {
+    return () => null;
+  }
+  const added =
+    edit.kind === 'edited' ||
+    existingResources.replace(/\r\n/g, '\n') === resources.content;
+  const kept =
+    tooling.typescript === null || edit.kept.length === 0
+      ? new Map<string, EntryActions>()
+      : existingEntryActions(
+          tooling.typescript,
+          resources.path,
+          existingResources,
+        );
+  return (table) => {
+    if (edit.kept.includes(table.table)) {
+      return kept.get(table.table) ?? null;
+    }
+    return added ? plannedEntryActions(table) : null;
+  };
 }
 
 function printDiff(
@@ -744,29 +801,6 @@ async function runInit(
     configSource,
     configRequest,
   );
-  const routesEdit = editAppRoutes(
-    tooling.typescript,
-    layout.routesFile,
-    routesSource,
-    './resource-routes',
-    newApp ? entryRedirect(generation) : null,
-  );
-  const htmlEdit =
-    htmlSource === null || hasLayout
-      ? { kind: 'unchanged' as const }
-      : withLayout
-        ? {
-            kind: 'edited' as const,
-            content: layoutAppHtml(layout.projectName),
-          }
-        : editAppHtml(htmlPath, htmlSource, tooling.welcomeTemplate);
-
-  const specPath = posix.join(layout.appDirectory, 'app.spec.ts');
-  const specSource =
-    htmlEdit.kind === 'edited'
-      ? await readOptional(context.cwd, specPath)
-      : null;
-
   const existingResources = await readOptional(
     context.cwd,
     generatedResources.path,
@@ -787,6 +821,33 @@ async function runInit(
       `${table} is already in ${generatedResources.path}, left as it is.`,
     ),
   );
+
+  const entry = entryRedirect(
+    generation,
+    entryActionsAfterRun(tooling, generatedResources, existingResources, edit),
+  );
+  const routesEdit = editAppRoutes(
+    tooling.typescript,
+    layout.routesFile,
+    routesSource,
+    './resource-routes',
+    newApp && entry.kind === 'redirect' ? entry.path : null,
+  );
+  const htmlEdit =
+    htmlSource === null || hasLayout
+      ? { kind: 'unchanged' as const }
+      : withLayout
+        ? {
+            kind: 'edited' as const,
+            content: layoutAppHtml(layout.projectName),
+          }
+        : editAppHtml(htmlPath, htmlSource, tooling.welcomeTemplate);
+
+  const specPath = posix.join(layout.appDirectory, 'app.spec.ts');
+  const specSource =
+    htmlEdit.kind === 'edited'
+      ? await readOptional(context.cwd, specPath)
+      : null;
 
   const listed = (table: string) =>
     newApp ||
@@ -906,8 +967,11 @@ async function runInit(
   if (status !== EXIT_OK) {
     return status;
   }
+  if (newApp && entry.kind === 'unknown') {
+    printUndecidedEntry(context, generatedResources.path, entry.table);
+  }
   if (!newApp && !declaresEntryRoute(tooling.typescript, routesSource)) {
-    printExistingAppNotice(context, layout, entryRedirect(generation));
+    printExistingAppNotice(context, layout, generatedResources.path, entry);
   }
   const installPlan = await planInstall(context, generation.setup.packages);
   const installResult = await installPackages(
