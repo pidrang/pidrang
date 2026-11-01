@@ -22,7 +22,7 @@ It then wires the app: `providePidrang({...})`, the Supabase client and `withCom
 
 ## `pidrang generate auth`
 
-Adds the same sign-in page to an app that has none, without asking anything, and wires it the same way: `src/app/pages/sign-in-page.ts`, `...resourceRoutes` in `app.routes.ts` and `provideSignInPath('/sign-in')` in `app.config.ts` when they are missing. It writes nothing and exits `0` when `app.routes.ts` already declares a `sign-in` route or the page is already the one it generates, and exits `1` without writing when the page is there with other content or `app.config.ts` already calls `provideSignInPath` with another path.
+Adds the same sign-in page to an app that has none, without asking anything, and wires it the same way: `src/app/pages/sign-in-page.ts`, its `sign-in` route in `resource-routes.ts`, `...resourceRoutes` in `app.routes.ts` and `provideSignInPath('/sign-in')` in `app.config.ts` when they are missing. A `resource-routes.ts` edited by hand gets a `pidrang:` comment with the route to add. It writes nothing and exits `0` when `app.routes.ts` already declares a `sign-in` route or the page and its route are already the ones it generates, and exits `1` without writing when `resource-routes.ts` is missing (run `pidrang init` first), the page is there with other content or `app.config.ts` already calls `provideSignInPath` with another path.
 
 Exit status: `0` when done or when nothing is left to write, `1` on invalid input, an unsupported Node.js or app, a file in the way or a failed install, `130` when cancelled. When writing stops half way, it lists what it wrote and what is left; running it again with the same answers finishes.
 

@@ -13,6 +13,7 @@ import {
   AppSetup,
   SchemaProviderDefinition,
   generatePagesBundle,
+  generateResourceRoutesFile,
 } from '@pidrang/cli';
 import * as typescript from 'typescript';
 import { AppTooling } from './app-tooling';
@@ -1195,11 +1196,15 @@ export const routes: Routes = [
 
   describe('pidrang generate auth', () => {
     const GENERATED = 'src/app/pages/sign-in-page.ts';
+    const ROUTES = 'src/app/resource-routes.ts';
+    const WITHOUT_SIGN_IN = generateResourceRoutesFile(false).content;
+    const WITH_SIGN_IN = generateResourceRoutesFile(true).content;
 
     it('writes the sign-in page and its route when TypeScript is available', async () => {
       await put({
         'src/app/app.config.ts': NG_CONFIG,
         'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: WITHOUT_SIGN_IN,
       });
 
       expect(
@@ -1208,6 +1213,7 @@ export const routes: Routes = [
 
       const after = await snapshot();
       expect(after[GENERATED]).toContain("selector: 'app-sign-in-page'");
+      expect(after[ROUTES]).toBe(WITH_SIGN_IN);
       expect(after['src/app/app.routes.ts']).toContain(
         "import { resourceRoutes } from './resource-routes';",
       );
@@ -1233,6 +1239,7 @@ export const routes: Routes = [
       await put({
         'src/app/app.config.ts': NG_CONFIG,
         'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: WITHOUT_SIGN_IN,
         'package.json': JSON.stringify({
           dependencies: {
             '@angular/core': '^22.1.0',
@@ -1253,6 +1260,7 @@ export const routes: Routes = [
       await put({
         'src/app/app.config.ts': NG_CONFIG,
         'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: WITHOUT_SIGN_IN,
       });
       expect(
         await runCli(['generate', 'auth'], context(undefined, STRUCTURAL)),
@@ -1296,6 +1304,7 @@ export const routes: Routes = [
       await put({
         'src/app/app.config.ts': NG_CONFIG,
         'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: WITHOUT_SIGN_IN,
         [GENERATED]: 'export const mine = true;\n',
       });
       const before = await snapshot();
@@ -1314,6 +1323,7 @@ export const routes: Routes = [
           "provideRouter(routes), provideSignInPath('/login')",
         ),
         'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: WITHOUT_SIGN_IN,
       });
       const before = await snapshot();
 
@@ -1323,6 +1333,117 @@ export const routes: Routes = [
       expect(err.join('\n')).toContain(
         "src/app/app.config.ts already calls provideSignInPath with another path, so pidrang wrote nothing. Change that path to '/sign-in' to use the generated page, or keep your own sign-in page.",
       );
+    });
+    it('refuses an app that has no resource routes, since the sign-in route goes there', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+      });
+      const before = await snapshot();
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(1);
+
+      expect(await snapshot()).toEqual(before);
+      expect(err.join('\n')).toContain(
+        `${ROUTES} was not found, so pidrang wrote nothing: the sign-in route goes there. Run pidrang init first`,
+      );
+    });
+
+    it('keeps the sign-in guard of the resource routes when it adds the route', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: generateResourceRoutesFile(false, ['products']).content,
+      });
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+
+      expect((await snapshot())[ROUTES]).toBe(
+        generateResourceRoutesFile(true, ['products']).content,
+      );
+    });
+
+    it('adds the route to resource routes a formatter turned to double quotes', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: WITHOUT_SIGN_IN.replace(/'([^'\\]*)'/g, '"$1"'),
+      });
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+
+      expect((await snapshot())[ROUTES]).toBe(WITH_SIGN_IN);
+    });
+
+    it('leaves resource routes that already declare the sign-in route alone', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: WITH_SIGN_IN,
+      });
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+
+      const after = await snapshot();
+      expect(after[GENERATED]).toContain("selector: 'app-sign-in-page'");
+      expect(after[ROUTES]).toBe(WITH_SIGN_IN);
+    });
+
+    it('adds the route when the page is already there without it', async () => {
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: WITHOUT_SIGN_IN,
+      });
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+      const page = (await snapshot())[GENERATED];
+      await put({ [ROUTES]: WITHOUT_SIGN_IN });
+      out = [];
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+
+      const after = await snapshot();
+      expect(after[ROUTES]).toBe(WITH_SIGN_IN);
+      expect(after[GENERATED]).toBe(page);
+      expect(output()).not.toContain('so pidrang wrote nothing');
+    });
+
+    it('asks for the route in a comment when the resource routes were edited by hand', async () => {
+      const edited = `${WITHOUT_SIGN_IN}// mine\n`;
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: edited,
+      });
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+
+      const after = (await snapshot())[ROUTES];
+      expect(after.endsWith(edited)).toBe(true);
+      expect(after).toContain("// pidrang:     path: 'sign-in',");
+      expect(
+        after
+          .slice(0, after.length - edited.length)
+          .split('\n')
+          .filter((line) => line !== '')
+          .every((line) => line.startsWith('// pidrang:')),
+      ).toBe(true);
+      expect(output()).toContain(
+        `${ROUTES}: it is not the file pidrang init writes`,
+      );
+    });
+
+    it('leaves resource routes edited by hand alone when they already declare the sign-in route', async () => {
+      const edited = `${WITH_SIGN_IN}// mine\n`;
+      await put({
+        'src/app/app.config.ts': NG_CONFIG,
+        'src/app/app.routes.ts': NG_ROUTES,
+        [ROUTES]: edited,
+      });
+
+      expect(await runCli(['generate', 'auth'], context())).toBe(0);
+
+      expect((await snapshot())[ROUTES]).toBe(edited);
     });
   });
 
@@ -1754,6 +1875,107 @@ export const routes: Routes = [
         "canMatchSignedIn(['orders'])",
       );
       expect(after['src/app/resource-routes.ts']).not.toContain("'products'");
+    });
+  });
+
+  describe('the sign-in route of the resource routes', () => {
+    const ROUTES = 'src/app/resource-routes.ts';
+    const PAGE = 'src/app/pages/sign-in-page.ts';
+    const run = async (plan: unknown, name: string) =>
+      runCli(
+        ['init', '--plan', await planFile(plan, name)],
+        context(undefined, STRUCTURAL),
+      );
+
+    it.each([true, false])(
+      'follows the sign-in page on a new app (signIn: %s)',
+      async (signIn) => {
+        await put(newAppFiles());
+
+        expect(await run({ ...PLAN, signIn }, 'plan.json')).toBe(0);
+
+        const after = await snapshot();
+        expect(after[ROUTES]).toBe(generateResourceRoutesFile(signIn).content);
+        expect(after[PAGE] !== undefined).toBe(signIn);
+      },
+    );
+
+    it('leaves out the route, the path and the guard when another sign-in page is in the way', async () => {
+      await put(newAppFiles({ [PAGE]: 'export const mine = true;\n' }));
+
+      expect(await run({ ...PLAN, readsNeedSignIn: true }, 'plan.json')).toBe(
+        0,
+      );
+
+      const after = await snapshot();
+      expect(after[PAGE]).toBe('export const mine = true;\n');
+      expect(after[ROUTES]).toBe(generateResourceRoutesFile(false).content);
+      expect(after['src/app/app.config.ts']).not.toContain('provideSignInPath');
+      expect(output()).toContain(
+        `pidrang did not generate the sign-in page the pages and the layout link to: ${PAGE} is already there and differs from what this pidrang version generates, so pidrang left it as it is.`,
+      );
+      expect(err.join('\n')).toContain(
+        '"products": reads need a signed-in user, but pidrang did not add the sign-in guard',
+      );
+    });
+
+    it('adds the route on a second run that writes the page the first run left out', async () => {
+      await put(newAppFiles());
+      expect(await run({ ...PLAN, signIn: false }, 'first.json')).toBe(0);
+      await installCore();
+
+      expect(await run(TWO_TABLES, 'second.json')).toBe(0);
+
+      const after = await snapshot();
+      expect(after[PAGE]).toContain("selector: 'app-sign-in-page'");
+      expect(after[ROUTES]).toBe(generateResourceRoutesFile(true).content);
+      expect(after['src/app/app.config.ts']).toContain(
+        "provideSignInPath('/sign-in')",
+      );
+    });
+
+    it('keeps the route on a second run that leaves out the page the first run wrote', async () => {
+      await put(newAppFiles());
+      expect(await run(PLAN, 'first.json')).toBe(0);
+      await installCore();
+      const before = await snapshot();
+
+      expect(await run({ ...PLAN, signIn: false }, 'second.json')).toBe(0);
+
+      const after = await snapshot();
+      expect(after[ROUTES]).toBe(before[ROUTES]);
+      expect(after[ROUTES]).toBe(generateResourceRoutesFile(true).content);
+      expect(after[PAGE]).toBe(before[PAGE]);
+    });
+
+    it('keeps the route on a second run when the page of the first run was changed', async () => {
+      await put(newAppFiles());
+      expect(await run(PLAN, 'first.json')).toBe(0);
+      await installCore();
+      await put({ [PAGE]: 'export class SignInPage {}\n' });
+
+      expect(await run(TWO_TABLES, 'second.json')).toBe(0);
+
+      const after = await snapshot();
+      expect(after[ROUTES]).toBe(generateResourceRoutesFile(true).content);
+      expect(after[PAGE]).toBe('export class SignInPage {}\n');
+    });
+
+    it('stops on a second run when resource routes edited by hand are in the way of the route', async () => {
+      await put(newAppFiles());
+      expect(await run({ ...PLAN, signIn: false }, 'first.json')).toBe(0);
+      await installCore();
+      const edited = `${generateResourceRoutesFile(false).content}// mine\n`;
+      await put({ [ROUTES]: edited });
+      const plan = await planFile(PLAN, 'second.json');
+      const before = await snapshot();
+
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(1);
+
+      expect(await snapshot()).toEqual(before);
+      expect(err.join('\n')).toContain(`  ${ROUTES}: `);
     });
   });
 

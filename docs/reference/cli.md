@@ -7,9 +7,9 @@
 | Command | What it does |
 |---------|-------------|
 | `pidrang init [--plan <file>] [--project <name>] [--skip-install]` | Scaffolds Resource definitions and CRUD pages into an Angular app. Run it from the workspace root. |
-| `pidrang generate auth [--project <name>]` | Writes the sign-in page the pages and the layout link to, when the app has none. |
+| `pidrang generate auth [--project <name>]` | Writes the sign-in page the pages and the layout link to, and its route, when the app has none. Needs the `resource-routes.ts` that `init` writes. |
 
-Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 102–156.
+Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 103–157.
 
 ## Options
 
@@ -20,7 +20,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 102–156.
 | `--skip-install` | `init` | Do not offer to install the packages; print the commands instead. |
 | `-h, --help` | Both | Show this help message. |
 
-Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 110–114.
+Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 111–115.
 
 ## Requirements
 
@@ -55,7 +55,7 @@ When the connection attempt fails, the wizard repeats the question with the reje
 | File | What lands there | When |
 |------|-----------------|------|
 | `src/app/resources.ts` | `export const resources: Resource[] = [...]` — one entry per selected table: `{ name, label, fields, defaultSorters?, list, create, show, edit, delete }`. Each field is `{ name, label, type, hidden?, readOnly?, nullable?, hasDefault? }`, inferred from introspection; a field named in the plan file's `hiddenFields` is written with `hidden: true`. `defaultSorters` is written only when a `timestamp` or `date` `created_at` column exists. | Every run. Edited in-place on subsequent runs. |
-| `src/app/resource-routes.ts` | Generic routes `:resource`, `:resource/create`, `:resource/:id/edit`, `:resource/:id` pointing to generated pages, with `canMatch` guards. | Every run. Regenerated; an existing guard list is extended in place. |
+| `src/app/resource-routes.ts` | Generic routes `:resource`, `:resource/create`, `:resource/:id/edit`, `:resource/:id` pointing to generated pages, with `canMatch` guards. | Every run. Regenerated; an existing guard list is extended in place, and the `sign-in` route is added once the sign-in page is in place. |
 | `src/app/pages/resource-list-page.ts` | List page using `injectResourceList`, `ResourceTable`, with actions projected. | Every run, on a new or an existing app. A file already there with other content stops `init` before any write. |
 | `src/app/pages/resource-create-page.ts` | Create page using `ResourceForm`, calls `dataProvider.create`. | Same as the list page. |
 | `src/app/pages/resource-show-page.ts` | Show page displaying fields and links to edit/delete. | Same as the list page. |
@@ -146,7 +146,7 @@ Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts` lines
 | 1 | Invalid input, unsupported Node.js or app, conflicting file, failed install, unknown provider, wrong table name. |
 | 130 | Cancelled by the user (interrupt signal or declining install). Prints `Cancelled: nothing was written.` to stderr. |
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 69–71 (`EXIT_OK`, `EXIT_FAILED`, `EXIT_CANCELLED`) and the `INSTALL_STATUS` map at line 566.
+Source: `apps/pidrang-cli/src/run-cli.ts` lines 70–72 (`EXIT_OK`, `EXIT_FAILED`, `EXIT_CANCELLED`) and the `INSTALL_STATUS` map at line 572.
 
 ## A second run
 
@@ -154,7 +154,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 69–71 (`EXIT_OK`, `EXIT_FAILED
 
 Guard updates: a guard already written receives new private tables appended to its list. Guards for tables not seen in `resources.ts` are held back until those tables are listed.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 772–810 (resources edit, guarded resources).
+Source: `apps/pidrang-cli/src/run-cli.ts` lines 770–808 (resources edit, guarded resources).
 
 ## A new app and an existing app
 
@@ -162,7 +162,7 @@ On a new app, `init` replaces the welcome page, generates the full page bundle (
 
 The layout feature (`app-layout.ts`) is gated on four conditions met together: the app must be new (`ng new`'s `app.html` has not been changed), `app.html` must contain only `<app-layout>`, `app.ts` must match the `ng new` template, and the layout must be requested (`sidebar`). When any condition fails, `init` reports the missing files and skips the layout. An existing app kept its own `app.html` and never receives a layout.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 676–697 (layout conditions), `libs/cli/src/lib/generate-layout-module.ts` lines 14–17 (`LAYOUTS` map keyed on `LayoutUi`).
+Source: `apps/pidrang-cli/src/run-cli.ts` lines 674–695 (layout conditions), `libs/cli/src/lib/generate-layout-module.ts` lines 14–17 (`LAYOUTS` map keyed on `LayoutUi`).
 
 ## When the tables need a signed-in user
 
@@ -172,17 +172,19 @@ For new apps: init asks once ("Do your tables need a signed-in user to be read?"
 
 Only the `postgres` strategy answers `readsNeedSignIn` per-table (reading the actual Row Level Security policies). The `graphql` and `secret-key` strategies ask a single global question.
 
-Source: `libs/cli/src/lib/wizard.ts` lines 43–55 (`providerReadsNeedSignIn`), `apps/pidrang-cli/src/run-cli.ts` lines 652–665 (guard setup and unguarded resources message).
+Source: `libs/cli/src/lib/wizard.ts` lines 43–55 (`providerReadsNeedSignIn`), `apps/pidrang-cli/src/run-cli.ts` lines 656–669 (guard setup and unguarded resources message).
 
 ## The sign-in page
 
 `init` writes the sign-in page at `src/app/pages/sign-in-page.ts` in three cases: on a new app when you accept the sign-in question, on an existing app in an interactive run where it is always written and the question is not asked, and on an existing app driven by a plan whose `signIn` is `true`. The page links to the login method provided by the app.
 
-`pidrang generate auth` writes the same page when `app.routes.ts` has no existing sign-in route and `app.config.ts` does not call `provideSignInPath` with another path.
+When `src/app/pages/sign-in-page.ts` is already there with other content, `init` keeps it and treats the run as one without a page: no new `sign-in` route, no `provideSignInPath` and no sign-in guard.
 
-`init` writes its own `sign-in` route into `resource-routes.ts`, above the `:resource` routes. When `app.routes.ts` already declares a first segment named `sign-in`, it writes no sign-in route and leaves yours in place. A table whose name is already a route declared in `app.routes.ts` is refused, so the `:resource` routes cannot take the sign-in path. Source: `libs/cli/src/lib/generate-pages-bundle.ts` lines 5-11 and 97-110 (sign-in route placement), `apps/pidrang-cli/src/preflight-app.ts` lines 180-182 (`declaresSignInRoute`), `libs/cli/src/lib/wizard.ts` lines 77-86 (`routeNameProblem`).
+`pidrang generate auth` writes the same page when `app.routes.ts` has no existing sign-in route and `app.config.ts` does not call `provideSignInPath` with another path. It needs the `src/app/resource-routes.ts` that `init` writes, since the route goes there: without it, it exits `1` and writes nothing.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 435–443 (instruction printed without provider), `libs/demo-shared/src/lib/provide-sign-in-path.ts` (validation logic).
+`init` writes its own `sign-in` route into `resource-routes.ts`, above the `:resource` routes, only when the sign-in page it generates is in place: a run that leaves the page out writes no route, a later run that writes the page adds it, and a route an earlier run wrote is kept. `pidrang generate auth` adds the route with the page; when `resource-routes.ts` was edited by hand, it adds a `// pidrang:` comment with the route to write instead. When `app.routes.ts` already declares a first segment named `sign-in`, `init` writes no sign-in route and leaves yours in place. A table named `sign-in` or `resource-unavailable`, or like a route declared in `app.routes.ts`, is refused on every run, so the `:resource` routes cannot take those paths. Source: `libs/cli/src/lib/generate-pages-bundle.ts` lines 5-10 and 102-116 (sign-in route placement), `apps/pidrang-cli/src/run-cli.ts` lines 264-306 (`planSignIn`), 809-822 (sign-in route on init) and 997-1093 (`runGenerateAuth`), `apps/pidrang-cli/src/add-sign-in-route.ts`, `apps/pidrang-cli/src/preflight-app.ts` lines 180-182 (`declaresSignInRoute`), `libs/cli/src/lib/wizard.ts` lines 79-99 (`routeNameProblem`).
+
+Source: `apps/pidrang-cli/src/run-cli.ts` lines 441–449 (instruction printed without provider), `libs/demo-shared/src/lib/provide-sign-in-path.ts` (validation logic).
 
 ## Changing what it wrote
 
@@ -192,7 +194,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 435–443 (instruction printed w
 - The helpers under `src/app/pidrang/` are called by the generated pages and the layout module, so deleting them breaks the build even when `resources.ts` is correct.
 - `pnpm run sync:pages` and `sync:layout` serve the demo repositories in this codebase; they are not meant for consumer applications.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 143–146 (never-overwrite rule, manual comments), `apps/pidrang-cli/src/write-plan.ts` (conflict detection), `docs/design-notes.md` lines 157, 169.
+Source: `apps/pidrang-cli/src/run-cli.ts` lines 144–147 (never-overwrite rule, manual comments), `apps/pidrang-cli/src/write-plan.ts` (conflict detection), `docs/design-notes.md` lines 157, 169.
 
 ## When it stops
 

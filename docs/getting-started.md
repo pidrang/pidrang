@@ -91,7 +91,7 @@ The app still shows the Angular welcome page: `app.html` still holds it. Init re
 
 `ng build` warns that the initial bundle exceeded its budget: the budget `ng new` sets warns above 500 kB, and an app with the Supabase client, Angular Material and the layout starts above it (about 690 kB with the layout) even though the pages load lazily. It is a warning, the build succeeds; raise `maximumWarning` in the `budgets` of `angular.json` if you want it gone.
 
-The Sign in button does nothing and the console shows the router error `NG04002` (`Cannot match any routes. URL Segment: 'sign-in'` in a development build): `provideSignInPath('/sign-in')` is set but no sign-in page is, and the resource routes do not match a name that is not a resource. Run `pidrang generate auth`, add your own sign-in page at `/sign-in`, or change the path in `app.config.ts`.
+The Sign in button does nothing and the console shows the router error `NG04002` (`Cannot match any routes. URL Segment: 'sign-in'` in a development build): `provideSignInPath('/sign-in')` is set but no sign-in route is, and the resource routes do not match a name that is not a resource. Run `pidrang generate auth`, which writes the page and adds its route to `resource-routes.ts`, add your own sign-in page at `/sign-in`, or change the path in `app.config.ts`.
 
 The URL changes but a page stays blank: `provideRouter` has no `withComponentInputBinding()`. The pages read `:resource` and `:id` from their inputs and render nothing without it. Init adds it to the existing `provideRouter(...)` call; if your app config could not be edited, the `// pidrang:` comment at the top of the file shows the line to write.
 

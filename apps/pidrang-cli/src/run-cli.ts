@@ -44,7 +44,8 @@ import { editAppHtml } from './edit-app-html';
 import { editAppComponent } from './edit-app-component';
 import { editAppSpec } from './edit-app-spec';
 import { editResources } from './edit-resources';
-import { existingSignedInGuards } from './existing-signed-in-guards';
+import { recognizeResourceRoutes } from './recognize-resource-routes';
+import { addSignInRoute } from './add-sign-in-route';
 import { entryRedirect } from './entry-redirect';
 import {
   addEnvironmentFileReplacements,
@@ -249,6 +250,7 @@ interface SignInPlan {
   path: string;
   file: GeneratedFile | null;
   written: boolean;
+  pageInPlace: boolean;
   reason: string;
 }
 
@@ -265,11 +267,14 @@ async function planSignIn(
   tooling: AppTooling,
   wanted: boolean,
 ): Promise<SignInPlan> {
+  const file = signInFile(layout, tooling);
+  const problem = await conflictReason(context.cwd, file);
   if (!wanted) {
     return {
       path: layout.signInPath,
       file: null,
       written: false,
+      pageInPlace: !layout.signInRoute && problem === 'unchanged',
       reason: 'You declined the sign-in page, so pidrang did not generate one',
     };
   }
@@ -278,23 +283,24 @@ async function planSignIn(
       path: layout.signInPath,
       file: null,
       written: false,
+      pageInPlace: false,
       reason: `app.routes.ts already declares its own ${layout.signInPath} route, so pidrang left the sign-in page to it`,
     };
   }
-  const file = signInFile(layout, tooling);
-  const problem = await conflictReason(context.cwd, file);
   if (problem === null || problem === 'unchanged') {
     return {
       path: layout.signInPath,
       file: problem === null ? file : null,
       written: true,
+      pageInPlace: true,
       reason: '',
     };
   }
   return {
     path: layout.signInPath,
     file: null,
-    written: true,
+    written: false,
+    pageInPlace: false,
     reason: `${file.path} is already there and ${problem}, so pidrang left it as it is`,
   };
 }
@@ -636,11 +642,9 @@ async function runInit(
   const existingRoutes = newApp
     ? null
     : await readOptional(context.cwd, routesFile.path);
-  const recognizedGuards =
-    existingRoutes === null
-      ? null
-      : existingSignedInGuards(existingRoutes, !layout.signInRoute);
-  const existingGuards = recognizedGuards ?? [];
+  const recognizedRoutes =
+    existingRoutes === null ? null : recognizeResourceRoutes(existingRoutes);
+  const existingGuards = recognizedRoutes?.guards ?? [];
   const generation = await collectPlan(
     context,
     layout,
@@ -664,12 +668,6 @@ async function runInit(
   if (unguardedResources.length > 0) {
     context.err(unguardedReadsMessage(unguardedResources, newApp, signIn));
   }
-  const routesGuardEdit =
-    existingRoutes !== null &&
-    existingGuards.length > 0 &&
-    guardedResources.length > existingGuards.length
-      ? existingRoutes
-      : null;
   const [layoutFile] = relocateFiles(
     [generateLayoutFile(tooling.layoutUi)],
     layout.appDirectory,
@@ -808,14 +806,19 @@ async function runInit(
     );
   }
   const confirmedGuards = guardedResources.filter(listed);
-  const guardEdit =
-    routesGuardEdit !== null && confirmedGuards.length > existingGuards.length
-      ? routesGuardEdit
-      : null;
+  const routesWithSignIn =
+    signIn.pageInPlace || recognizedRoutes?.signIn === true;
   const [guardedRoutes] = relocateFiles(
-    [generateResourceRoutesFile(!layout.signInRoute, confirmedGuards)],
+    [generateResourceRoutesFile(routesWithSignIn, confirmedGuards)],
     layout.appDirectory,
   );
+  const resourceRoutesBefore =
+    existingRoutes !== null &&
+    recognizedRoutes !== null &&
+    (recognizedRoutes.signIn !== routesWithSignIn ||
+      confirmedGuards.length > existingGuards.length)
+      ? existingRoutes
+      : null;
 
   const candidates: FileEditPlan[] = [
     ...(existingResources === null || resourcesEdit === null
@@ -825,12 +828,12 @@ async function runInit(
           existingResources,
           resourcesEdit,
         )),
-    ...(guardEdit === null
+    ...(resourceRoutesBefore === null
       ? []
       : [
           {
             path: guardedRoutes.path,
-            before: guardEdit,
+            before: resourceRoutesBefore,
             after: guardedRoutes.content,
             manual: false,
           },
@@ -882,9 +885,7 @@ async function runInit(
   const plan = await planWrites(context.cwd, [
     ...(existingResources === null ? [generatedResources] : []),
     ...pages,
-    ...(routesGuardEdit === null && recognizedGuards === null
-      ? [guardedRoutes]
-      : []),
+    ...(recognizedRoutes === null ? [guardedRoutes] : []),
     ...environmentFilesToWrite,
     ...layoutFiles,
     ...(signIn.file === null ? [] : [signIn.file]),
@@ -1004,20 +1005,35 @@ async function runGenerateAuth(
     );
     return EXIT_OK;
   }
+  const [resourceRoutesFile] = relocateFiles(
+    [generateResourceRoutesFile()],
+    layout.appDirectory,
+  );
+  const resourceRoutesSource = await readOptional(
+    context.cwd,
+    resourceRoutesFile.path,
+  );
+  if (resourceRoutesSource === null) {
+    context.err(
+      `${resourceRoutesFile.path} was not found, so pidrang wrote nothing: the sign-in route goes there. Run pidrang init first, then pidrang generate auth if the app still has no sign-in page.`,
+    );
+    return EXIT_FAILED;
+  }
   const tooling = context.tooling ?? (await loadAppTooling(context.cwd));
   const file = signInFile(layout, tooling);
   const problem = await conflictReason(context.cwd, file);
-  if (problem === 'unchanged') {
-    context.out(
-      `${file.path} is already the sign-in page pidrang generates for this app, so pidrang wrote nothing.`,
-    );
-    return EXIT_OK;
-  }
-  if (problem !== null) {
+  if (problem !== null && problem !== 'unchanged') {
     context.err(
       `${file.path} is already there and ${problem}, so pidrang left it as it is and wrote nothing.`,
     );
     return EXIT_FAILED;
+  }
+  const resourceRoutesEdit = addSignInRoute(resourceRoutesSource);
+  if (problem === 'unchanged' && resourceRoutesEdit.kind === 'unchanged') {
+    context.out(
+      `${file.path} is already the sign-in page pidrang generates for this app, so pidrang wrote nothing.`,
+    );
+    return EXIT_OK;
   }
   const routesSource = await readFile(
     join(context.cwd, layout.routesFile),
@@ -1047,6 +1063,11 @@ async function runGenerateAuth(
     return EXIT_FAILED;
   }
   const candidates: FileEditPlan[] = [
+    ...editCandidate(
+      resourceRoutesFile.path,
+      resourceRoutesSource,
+      resourceRoutesEdit,
+    ),
     ...editCandidate(layout.routesFile, routesSource, routesEdit),
     ...editCandidate(
       layout.configFile,

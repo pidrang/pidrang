@@ -40,16 +40,22 @@ function unquote(text: string): string {
   );
 }
 
-export function existingSignedInGuards(
+export interface RecognizedResourceRoutes {
+  signIn: boolean;
+  guards: string[];
+}
+
+export function recognizeResourceRoutes(
   content: string,
-  signInRoute: boolean,
-): string[] | null {
+): RecognizedResourceRoutes | null {
   const source = content.replace(/\r\n/g, '\n').replace(STRING, singleQuoted);
-  const names = guardedNames(source);
-  return generateResourceRoutesFile(signInRoute, names).content.replace(
-    STRING,
-    singleQuoted,
-  ) === source
-    ? names
-    : null;
+  const guards = guardedNames(source);
+  const signIn = [true, false].find(
+    (withSignIn) =>
+      generateResourceRoutesFile(withSignIn, guards).content.replace(
+        STRING,
+        singleQuoted,
+      ) === source,
+  );
+  return signIn === undefined ? null : { signIn, guards };
 }
