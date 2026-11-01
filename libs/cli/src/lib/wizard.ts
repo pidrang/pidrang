@@ -62,7 +62,10 @@ const ACTION_CHOICES: { name: string; value: CrudAction }[] = [
   { name: 'Delete', value: 'delete' },
 ];
 
-const ROUTES_OWNED_BY_GENERATED_PAGES = new Set(['resource-unavailable']);
+const ROUTES_OWNED_BY_GENERATED_PAGES = new Set([
+  'resource-unavailable',
+  'sign-in',
+]);
 
 const DOT_SEGMENTS = new Set(['.', '..']);
 

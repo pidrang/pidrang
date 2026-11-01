@@ -1,5 +1,7 @@
 import { checkbox, confirm, select } from '@inquirer/prompts';
 import { AppSetup } from './app-setup';
+import { RESOURCE_ROUTES_SNIPPET } from './generate-pages-bundle';
+import { GENERATED_PAGE_FILES } from './generated-pages';
 import {
   confirmPackageInstall,
   runInitWizard,
@@ -374,16 +376,60 @@ describe('runInitWizard', () => {
     expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
   });
 
-  it('refuses a table named after a route the generated pages reserve for themselves', async () => {
-    const schemaProvider = fakeSchemaProvider();
-    const definition = fakeDefinition('supabase', schemaProvider);
+  it.each([
+    ['resource-unavailable', true],
+    ['resource-unavailable', false],
+    ['sign-in', true],
+    ['sign-in', false],
+  ])(
+    'refuses a table named %s, a route the generated pages reserve for themselves (new app: %s)',
+    async (table, isNewApp) => {
+      const schemaProvider = fakeSchemaProvider();
+      const definition = fakeDefinition('supabase', schemaProvider);
 
-    vi.mocked(checkbox).mockResolvedValueOnce(['resource-unavailable']);
+      vi.mocked(checkbox).mockResolvedValueOnce([table]);
 
-    await expect(runInitWizard([definition])).rejects.toThrow(
-      '"resource-unavailable" collides with a route the generated pages reserve',
+      await expect(
+        runInitWizard([definition], { isNewApp, takenRoutes: [] }),
+      ).rejects.toThrow(
+        `"${table}" collides with a route the generated pages reserve`,
+      );
+      expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
+    },
+  );
+
+  it('reserves the first segment of every fixed route resource-routes.ts declares', async () => {
+    const paths = [...RESOURCE_ROUTES_SNIPPET.matchAll(/path: ([^,]*),/g)].map(
+      (match) => match[1],
     );
-    expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
+    const unavailablePath = /RESOURCE_UNAVAILABLE_PATH = '([^']*)'/.exec(
+      GENERATED_PAGE_FILES.find((file) =>
+        file.path.endsWith('/resource-unavailable-path.ts'),
+      )?.content ?? '',
+    )?.[1];
+    expect(unavailablePath).toBe('resource-unavailable');
+    const reserved = paths
+      .map((path) =>
+        path === 'RESOURCE_UNAVAILABLE_PATH'
+          ? (unavailablePath ?? '')
+          : /^'([^']*)'$/.exec(path)?.[1],
+      )
+      .map((path) => {
+        expect(path).toBeDefined();
+        return (path ?? '').split('/')[0];
+      })
+      .filter((segment) => segment !== '' && !segment.startsWith(':'));
+    expect(reserved).toContain('sign-in');
+
+    for (const table of reserved) {
+      const schemaProvider = fakeSchemaProvider();
+      const definition = fakeDefinition('supabase', schemaProvider);
+      vi.mocked(checkbox).mockResolvedValueOnce([table]);
+
+      await expect(runInitWizard([definition])).rejects.toThrow(
+        'reserve for their own use',
+      );
+    }
   });
 
   it('plans every selected table', async () => {
@@ -796,6 +842,30 @@ describe('runScriptedInit', () => {
           { takenRoutes },
         ),
       ).rejects.toThrow(message);
+      expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [true, []],
+    [false, []],
+    [true, ['sign-in']],
+    [false, ['sign-in']],
+  ])(
+    'refuses a table named sign-in in a plan (new app: %s, app routes: %j)',
+    async (isNewApp, takenRoutes) => {
+      const schemaProvider = fakeSchemaProvider();
+      vi.mocked(schemaProvider.listTables).mockResolvedValue(['sign-in']);
+      const definition = fakeDefinition('supabase', schemaProvider);
+
+      await expect(
+        runScriptedInit(
+          [definition],
+          scripted([{ table: 'sign-in', actions: ['list'], hiddenFields: [] }]),
+          {},
+          { isNewApp, takenRoutes },
+        ),
+      ).rejects.toThrow('"sign-in" collides with a route');
       expect(schemaProvider.introspectTable).not.toHaveBeenCalled();
     },
   );
