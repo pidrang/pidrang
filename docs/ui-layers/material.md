@@ -47,20 +47,24 @@ Declare both stylesheets under `"styles"` in the `build` options of the project 
 ]
 ```
 
-Source: `apps/demo-material/project.json` lines 23–26.
+Source: `apps/demo-material/project.json` lines 23–29.
 
 ## Page styles
 
 `mat.theme()` only declares the `--mat-sys-*` variables, which Material components read. It does not style the page and does not load Roboto. Without the two additions below, headings and plain text use the browser's default font and colors.
 
-Load Roboto in `src/index.html`, in `<head>`:
+Load Roboto from the app itself, not from Google: `ng add @angular/material` adds Google Fonts links for Roboto to `src/index.html` (see `node_modules/@angular/material/schematics/ng-add/fonts/material-fonts.js`), and those requests go to a third-party host. To serve the font from the app, install `@fontsource/roboto` and list its weights before the other stylesheets:
 
-```html
-    <link rel="preconnect" href="https://fonts.gstatic.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap"
-      rel="stylesheet"
-    />
+```bash
+npm install @fontsource/roboto
+```
+
+```json
+"styles": [
+  "node_modules/@fontsource/roboto/300.css",
+  "node_modules/@fontsource/roboto/400.css",
+  "node_modules/@fontsource/roboto/500.css"
+]
 ```
 
 Apply the variables in the application stylesheet, `src/styles.css`:
@@ -90,7 +94,7 @@ a {
 }
 ```
 
-Source: `apps/demo-material/src/index.html` and `apps/demo-material/src/styles.css`.
+Source: `apps/demo-material/project.json` and `apps/demo-material/src/styles.css`.
 
 ## Selector
 

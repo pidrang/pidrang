@@ -132,6 +132,35 @@ for (const demo of DEMOS) {
       await expect(page.locator(`a[href="${demo.sibling}"]`)).toHaveCount(1);
     });
 
+    test('requests no host but the app and Supabase', async ({ page }) => {
+      const hosts: string[] = [];
+      page.on('request', (request) => {
+        hosts.push(new URL(request.url()).hostname);
+      });
+
+      const pages = [
+        { route: '', heading: 'Pidrang demo' },
+        { route: 'products', heading: /^\s*products\s*$/ },
+        { route: 'products/1', heading: /^\s*products — Keyboard\s*$/ },
+        {
+          route: 'products/1/edit',
+          heading: /^\s*Edit products — Keyboard\s*$/,
+        },
+      ];
+      for (const entry of pages) {
+        await page.goto(`/${demo.path}/${entry.route}`);
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+          entry.heading,
+        );
+      }
+
+      const allowed = ['127.0.0.1', new URL(SUPABASE_ORIGIN).hostname];
+      const unexpected = [...new Set(hosts)].filter(
+        (host) => !allowed.includes(host),
+      );
+      expect(unexpected).toEqual([]);
+    });
+
     for (const link of DEEP_LINKS) {
       test(`restores /${link.route} after a hard refresh`, async ({ page }) => {
         const response = await page.goto(`/${demo.path}/${link.route}`);
@@ -317,5 +346,29 @@ test.describe('demo-material page styles', () => {
       'list-style-type',
       'none',
     );
+  });
+
+  test('loads Roboto from the app itself', async ({ page }) => {
+    const fontUrls: string[] = [];
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.endsWith('.woff2')) {
+        fontUrls.push(request.url());
+      }
+    });
+
+    await page.goto('/demo-material/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      'Pidrang demo',
+    );
+    const robotoLoaded: boolean = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return document.fonts.check('16px Roboto');
+    });
+
+    expect(robotoLoaded).toBe(true);
+    expect(fontUrls.length).toBeGreaterThan(0);
+    for (const url of fontUrls) {
+      expect(new URL(url).hostname).toBe('127.0.0.1');
+    }
   });
 });
