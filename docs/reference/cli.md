@@ -194,7 +194,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 498–506 (instruction printed w
 - The helpers under `src/app/pidrang/` are called by the generated pages and the layout module, so deleting them breaks the build even when `resources.ts` is correct.
 - `pnpm run sync:pages` and `sync:layout` serve the demo repositories in this codebase; they are not meant for consumer applications.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 153–156 (never-overwrite rule, manual comments), `apps/pidrang-cli/src/write-plan.ts` (conflict detection), `docs/design-notes.md` lines 157, 169.
+Source: `apps/pidrang-cli/src/run-cli.ts` lines 153–156 (never-overwrite rule, manual comments), `apps/pidrang-cli/src/write-plan.ts` (conflict detection), `docs/design-notes.md` lines 163, 175.
 
 ## When it stops
 
