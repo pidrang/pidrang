@@ -36,6 +36,7 @@ const ROWS = [
 async function setup(
   remove: (id: string) => Promise<unknown>,
   providers: Provider[] = [],
+  readError: Error | null = null,
 ) {
   const deletes: string[] = [];
   let lists = 0;
@@ -52,7 +53,9 @@ async function setup(
   const dataProvider: DataProvider = {
     getList: <T>() => {
       lists += 1;
-      return Promise.resolve({ data: ROWS as T[], total: ROWS.length });
+      return readError === null
+        ? Promise.resolve({ data: ROWS as T[], total: ROWS.length })
+        : Promise.reject(readError);
     },
     getOne: () => Promise.reject(new Error('unused')),
     create: () => Promise.reject(new Error('unused')),
@@ -335,6 +338,12 @@ describe('ResourceListPage delete', () => {
       'The earlier delete finished.',
     );
     expect(listCalls()).toBe(before + 1);
+    const element = fixture.nativeElement as HTMLElement;
+    const status = element.querySelector<HTMLElement>('[role="status"]');
+    if (status === null) {
+      throw new Error('status not rendered');
+    }
+    expect(getComputedStyle(status).color).not.toContain('--mat-sys-error');
   });
 
   it('says the earlier delete failed on return, with its category', async () => {
@@ -610,6 +619,24 @@ describe('ResourceListPage delete', () => {
         .querySelector('[role="alert"] a')
         ?.getAttribute('href'),
     ).toBe('/auth/sign-in');
+  });
+});
+
+describe('ResourceListPage errors', () => {
+  it('shows a failed list read as an alert in the theme error color', async () => {
+    const { fixture } = await setup(
+      () => Promise.reject(new Error('unused')),
+      [],
+      new Error('permission denied for table products'),
+    );
+
+    const element = fixture.nativeElement as HTMLElement;
+    const alert = element.querySelector<HTMLElement>('[role="alert"]');
+    if (alert === null) {
+      throw new Error('alert not rendered');
+    }
+    expect(alert.textContent).toContain('permission denied for table products');
+    expect(getComputedStyle(alert).color).toContain('--mat-sys-error');
   });
 });
 

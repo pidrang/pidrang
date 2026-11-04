@@ -94,6 +94,8 @@ a {
 }
 ```
 
+The pages `pidrang init` writes carry the same rule in the `styles` of each page component, because a generated app never receives this stylesheet. The `[role='alert']` rule above therefore only covers the pages you write yourself; `apps/demo-material` keeps it for the same reason.
+
 Source: `apps/demo-material/project.json` and `apps/demo-material/src/styles.css`.
 
 ## Selector

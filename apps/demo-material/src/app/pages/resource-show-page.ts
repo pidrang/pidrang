@@ -28,6 +28,11 @@ import { injectResourceShowState } from '@pidrang/demo-shared';
       </dl>
     }
   `,
+  styles: `
+    [role='alert'] {
+      color: var(--mat-sys-error);
+    }
+  `,
 })
 export class ResourceShowPage {
   readonly resource = input.required<string>();

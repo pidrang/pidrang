@@ -135,6 +135,10 @@ const STYLES = `
     margin: 0 0 8px;
     font-size: 1rem;
   }
+
+  [role='alert'] {
+    color: var(--mat-sys-error);
+  }
 `;
 
 @Component({

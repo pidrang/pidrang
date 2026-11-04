@@ -71,7 +71,7 @@ import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
       </p>
     }
     @if (list.error(); as error) {
-      <p>{{ error.message }}</p>
+      <p role="alert">{{ error.message }}</p>
     } @else {
       @if (total() === 0) {
         <p>No records yet.</p>
@@ -114,6 +114,11 @@ import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
         [disabled]="list.isLoading() || deleteLocked()"
         (page)="changePage($event)"
       />
+    }
+  `,
+  styles: `
+    [role='alert'] {
+      color: var(--mat-sys-error);
     }
   `,
 })

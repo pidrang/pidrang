@@ -17,7 +17,9 @@ import { MatButtonModule } from '@angular/material/button';
     <h1>Pidrang demo</h1>
 
     @if (session.error(); as sessionError) {
-      <p>Could not load your session: {{ sessionError.message }}</p>
+      <p role="alert">
+        Could not load your session: {{ sessionError.message }}
+      </p>
     } @else if (session.value(); as identity) {
       <p>
         Signed in as {{ identity.email ?? identity.id }}
@@ -53,6 +55,11 @@ import { MatButtonModule } from '@angular/material/button';
       Compare with the same demo built on a different UI adapter:
       <a mat-button [href]="tailwindDemoUrl">Tailwind adapter</a>
     </p>
+  `,
+  styles: `
+    [role='alert'] {
+      color: var(--mat-sys-error);
+    }
   `,
 })
 export class HomePage {

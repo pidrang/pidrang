@@ -397,4 +397,29 @@ describe('ResourceCreatePage', () => {
     );
     expect(link?.getAttribute('href')).toBe('/auth/sign-in');
   });
+
+  it('shows a failed save in the theme error color', async () => {
+    const { fixture } = setup(() => Promise.reject(new Error('network down')));
+    await settle(fixture);
+
+    const input: HTMLInputElement | null =
+      fixture.nativeElement.querySelector('input');
+    if (input === null) {
+      throw new Error('name input not rendered');
+    }
+    input.value = 'Draft';
+    input.dispatchEvent(new Event('input'));
+    await settle(fixture);
+
+    saveButton(fixture.nativeElement).click();
+    await settle(fixture);
+
+    const element = fixture.nativeElement as HTMLElement;
+    const alert = element.querySelector<HTMLElement>('[role="alert"]');
+    if (alert === null) {
+      throw new Error('alert not rendered');
+    }
+    expect(alert.textContent).toContain('network down');
+    expect(getComputedStyle(alert).color).toContain('--mat-sys-error');
+  });
 });

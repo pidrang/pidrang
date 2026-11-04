@@ -322,6 +322,26 @@ test('styles the generated pages with the Material theme', async ({ page }) => {
   expect(background).not.toBe('transparent');
 });
 
+test('shows a page error in the Material theme error color', async ({
+  page,
+}) => {
+  await page.goto('/products/00000000-0000-4000-8002-999999999999');
+  const alert = page.getByRole('alert');
+  await expect(alert).toBeVisible();
+  const [alertColor, errorColor] = await Promise.all([
+    alert.evaluate((element) => getComputedStyle(element).color),
+    page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--mat-sys-error)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    }),
+  ]);
+  expect(alertColor).toBe(errorColor);
+});
+
 function capturedBody(page: Page, method: string): () => unknown {
   let body: unknown;
   page.on('request', (request) => {

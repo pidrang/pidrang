@@ -73,6 +73,11 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
       }
     }
   `,
+  styles: `
+    [role='alert'] {
+      color: var(--mat-sys-error);
+    }
+  `,
 })
 export class ResourceEditPage {
   readonly resource = input.required<string>();

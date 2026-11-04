@@ -116,4 +116,18 @@ describe('ResourceShowPage', () => {
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
     expect(text(fixture.nativeElement)).toContain('First');
   });
+
+  it('shows a failed read in the theme error color', async () => {
+    const fixture = setup(() => Promise.reject(new Error('denied')));
+    fixture.componentRef.setInput('id', '1');
+    await fixture.whenStable();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const alert = element.querySelector<HTMLElement>('[role="alert"]');
+    if (alert === null) {
+      throw new Error('alert not rendered');
+    }
+    expect(alert.textContent).toContain('denied');
+    expect(getComputedStyle(alert).color).toContain('--mat-sys-error');
+  });
 });

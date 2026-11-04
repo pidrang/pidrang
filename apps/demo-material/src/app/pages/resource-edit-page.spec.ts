@@ -645,6 +645,24 @@ describe('ResourceEditPage', () => {
     );
     expect(link?.getAttribute('href')).toBe('/auth/sign-in');
   });
+
+  it('shows a failed save in the theme error color', async () => {
+    const { fixture } = setup(() => Promise.reject(new Error('network down')));
+    await settle(fixture);
+
+    dirtyName(fixture.nativeElement);
+    await settle(fixture);
+    saveButton(fixture.nativeElement).click();
+    await settle(fixture);
+
+    const element = fixture.nativeElement as HTMLElement;
+    const alert = element.querySelector<HTMLElement>('[role="alert"]');
+    if (alert === null) {
+      throw new Error('alert not rendered');
+    }
+    expect(alert.textContent).toContain('network down');
+    expect(getComputedStyle(alert).color).toContain('--mat-sys-error');
+  });
 });
 
 describe('ResourceEditPage sign-in link inside a route', () => {

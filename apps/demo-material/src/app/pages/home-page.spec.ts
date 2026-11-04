@@ -8,7 +8,10 @@ import { HomePage } from './home-page';
 
 const unused = () => Promise.reject(new Error('unused'));
 
-async function render(providers: Provider[]) {
+async function render(
+  providers: Provider[],
+  getIdentity: AuthProvider['getIdentity'] = () => Promise.resolve(null),
+) {
   const dataProvider: DataProvider = {
     getList: unused,
     getOne: unused,
@@ -19,7 +22,7 @@ async function render(providers: Provider[]) {
   const authProvider: AuthProvider = {
     login: () => Promise.resolve(),
     logout: () => Promise.resolve(),
-    getIdentity: () => Promise.resolve(null),
+    getIdentity,
   };
   TestBed.configureTestingModule({
     imports: [HomePage],
@@ -53,5 +56,20 @@ describe('HomePage sign-in', () => {
         (element) => element.textContent?.trim() === 'Sign in',
       ),
     ).toBe(false);
+  });
+});
+
+describe('HomePage session', () => {
+  it('shows a session error as an alert in the theme error color', async () => {
+    const page = await render([], () =>
+      Promise.reject(new Error('network down')),
+    );
+
+    const alert = page.querySelector<HTMLElement>('[role="alert"]');
+    if (alert === null) {
+      throw new Error('alert not rendered');
+    }
+    expect(alert.textContent).toContain('network down');
+    expect(getComputedStyle(alert).color).toContain('--mat-sys-error');
   });
 });

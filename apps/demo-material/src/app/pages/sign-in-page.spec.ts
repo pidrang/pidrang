@@ -121,9 +121,13 @@ describe('SignInPage demo account', () => {
     demoButton(fixture.nativeElement)?.click();
     await fixture.whenStable();
 
-    expect(
-      fixture.nativeElement.querySelector('[role="alert"]')?.textContent,
-    ).toContain('Invalid login credentials');
+    const element = fixture.nativeElement as HTMLElement;
+    const alert = element.querySelector<HTMLElement>('[role="alert"]');
+    if (alert === null) {
+      throw new Error('alert not rendered');
+    }
+    expect(alert.textContent).toContain('Invalid login credentials');
+    expect(getComputedStyle(alert).color).toContain('--mat-sys-error');
   });
 });
 

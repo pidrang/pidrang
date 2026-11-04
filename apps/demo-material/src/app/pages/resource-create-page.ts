@@ -72,6 +72,11 @@ import {
       }
     }
   `,
+  styles: `
+    [role='alert'] {
+      color: var(--mat-sys-error);
+    }
+  `,
 })
 export class ResourceCreatePage {
   readonly resource = input.required<string>();
