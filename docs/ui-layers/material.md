@@ -90,7 +90,7 @@ a {
 }
 ```
 
-Source: apps/demo-material/src/index.html and apps/demo-material/src/styles.css.
+Source: `apps/demo-material/src/index.html` and `apps/demo-material/src/styles.css`.
 
 ## Selector
 
