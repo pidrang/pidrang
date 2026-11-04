@@ -188,3 +188,134 @@ test('an unknown path shows the not found page without redirecting', async ({
     'Page not found',
   );
 });
+
+async function themeColor(
+  page: Page,
+  property: 'color' | 'background-color',
+  token: string,
+): Promise<string> {
+  return page.evaluate(
+    ([cssProperty, cssToken]) => {
+      const probe = document.createElement('span');
+      probe.style.setProperty(cssProperty, `var(${cssToken})`);
+      document.body.append(probe);
+      const value = getComputedStyle(probe).getPropertyValue(cssProperty);
+      probe.remove();
+      return value;
+    },
+    [property, token] as const,
+  );
+}
+
+test.describe('demo-material page styles', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+  });
+
+  test('uses Roboto for headings and body text', async ({ page }) => {
+    await page.goto('/demo-material/');
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect(heading).toHaveText('Pidrang demo');
+
+    const bodyFont = await page.evaluate(
+      () => getComputedStyle(document.body).fontFamily,
+    );
+    const headingFont = await heading.evaluate(
+      (element) => getComputedStyle(element).fontFamily,
+    );
+    expect(bodyFont).toMatch(/^"?Roboto/);
+    expect(headingFont).toMatch(/^"?Roboto/);
+
+    await page.goto('/demo-material/products');
+    const listHeading = page.getByRole('heading', { level: 1 });
+    await expect(listHeading).toHaveText(/^\s*products\s*$/);
+    const listHeadingFont = await listHeading.evaluate(
+      (element) => getComputedStyle(element).fontFamily,
+    );
+    expect(listHeadingFont).toMatch(/^"?Roboto/);
+  });
+
+  test('paints the page with the theme surface and text colors', async ({
+    page,
+  }) => {
+    await page.goto('/demo-material/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      'Pidrang demo',
+    );
+
+    const body = page.locator('body');
+    await expect(body).toHaveCSS(
+      'background-color',
+      await themeColor(page, 'background-color', '--mat-sys-surface'),
+    );
+    await expect(body).toHaveCSS(
+      'color',
+      await themeColor(page, 'color', '--mat-sys-on-surface'),
+    );
+    await expect(body).toHaveCSS('margin', '0px');
+  });
+
+  test('follows the dark color scheme', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto('/demo-material/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      'Pidrang demo',
+    );
+    const lightBackground = await page
+      .locator('body')
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+
+    await page.emulateMedia({ colorScheme: 'dark' });
+    const darkBackground = await page
+      .locator('body')
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+
+    expect(darkBackground).not.toBe(lightBackground);
+    expect(darkBackground).toBe(
+      await themeColor(page, 'background-color', '--mat-sys-surface'),
+    );
+  });
+
+  test('shows alerts in the theme error color and status messages in the text color', async ({
+    page,
+  }) => {
+    await page.goto('/demo-material/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      'Pidrang demo',
+    );
+
+    await page.evaluate(() => {
+      const host = document.querySelector('main') ?? document.body;
+      const alert = document.createElement('p');
+      alert.id = 'probe-alert';
+      alert.setAttribute('role', 'alert');
+      alert.textContent = 'x';
+      const status = document.createElement('p');
+      status.id = 'probe-status';
+      status.setAttribute('role', 'status');
+      status.textContent = 'y';
+      host.append(alert, status);
+    });
+
+    await expect(page.locator('#probe-alert')).toHaveCSS(
+      'color',
+      await themeColor(page, 'color', '--mat-sys-error'),
+    );
+    await expect(page.locator('#probe-status')).toHaveCSS(
+      'color',
+      await themeColor(page, 'color', '--mat-sys-on-surface'),
+    );
+  });
+
+  test('drops the default list bullets on the home page', async ({ page }) => {
+    await page.goto('/demo-material/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      'Pidrang demo',
+    );
+
+    await expect(page.locator('app-home-page ul')).toHaveCSS(
+      'list-style-type',
+      'none',
+    );
+  });
+});

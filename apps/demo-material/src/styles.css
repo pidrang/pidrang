@@ -1,0 +1,27 @@
+body {
+  margin: 0;
+  font: var(--mat-sys-body-medium);
+  color: var(--mat-sys-on-surface);
+  background: var(--mat-sys-surface);
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+}
+
+h2 {
+  font: var(--mat-sys-title-large);
+}
+
+a {
+  color: var(--mat-sys-primary);
+}
+
+[role='alert'] {
+  color: var(--mat-sys-error);
+}
+
+app-home-page ul {
+  list-style: none;
+  padding: 0;
+}
