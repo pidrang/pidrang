@@ -49,6 +49,49 @@ Declare both stylesheets under `"styles"` in the `build` options of the project 
 
 Source: `apps/demo-material/project.json` lines 23–26.
 
+## Page styles
+
+`mat.theme()` only declares the `--mat-sys-*` variables, which Material components read. It does not style the page and does not load Roboto. Without the two additions below, headings and plain text use the browser's default font and colors.
+
+Load Roboto in `src/index.html`, in `<head>`:
+
+```html
+    <link rel="preconnect" href="https://fonts.gstatic.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+```
+
+Apply the variables in the application stylesheet, `src/styles.css`:
+
+```css
+body {
+  margin: 0;
+  font: var(--mat-sys-body-medium);
+  color: var(--mat-sys-on-surface);
+  background: var(--mat-sys-surface);
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+}
+
+h2 {
+  font: var(--mat-sys-title-large);
+}
+
+a {
+  color: var(--mat-sys-primary);
+}
+
+[role='alert'] {
+  color: var(--mat-sys-error);
+}
+```
+
+Source: apps/demo-material/src/index.html and apps/demo-material/src/styles.css.
+
 ## Selector
 
 Every component emits elements prefixed with `pidrang-material-`:
