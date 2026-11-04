@@ -232,3 +232,48 @@ test('keeps the open menu inside a narrow screen with a large root font', async 
   await expect(page.locator('#app-menu')).toBeVisible();
   await expectNoHorizontalScroll(page);
 });
+
+test('scrolls the resource table sideways on a narrow screen and leaves the page in place', async ({
+  page,
+}) => {
+  await page.setViewportSize(NARROW);
+  await page.goto('/products');
+  await rowIds(page);
+
+  const region = page.getByRole('region', { name: 'Resource table' });
+  const actions = page.getByRole('columnheader', { name: 'Actions' });
+  await expect(actions).not.toBeInViewport();
+  await expectNoHorizontalScroll(page);
+  const { scrollWidth, clientWidth } = await region.evaluate((element) => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(scrollWidth).toBeGreaterThan(clientWidth);
+
+  await region.evaluate((element) => element.scrollTo(element.scrollWidth, 0));
+
+  await expect(actions).toBeInViewport();
+  await expectNoHorizontalScroll(page);
+});
+
+test('keeps the resource table at the width of its container on a wide screen', async ({
+  page,
+}) => {
+  await page.goto('/products');
+  await rowIds(page);
+
+  const region = page.getByRole('region', { name: 'Resource table' });
+  const { scrollWidth, clientWidth } = await region.evaluate((element) => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  const tableWidth = await region
+    .locator('table')
+    .evaluate((element) => element.getBoundingClientRect().width);
+
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  expect(Math.abs(tableWidth - clientWidth)).toBeLessThanOrEqual(1);
+  await expect(
+    page.getByRole('columnheader', { name: 'Actions' }),
+  ).toBeInViewport();
+});

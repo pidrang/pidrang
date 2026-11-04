@@ -136,4 +136,45 @@ describe('ResourceTable', () => {
     ).map((cell) => cell.textContent?.trim());
     expect(cells).toEqual(['129']);
   });
+
+  it('puts the table in a focusable region named Resource table', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceTable] });
+
+    const fixture = TestBed.createComponent(ResourceTable);
+    fixture.componentRef.setInput('fields', [{ name: 'name', type: 'text' }]);
+    fixture.componentRef.setInput('data', [{ name: 'Alice' }]);
+    await fixture.whenStable();
+
+    const table: HTMLTableElement | null =
+      fixture.nativeElement.querySelector('table');
+    if (table === null) {
+      throw new Error('the resource table is not rendered');
+    }
+    const container = table.parentElement;
+    expect(container?.tagName).toBe('DIV');
+    expect(container?.className).toBe('table-scroll');
+    expect(container?.getAttribute('role')).toBe('region');
+    expect(container?.getAttribute('tabindex')).toBe('0');
+    expect(container?.getAttribute('aria-label')).toBe('Resource table');
+  });
+
+  it('scrolls the table inside its container, not the page', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceTable] });
+
+    const fixture = TestBed.createComponent(ResourceTable);
+    fixture.componentRef.setInput('fields', [{ name: 'name', type: 'text' }]);
+    fixture.componentRef.setInput('data', [{ name: 'Alice' }]);
+    await fixture.whenStable();
+
+    const table: HTMLTableElement | null =
+      fixture.nativeElement.querySelector('table');
+    if (table === null) {
+      throw new Error('the resource table is not rendered');
+    }
+    const container = table.parentElement;
+    if (container === null) {
+      throw new Error('the resource table has no container');
+    }
+    expect(getComputedStyle(container).overflowX).toBe('auto');
+  });
 });

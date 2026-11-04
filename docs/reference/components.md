@@ -24,6 +24,8 @@ Projected `#actions`: a `TemplateRef<{ $implicit: T }>` rendered as the last col
 
 Mat table columns use positional names (`field-N`) rather than field names for identification, avoiding the duplicate-column error that would occur if a data column were named `actions` (colliding with the projected actions column).
 
+The table sits in a scroll container of its own: a `div` with `overflow-x: auto`, `role="region"`, `tabindex="0"` and `aria-label="Resource table"`. On a narrow screen only the table scrolls sideways, so the page stays in place and the `Actions` column is reachable by scrolling the table, and a keyboard user can focus the container even when no row has a focusable element. On a wide screen the container never scrolls and the table keeps the full width of its parent. Source: `libs/material/src/lib/resource-table/resource-table.html` and `resource-table.css`; `libs/tailwind/src/lib/resource-table/resource-table.html`.
+
 ## ResourceForm
 
 Inputs and outputs:
@@ -47,7 +49,7 @@ Behaviour:
 | Validation by type with format patterns for `date`, `timestamp`, `time`, `numeric`. An empty input on those types blocks submit unless `nullable: true`. | Always. Source: `libs/core/src/lib/field-presentation.ts` lines 18–25 (pattern), lines 36–41 (empty means no value), `resource-form.ts` lines 90–96 (`isRequiredWhenEmpty`). |
 | Submit blocked while invalid. In create mode, blocking starts immediately; in edit mode only after the field is touched and dirty + invalid. | Depends on `shouldBlockSubmit(mode, dirty, invalid)`. Source: `libs/core/src/lib/resource-form-payload.ts` lines 50–56. |
 
-`ResourceForm` is remounted per resource and per record (via `@for (r of [key]; track r)` keyed on resource name or `` `${resource()}:${id()}` ``) so Signal Forms do not carry stale dirty state across navigations. Source: `docs/design-notes.md` line 95.
+`ResourceForm` is remounted per resource and per record (via `@for (r of [key]; track r)` keyed on resource name or `` `${resource()}:${id()}` ``) so Signal Forms do not carry stale dirty state across navigations. Source: `docs/design-notes.md` line 101.
 
 ## Choosing a layer
 
