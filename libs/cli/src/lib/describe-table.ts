@@ -15,7 +15,7 @@ export interface DescribeTableOptions {
 }
 
 function sqlIdentifier(name: string): string {
-  return `"${name.replaceAll('"', '""')}"`;
+  return `"${name.replace(/"/g, '""')}"`;
 }
 
 function auditColumnWithoutDefault(
