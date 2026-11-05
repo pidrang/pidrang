@@ -1499,8 +1499,8 @@ export class App {
       expect(err.join('\n')).not.toContain('navigation layout');
       expect(layout).toContain("selector: 'app-layout'");
       expect(layout).toContain('MatToolbarModule');
-      expect(layout).toContain(
-        "import { injectSignInUrl } from '../pidrang/index';",
+      expect(layout).toMatch(
+        /import \{[^}]*\binjectSignInUrl\b[^}]*\} from '\.\.\/pidrang\/index';/,
       );
       expect(layout).not.toContain('@pidrang/demo-shared');
 
@@ -1560,8 +1560,8 @@ export class App {
       expect(after['src/app/app.routes.ts']).toContain(
         "{ path: '', pathMatch: 'full', redirectTo: '/products' },",
       );
-      expect(after['src/app/layout/app-layout.ts']).toContain(
-        "import { injectSignInUrl } from '../pidrang/index';",
+      expect(after['src/app/layout/app-layout.ts']).toMatch(
+        /import \{[^}]*\binjectSignInUrl\b[^}]*\} from '\.\.\/pidrang\/index';/,
       );
       expect(after['src/app/pidrang/index.ts']).toContain(
         "export * from './sign-in-url';",
