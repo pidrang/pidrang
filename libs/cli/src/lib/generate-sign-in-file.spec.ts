@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import * as ts from 'typescript';
 
 import { generatedSignInPage, templateOf } from './build-sign-in-page';
 import { generatePagesBundle } from './generate-pages-bundle';
@@ -31,6 +32,16 @@ function markup(template: string): string {
 
 const BS = String.fromCharCode(92);
 const D = String.fromCharCode(34);
+
+function syntaxErrors(content: string): string[] {
+  const { diagnostics } = ts.transpileModule(content, {
+    fileName: 'sign-in-page.ts',
+    reportDiagnostics: true,
+  });
+  return (diagnostics ?? []).map((diagnostic) =>
+    ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+  );
+}
 
 describe('generatedSignInPage', () => {
   const source = readDemo('sign-in-page.ts');
@@ -99,6 +110,13 @@ describe('generateSignInFile', () => {
     expect(file.content).toContain(`(submit)=${BS}${D}submit($event)${BS}${D}`);
   });
 
+  it.each(['material', 'tailwind'] as const)(
+    'writes a %s page that TypeScript parses without errors',
+    (ui) => {
+      expect(syntaxErrors(generateSignInFile(ui).content)).toEqual([]);
+    },
+  );
+
   it('asks for the same credentials in both pages', () => {
     for (const ui of ['material', 'tailwind'] as const) {
       const content = generateSignInFile(ui).content;
@@ -116,8 +134,9 @@ describe('generateSignInFile', () => {
     );
     const page = generateSignInFile('tailwind').content;
     const template = /^const TEMPLATE = "((?:[^"\\]|\\.)*)";$/m.exec(page);
-    const raw = (template?.[1] ?? '').replaceAll(`${BS}${D}`, D);
-    const pageMarkup = markup(raw);
+    const raw: unknown = JSON.parse(`${D}${template?.[1] ?? ''}${D}`);
+    expect(typeof raw).toBe('string');
+    const pageMarkup = markup(String(raw));
     const demoMarkup = markup(demo);
 
     expect(template).not.toBeNull();
