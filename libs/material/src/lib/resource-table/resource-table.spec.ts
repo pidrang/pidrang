@@ -177,4 +177,29 @@ describe('ResourceTable', () => {
     }
     expect(getComputedStyle(container).overflowX).toBe('auto');
   });
+
+  it('keeps a long field value on one line, at the top of the row, with the full value in the title', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceTable] });
+
+    const longText = 'A long value '.repeat(40).trim();
+    const fixture = TestBed.createComponent(ResourceTable);
+    fixture.componentRef.setInput('fields', [{ name: 'body', type: 'text' }]);
+    fixture.componentRef.setInput('data', [{ body: longText }]);
+    await fixture.whenStable();
+
+    const cell = fixture.nativeElement.querySelector('tbody td') as HTMLElement;
+    expect(cell.getAttribute('title')).toBe(longText);
+    expect(getComputedStyle(cell).verticalAlign).toBe('top');
+
+    const text = cell.querySelector('.cell-text');
+    if (text === null) {
+      throw new Error('the cell has no text wrapper');
+    }
+    const style = getComputedStyle(text);
+    expect(style.display).toBe('block');
+    expect(style.maxWidth).toBe('20rem');
+    expect(style.overflow).toBe('hidden');
+    expect(style.textOverflow).toBe('ellipsis');
+    expect(style.whiteSpace).toBe('nowrap');
+  });
 });

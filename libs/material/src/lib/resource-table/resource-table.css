@@ -5,3 +5,15 @@ table {
 .table-scroll {
   overflow-x: auto;
 }
+
+td.mat-mdc-cell {
+  vertical-align: top;
+}
+
+.cell-text {
+  display: block;
+  max-width: 20rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
