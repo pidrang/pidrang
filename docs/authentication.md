@@ -20,12 +20,12 @@ Without it, `injectAuthProvider()` throws a descriptive error if anything asks f
 
 `injectAuthSession(): AuthSessionRef` loads the identity once and keeps it up to date after each login or logout. It throws when no `authProvider` was passed to `providePidrang()`.
 
-| Member | Type | Meaning |
-|--------|------|---------|
-| `value()` | `AuthIdentity \| null \| undefined` | `undefined` during initial load, `null` when signed out, `AuthIdentity` when signed in. Updates automatically after login or logout. Source: `libs/core/src/lib/auth-session.ts` lines 25–36. |
-| `error()` | `Error \| undefined` | A provider failure during the initial identity load. Check this alongside `value()`. |
-| `isLoading()` | `Signal<boolean>` | True between reloads until the identity settles. |
-| `reload()` | `() => void` | Force a reload of the identity. With `@pidrang/supabase` the provider already pushes login and logout changes. |
+| Member        | Type                                | Meaning                                                                                                                                                                                       |
+| ------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value()`     | `AuthIdentity \| null \| undefined` | `undefined` during initial load, `null` when signed out, `AuthIdentity` when signed in. Updates automatically after login or logout. Source: `libs/core/src/lib/auth-session.ts` lines 25–36. |
+| `error()`     | `Error \| undefined`                | A provider failure during the initial identity load. Check this alongside `value()`.                                                                                                          |
+| `isLoading()` | `Signal<boolean>`                   | True between reloads until the identity settles.                                                                                                                                              |
+| `reload()`    | `() => void`                        | Force a reload of the identity. With `@pidrang/supabase` the provider already pushes login and logout changes.                                                                                |
 
 See [Core reference — Reading the session](./reference/core.md#reading-the-session) for details on `AuthSessionRef` and `AuthIdentity`.
 
@@ -59,12 +59,12 @@ When `pidrang init` sets up a new app, it asks whether to create a minimal sign-
 
 `provideSignInPath` refuses these values with clear error messages:
 
-| Value | Error |
-|-------|-------|
-| Empty string, surrounded spaces | `SIGN_IN_PATH must be a path inside the app, such as '/auth/sign-in', got '...'` |
-| External URL (`https://...`, `//...`) | Same — external URLs cannot be links inside the app |
-| `.` or `..` segments | Same — dot segments are checked on parsed segments, after decoding, so `%2e%2e` is refused too |
-| `/your-sign-in-route` | `"SIGN_IN_PATH is still '/your-sign-in-route': replace the placeholder with the path of your app's sign-in page"` |
+| Value                                 | Error                                                                                                             |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Empty string, surrounded spaces       | `SIGN_IN_PATH must be a path inside the app, such as '/auth/sign-in', got '...'`                                  |
+| External URL (`https://...`, `//...`) | Same — external URLs cannot be links inside the app                                                               |
+| `.` or `..` segments                  | Same — dot segments are checked on parsed segments, after decoding, so `%2e%2e` is refused too                    |
+| `/your-sign-in-route`                 | `"SIGN_IN_PATH is still '/your-sign-in-route': replace the placeholder with the path of your app's sign-in page"` |
 
 A well-formed path to a route that does not exist is not detected by `provideSignInPath`; that is the responsibility of your router configuration.
 
@@ -96,23 +96,40 @@ Demo policies for the three shared demo tables are defined in `pidrang/supabase`
 
 How the question is answered depends on the schema strategy:
 
-| Strategy | Per-table reads check? | Source |
-|----------|----------------------|--------|
+| Strategy              | Per-table reads check?                                                                                                                                                                    | Source                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Postgres (`postgres`) | Yes — queries `pg_class.relrowsecurity`, `has_table_privilege('anon')`, and policy catalog views per table. An anonymous visitor needs `select` privilege with no restrictive conditions. | `libs/cli-supabase/src/lib/postgres-schema-provider.ts` `readsNeedSignIn(table)` at lines 153–204 |
-| Secret key / GraphQL | No — both supply only OpenAPI introspection or type definitions, which do not include RLS policies. The wizard asks once on a new app, and the answer applies to all tables. | `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts` |
+| Secret key / GraphQL  | No — both supply only OpenAPI introspection or type definitions, which do not include RLS policies. The wizard asks once on a new app, and the answer applies to all tables.              | `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`                                |
 
 A guard is a convenience, not authorization. Row Level Security remains the source of truth. Adding a table later requires regenerating `resource-routes.ts` (running `pidrang init` again), because the names are written statically and read at runtime.
+
+## When nobody is signed in
+
+With an `authProvider` configured and no session, the generated pages stop offering writes:
+
+- The list page hides Create, Edit and Delete; Show stays visible, since reads are public.
+- `/<resource>/create` and `/<resource>/<id>/edit` show "Sign in to make changes." instead of the form. "Sign in" links to the path given to `provideSignInPath`, or stays plain text when no sign-in path is configured.
+- The layout menu hides the resources listed in `canMatchSignedIn([...])`, and the "Create X" entries of resources that have no list.
+- Signing out from a create or edit page, or from a page of a resource listed in `canMatchSignedIn([...])`, opens the sign-in page. Signing out from a public list leaves the page where it is.
+
+While the identity is still loading, the write actions stay hidden and the create and edit pages show neither the form nor the message: a signed-in user who reloads one of those pages never sees the message, even briefly.
+
+`injectAuthSessionState()` returns the session and the two signals the pages read: `signedOut` is true when the identity is `null` or its read failed, `sessionPending` while the identity is still unknown. `injectSignedInResources()` returns the names of the resources the layout hides, read from `Router.config`, and `urlNeedsSignIn(url, guarded)` tells the layout whether signing out should leave the current page. The list, create and edit states apply these rules, so an app generated by `pidrang init` behaves like the demos.
+
+Without an `authProvider`, nothing changes: every action stays visible, the menu is complete, and no Sign in link or Sign out button is rendered.
+
+Known limit: an app whose auth provider lets anonymous visitors write no longer shows them these actions. Declaring per resource which actions need a session is planned for 0.2.0 (#163).
 
 ## React to a failure
 
 Every method on `DataProvider` and `AuthProvider` wraps errors in `PidrangError`, which carries a `category` that maps to user-facing responses:
 
-| Category | What the user sees |
-|----------|-------------------|
+| Category          | What the user sees                                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------------- |
 | `unauthenticated` | Ask the user to sign in. Generated pages redirect through `canMatchSignedIn` before they even render. |
-| `forbidden` | Display "Not allowed." A RLS deny that reaches the client after a successful sign-in. |
-| `not-found` | Indicate the record is invisible or absent. Do not confuse this with a routing 404. |
-| `unknown` | Fall back to a generic message. Includes server errors and network failures. |
+| `forbidden`       | Display "Not allowed." A RLS deny that reaches the client after a successful sign-in.                 |
+| `not-found`       | Indicate the record is invisible or absent. Do not confuse this with a routing 404.                   |
+| `unknown`         | Fall back to a generic message. Includes server errors and network failures.                          |
 
 Each category maps to exactly one response so a page can handle all four with a single switch. The `code`, `status` and `cause` properties give context for logging but should not drive different user flows beyond what the category specifies.
 

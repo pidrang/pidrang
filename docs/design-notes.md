@@ -176,12 +176,12 @@ The pages written by `pidrang init` are the generic pages of `apps/demo-material
 
 `apps/demo-material/src/app/layout/app-layout.ts`, `apps/demo-tailwind/src/app/layout/app-layout.ts`, `tools/sync-layout.ts`, `libs/cli/src/lib/generated-layout.ts`, `build-layout-module.ts`, `generate-layout-module.ts`
 
-Like the pages, the layout `pidrang init` writes is the demos' own: `pnpm run sync:layout` reads both demo layouts, inlines their `TEMPLATE` and `STYLES` constants into the `@Component` decorator, and writes them as two strings into `generated-layout.ts`. CI runs `pnpm run sync:layout -- --check`. The only change is the import of `injectSignInUrl`: the demos take it from `@pidrang/demo-shared`, the generated layout from `'../pidrang/index'`, the page helpers barrel init writes with the pages, so the layout needs no file of its own besides `src/app/layout/app-layout.ts`. There is one variant per UI layer, chosen from the app's `package.json` (`@pidrang/tailwind` gives the Tailwind one), so a Tailwind app does not get Angular Material just for its shell.
+Like the pages, the layout `pidrang init` writes is the demos' own: `pnpm run sync:layout` reads both demo layouts, inlines their `TEMPLATE` and `STYLES` constants into the `@Component` decorator, and writes them as two strings into `generated-layout.ts`. CI runs `pnpm run sync:layout -- --check`. The only difference is the module the helpers are imported from: the demos take them from `@pidrang/demo-shared`, the generated layout from `'../pidrang/index'`, the page helpers barrel init writes with the pages, whatever names are imported, so the layout needs no file of its own besides `src/app/layout/app-layout.ts`. There is one variant per UI layer, chosen from the app's `package.json` (`@pidrang/tailwind` gives the Tailwind one), so a Tailwind app does not get Angular Material just for its shell.
 
 The layout is written only on a new app (see [A new app opens on its first list](#a-new-app-opens-on-its-first-list)): an app with its own pages already has a shell, and a second header and menu around it would be wrong more often than right. Writing it takes four more edits, because a layout that is only written breaks the app:
 
 - `app.html` gets `<app-layout appName="..." />`, and `app.ts` gets `AppLayout` in its `imports`, edited on the syntax tree by `edit-app-component.ts`. `RouterOutlet` is replaced when nothing else in the file uses it, since Angular warns about an unused standalone import (`NG8113`), and kept otherwise.
-- `app.spec.ts`: the `should create the app` test of `ng new` creates `App`, which now creates `AppLayout`, which calls `injectAuthProvider()` and throws without `providePidrang`. Init adds `TestBed.overrideComponent(App, { remove: { imports: [AppLayout] }, add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] } })` to the `beforeEach`: the test still checks `App`, without the layout. The demos' own `app.spec.ts` do the same.
+- `app.spec.ts`: the `should create the app` test of `ng new` creates `App`, which now creates `AppLayout`, which reads the session through `injectAuthSessionState()` (it accepts no auth provider) and the registered resources with `injectResources()`, which throws without `providePidrang`. Init adds `TestBed.overrideComponent(App, { remove: { imports: [AppLayout] }, add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] } })` to the `beforeEach`: the test still checks `App`, without the layout. The demos' own `app.spec.ts` do the same.
 - `app.config.ts` gets `provideSignInPath('/sign-in')` only when init writes the sign-in page there (see [The generated sign-in page](#the-generated-sign-in-page)). Writing the printed `/your-sign-in-route` placeholder instead would stop the app at startup, since `provideSignInPath` refuses it (see [The sign-in link points only to a path the app provides](#the-sign-in-link-points-only-to-a-path-the-app-provides)).
 
 ### The side menu hides on narrow screens
@@ -315,6 +315,26 @@ Angular matches routes in order and `:resource` matches any single segment. More
 `libs/demo-shared/src/lib/can-match-resource-action.ts`, its generated copy in `libs/cli/src/lib/generated-pages.ts`
 
 `Resource.list`, `create`, `show`, `edit` and `delete` default to enabled when omitted. Each resource route has a `canMatch` guard. For a segment that is not a registered resource, the guard returns `false`, so an app route declared after the resource routes (such as `/settings`) can still match. For a registered resource whose action is disabled, it redirects to `RESOURCE_UNAVAILABLE_PATH` (`resource-unavailable`) with `skipLocationChange`, so `/products/create` with `create: false` does not fall through to the show route with `create` as an id. The path lives in one constant so an app can rename it if it clashes with its own routes. Flags control what the UI offers; they are not authorization, which stays with Row Level Security.
+
+## Signed-out pages
+
+`libs/demo-shared/src/lib/auth-session-state.ts`, `guarded-resources.ts`, `inject-signed-in-resources.ts`, `url-needs-sign-in.ts`, `resource-list-state.ts`, `resource-create-state.ts`, `resource-edit-state.ts`; the layouts of both demos
+
+The rules live in the shared states, not in the pages: `resource-list-state` computes `canCreate`, `canEdit` and `canDelete`, and `resource-create-state` and `resource-edit-state` expose `signedOut` and `sessionPending`. The pages `pidrang init` writes are copied from `apps/demo-material`, so a rule written once reaches the demo and every generated app.
+
+`signedOut` (the identity is `null`, or its read failed) and `sessionPending` (the identity is still unknown) are separate so a signed-in user who reloads a create or edit page never sees the sign-in message, even for a frame. The write buttons and the "Create X" menu entries are hidden in both cases, because an action is only offered once the session is known and open; the message is shown for `signedOut` only. The submit handler refuses on `signedOut` alone: while the session is pending the form is not rendered, so there is nothing to submit.
+
+The message is a state, not an error: `role="status"`, and no error color. A visitor who arrives without a session is not in a failure case.
+
+The guarded resources are found by reading `Router.config`, routes and `children` both. `canMatchSignedIn` registers its list in a `WeakMap` whose key is the guard function it returns, so the layout recovers the names without changing the `Resource` contract or the guard signature. Routes loaded with `loadChildren` are not read: the CLI only generates `loadComponent` routes. When nothing is found, the menu stays complete, which is what an app without a guard needs.
+
+The redirect after Sign out runs in the button handler, not in a router effect: a session that expires without a click on Sign out leaves the page displayed until the next navigation. The write actions disappear as soon as the session changes, and the next navigation to a guarded resource or to a create or edit page lands on the sign-in message or page, so the limit is accepted.
+
+`urlNeedsSignIn` treats any create or edit page as protected, even for a resource that is not in `canMatchSignedIn([...])`: those pages serve no purpose without a session. A list page counts only when its resource is guarded, so signing out from a public list leaves the visitor there.
+
+The names say what they measure: `signedOut` describes the session, `signInLink` describes the link the layout renders. `signInLink` is `null` without an auth provider or without a sign-in path, so such an app shows no sign-in control and keeps its whole menu.
+
+Known limit of 0.1.1: an app whose auth provider lets anonymous visitors write now hides those actions from them too, because the states only know whether someone is signed in, not whether a resource accepts anonymous writes. #163 (0.2.0) lets each resource declare the actions that need a session.
 
 ## Demo apps
 
