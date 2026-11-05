@@ -100,7 +100,7 @@ Source: `libs/core/src/lib/auth-session-ref.ts` lines 5–10 (interface definiti
 | `time` | `<input type="text">` pattern HH:mm:ss | String (never `Date`) |
 | `numeric` | `<input type="text">` pattern decimal digits | String (never `Number`) |
 
-`date`, `timestamp`, `time` and `numeric` remain strings end to end so a calendar date, a zoned time, or a `bigint`/high-precision `numeric` round-trips without rounding through `JSON.parse` or `Date`. Validation uses regex patterns defined in `libs/core/src/lib/field-presentation.ts` lines 15–25.
+`date`, `timestamp`, `time` and `numeric` stay strings: Pidrang never converts them through `Number` or `Date`. Validation uses regex patterns defined in `libs/core/src/lib/field-presentation.ts` lines 15–25.
 
 Source: `libs/core/src/lib/field-presentation.ts` lines 3–48 (`INPUT_TYPE_BY_FIELD_TYPE`, `FORMAT_PATTERN_BY_FIELD_TYPE`, `TEXT_INPUT_BOUND_FIELD_TYPES`).
 
@@ -124,7 +124,7 @@ Three helpers apply those rules before any request. `normalizeFilters(filters: L
 | Property | Type | What it holds |
 |----------|------|---------------|
 | `data` | `T[]` | The loaded rows. |
-| `total` | `number` | Total row count for pagination. List parameters are validated before a request is sent (`validate-list-params.ts`). Source: same file, lines 22–25 (`ListResult`). |
+| `total` | `number` | Total row count for pagination. List parameters are validated before a request is sent (`validate-list-params.ts`). Source: `libs/core/src/lib/list-params.ts` lines 22–25 (`ListResult`). |
 
 Filter operators:
 

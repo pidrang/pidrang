@@ -142,11 +142,11 @@ Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts` lines
 
 | Code | Meaning |
 |------|---------|
-| 0 | Done or nothing to do. Covers: successful write, everything already up to date, install skipped/installed, present, unsupported manager. |
-| 1 | Invalid input, unsupported Node.js or app, conflicting file, failed install, unknown provider, wrong table name. |
-| 130 | Cancelled by the user (interrupt signal or declining install). Prints `Cancelled: nothing was written.` to stderr. |
+| 0 | Done or nothing to do. Covers: successful write, everything already up to date, install skipped/installed, present, unsupported manager, declining the install (the files are already written; `init` prints the install commands). |
+| 1 | Invalid input, unsupported Node.js or app, conflicting file, failed install, unknown provider, wrong table name, writing stopped by an error (`init` lists the files written and not written). |
+| 130 | Interrupted by the user (Ctrl+C). Before any write: prints `Cancelled: nothing was written.` to stderr. During the writes: lists the files written and those not written, and asks to run `init` again. At the install question: the files are already written and `init` prints the install commands. |
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 79–81 (`EXIT_OK`, `EXIT_FAILED`, `EXIT_CANCELLED`) and the `INSTALL_STATUS` map at line 629.
+Source: `apps/pidrang-cli/src/run-cli.ts` lines 79–81 (`EXIT_OK`, `EXIT_FAILED`, `EXIT_CANCELLED`) and the `INSTALL_STATUS` map at line 646.
 
 ## A second run
 

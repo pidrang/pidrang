@@ -14,12 +14,12 @@ Add a `@source` line after the Tailwind import in your global stylesheet:
 
 ```css
 @import 'tailwindcss';
-@source '../../../libs/tailwind/src';
+@source '../node_modules/@pidrang/tailwind';
 ```
 
 Adjust the relative path so it points at `node_modules/@pidrang/tailwind` from where your stylesheet sits. This tells Tailwind to scan the library's templates and emit the utility classes it uses. Without this line the classes get purged during the build because the library ships no CSS of its own.
 
-Source: `apps/demo-tailwind/src/styles.css` lines 1–2.
+Source: `tools/release-gate/consumers/tailwind/src/styles.css` lines 1–2.
 
 ## Selector
 

@@ -17,7 +17,7 @@ Inputs:
 
 | Input | Type | Required | What it does |
 |-------|------|----------|-------------|
-| `fields` | `Field[]` | Yes | Columns to display — one data column per non-hidden field, in order. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 19 (Material); Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts`. |
+| `fields` | `Field[]` | Yes | Columns to display, one data column per entry, in order. The table does not read `hidden`: the caller filters those fields out, as the list page of [Write the pages yourself](../manual-setup.md) does. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 19 (Material); Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts`. |
 | `data` | `T[]` | Yes | Rows to render. Source: same file, line 20. |
 
 Projected `#actions`: a `TemplateRef<{ $implicit: T }>` rendered as the last column with an `Actions` header. The `$implicit` context variable gives access to the current row object. A data column named `actions` keeps its own column alongside the projected one — column names are internal identifiers (`field-0`, `field-1`, …) so no collision is possible. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 21; `docs/design-notes.md` line 89.
