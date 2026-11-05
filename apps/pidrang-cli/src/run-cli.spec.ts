@@ -43,7 +43,12 @@ const SETUP: AppSetup = {
   pidrangConfig: [{ name: 'dataProvider', value: 'provideFake({ client })' }],
   environment: [
     { name: 'supabaseUrl', value: 'https://abc.supabase.co' },
-    { name: 'supabasePublishableKey', value: 'YOUR-PUBLISHABLE-KEY' },
+    {
+      name: 'supabasePublishableKey',
+      value: 'YOUR-PUBLISHABLE-KEY',
+      hint: 'the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard',
+      placeholder: true,
+    },
   ],
   notes: ['Use the publishable key in the browser, never the secret key.'],
   packages: ['@pidrang/fake', 'fake-client'],
@@ -494,11 +499,16 @@ export const routes: Routes = [
       );
       expect(out).toContain("  supabaseUrl: 'https://abc.supabase.co',");
       expect(out).toContain(
-        "  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY',",
+        "  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY', // the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard",
       );
       expect(out.join('\n')).toContain(
         'Use the publishable key in the browser, never the secret key.',
       );
+      expect(out).toContain('Next steps:');
+      expect(out.at(-1)).toBe(
+        '  1. Run ng serve and open http://localhost:4200.',
+      );
+      expect(out.join('\n')).not.toContain('replace YOUR-PUBLISHABLE-KEY');
     });
 
     it('leaves an app wired with supabaseAnonKey as it is and prints the new line', async () => {
@@ -537,7 +547,7 @@ export const routes: Routes = [
         'Add these lines to src/environments/environment.ts:',
       );
       expect(out).toContain(
-        "  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY',",
+        "  supabasePublishableKey: 'YOUR-PUBLISHABLE-KEY', // the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard",
       );
       expect(out).not.toContain("  supabaseUrl: 'https://abc.supabase.co',");
     });
@@ -578,8 +588,38 @@ export const routes: Routes = [
         },
       ]);
       expect(configurations.production.fileReplacements).toBeUndefined();
+      expect(out).toContain('Next steps:');
       expect(out).toContain(
-        '  supabasePublishableKey: the publishable key of the project (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard',
+        '  1. In src/environments/environment.ts and src/environments/environment.development.ts, replace YOUR-PUBLISHABLE-KEY with the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard.',
+      );
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
+      );
+      expect(out.join('\n')).not.toContain('your project URL');
+    });
+
+    it('asks for the project URL only when init could not write it', async () => {
+      vi.mocked(provider.appSetup).mockReturnValue({
+        ...SETUP,
+        environment: [
+          {
+            name: 'supabaseUrl',
+            value: 'https://YOUR-PROJECT-REF.supabase.co',
+            hint: 'your project URL, from the Connect button at the top of the Supabase dashboard',
+            placeholder: true,
+          },
+          SETUP.environment[1],
+        ],
+      });
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+
+      expect(out).toContain(
+        '  1. In src/environments/environment.ts and src/environments/environment.development.ts, replace https://YOUR-PROJECT-REF.supabase.co with your project URL, from the Connect button at the top of the Supabase dashboard, and YOUR-PUBLISHABLE-KEY with the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard.',
+      );
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
       );
     });
 
@@ -594,6 +634,9 @@ export const routes: Routes = [
       expect(await snapshot()).toEqual(before);
       expect(out).toContain('Nothing to write: every file already matches.');
       expect(out.filter((line) => line.startsWith('Wrote'))).toEqual([]);
+      expect(out.at(-1)).toBe(
+        '  1. Run ng serve and open http://localhost:4200.',
+      );
     });
 
     it('writes only the missing files when the others already match', async () => {
@@ -2532,7 +2575,7 @@ export const routes: Routes = [
 
   describe('the package install', () => {
     const MANUAL = [
-      'Install the packages manually, then run ng build:',
+      'Install the packages manually:',
       '  npm install @pidrang/core@9.8.7 @pidrang/fake@9.8.7 fake-client @pidrang/material@9.8.7',
       '  npx ng add @angular/material',
     ];
@@ -2572,7 +2615,10 @@ export const routes: Routes = [
         [{ command: 'npx', args: ['ng', 'add', '@angular/material'] }],
       ]);
       expect(out.indexOf('Running npx ng add @angular/material')).toBeLessThan(
-        out.indexOf('Installed the packages. Run ng build to check the app.'),
+        out.indexOf('Installed the packages.'),
+      );
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
       );
       expect(output()).not.toContain('Install the packages manually');
       expect(err).toEqual([]);
@@ -2608,7 +2654,10 @@ export const routes: Routes = [
       expect(await runCli(['init'], context())).toBe(0);
 
       expect(runCommand).not.toHaveBeenCalled();
-      expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
+      expect(out.join('\n')).toContain(MANUAL.join('\n'));
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
+      );
     });
 
     it('stops at the first failing command, keeps the files and prints the commands', async () => {
@@ -2620,7 +2669,10 @@ export const routes: Routes = [
       expect(err).toContain(
         'npm install @pidrang/core@9.8.7 @pidrang/fake@9.8.7 fake-client @pidrang/material@9.8.7 failed: see its output above.',
       );
-      expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
+      expect(out.join('\n')).toContain(MANUAL.join('\n'));
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
+      );
       expect(await listFiles()).toEqual(
         expect.arrayContaining(['src/app/resources.ts']),
       );
@@ -2634,7 +2686,10 @@ export const routes: Routes = [
       expect(await runCli(['init'], context())).toBe(130);
 
       expect(runCommand).not.toHaveBeenCalled();
-      expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
+      expect(out.join('\n')).toContain(MANUAL.join('\n'));
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
+      );
       expect(output()).not.toContain('nothing was written');
     });
 
@@ -2649,7 +2704,10 @@ export const routes: Routes = [
 
       expect(confirmInstall).not.toHaveBeenCalled();
       expect(runCommand).not.toHaveBeenCalled();
-      expect(out.slice(-MANUAL.length)).toEqual(MANUAL);
+      expect(out.join('\n')).toContain(MANUAL.join('\n'));
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
+      );
     });
 
     async function installed(versions: Record<string, string>): Promise<void> {
@@ -2686,7 +2744,10 @@ export const routes: Routes = [
 
       expect(confirmInstall).not.toHaveBeenCalled();
       expect(runCommand).not.toHaveBeenCalled();
-      expect(out.at(-1)).toBe('The required packages are already installed.');
+      expect(out).toContain('The required packages are already installed.');
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
+      );
     });
 
     it('installs only what is missing or at another version, and leaves Material alone when it is there', async () => {
@@ -2717,10 +2778,12 @@ export const routes: Routes = [
 
       expect(await runCli(['init', '--skip-install'], context())).toBe(0);
 
-      expect(out.slice(-2)).toEqual([
-        'Install the packages manually, then run ng build:',
-        '  npx ng add @angular/material',
-      ]);
+      expect(out.join('\n')).toContain(
+        [
+          'Install the packages manually:',
+          '  npx ng add @angular/material',
+        ].join('\n'),
+      );
     });
 
     it('runs nothing with a package manager it cannot run and prints the npm commands', async () => {
@@ -2735,10 +2798,15 @@ export const routes: Routes = [
 
       expect(confirmInstall).not.toHaveBeenCalled();
       expect(runCommand).not.toHaveBeenCalled();
-      expect(out.slice(-MANUAL.length)).toEqual([
-        'pidrang cannot run cnpm, the package manager this app names. Install the packages with it, then run ng build. With npm, the commands would be:',
-        ...MANUAL.slice(1),
-      ]);
+      expect(out.join('\n')).toContain(
+        [
+          'pidrang cannot run cnpm, the package manager this app names. Install the packages with it. With npm, the commands would be:',
+          ...MANUAL.slice(1),
+        ].join('\n'),
+      );
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
+      );
     });
 
     it('exits with 130 and prints what is left when interrupted during the install', async () => {
@@ -2755,10 +2823,15 @@ export const routes: Routes = [
       expect(await runCli(['init'], context())).toBe(130);
 
       expect(runCommand).toHaveBeenCalledTimes(2);
-      expect(out.slice(-2)).toEqual([
-        'Install the packages manually, then run ng build:',
-        '  npx ng add @angular/material',
-      ]);
+      expect(out.join('\n')).toContain(
+        [
+          'Install the packages manually:',
+          '  npx ng add @angular/material',
+        ].join('\n'),
+      );
+      expect(out.at(-1)).toBe(
+        '  2. Run ng serve and open http://localhost:4200.',
+      );
       expect(output()).not.toContain('failed: see its output above');
     });
   });

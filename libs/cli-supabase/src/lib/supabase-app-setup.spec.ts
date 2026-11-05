@@ -90,6 +90,7 @@ describe('supabaseAppSetup', () => {
     expect(supabaseAppSetup(connection).environment[0]).toMatchObject({
       name: 'supabaseUrl',
       value: PROJECT_URL_PLACEHOLDER,
+      placeholder: true,
     });
     expect(supabaseAppSetup(connection).environment[0].hint).toContain(
       'project URL',
@@ -112,6 +113,7 @@ describe('supabaseAppSetup', () => {
       expect(setup.environment[1]).toMatchObject({
         name: 'supabasePublishableKey',
         value: PUBLISHABLE_KEY_PLACEHOLDER,
+        placeholder: true,
       });
       expect(JSON.stringify(setup)).not.toContain(SECRET);
       expect(setup.notes.join(' ')).toContain('never the secret key');

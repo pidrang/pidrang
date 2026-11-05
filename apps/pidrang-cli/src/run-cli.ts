@@ -464,18 +464,7 @@ function printInstructions(
       context.out(`  ${edit.path}: ${edit.reason ?? 'see the comment'}`),
     );
   }
-  if (report.createdEnvironment) {
-    context.out('');
-    context.out(
-      `Created ${report.environmentPath} and ${report.environmentDevelopmentPath}. Set the Supabase values there:`,
-    );
-    context.out(
-      `  supabaseUrl: your project URL, from the Connect button at the top of the Supabase dashboard`,
-    );
-    context.out(
-      `  supabasePublishableKey: the publishable key of the project (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard`,
-    );
-  } else if (report.environmentLines.length > 0) {
+  if (!report.createdEnvironment && report.environmentLines.length > 0) {
     context.out('');
     context.out(`Add these lines to ${report.environmentPath}:`);
     report.environmentLines.forEach((line) => context.out(line));
@@ -504,6 +493,27 @@ function printInstructions(
     `When a write needs a signed-in user, the pages say so in plain text. To turn that into a link to your sign-in page, add this provider to your ${layout.configFile} and replace /your-sign-in-route with the path of that page inside your app:\n`,
   );
   context.out(SIGN_IN_PATH_SNIPPET);
+}
+
+function printNextSteps(context: CliContext, report: SetupReport): void {
+  const placeholders = report.createdEnvironment
+    ? report.setup.environment.filter((entry) => entry.placeholder === true)
+    : [];
+  context.out('');
+  context.out('Next steps:');
+  let step = 1;
+  if (placeholders.length > 0) {
+    const replacements = placeholders.map((entry) =>
+      entry.hint === undefined
+        ? entry.value
+        : `${entry.value} with ${entry.hint}`,
+    );
+    context.out(
+      `  ${step}. In ${report.environmentPath} and ${report.environmentDevelopmentPath}, replace ${replacements.join(', and ')}.`,
+    );
+    step += 1;
+  }
+  context.out(`  ${step}. Run ng serve and open http://localhost:4200.`);
 }
 
 interface InstallPlan {
@@ -608,13 +618,13 @@ function printInstallReport(
     return;
   }
   if (result.outcome === 'installed') {
-    context.out('Installed the packages. Run ng build to check the app.');
+    context.out('Installed the packages.');
     return;
   }
   context.out(
     result.outcome === 'unsupported'
-      ? `pidrang cannot run ${plan.unsupportedManager}, the package manager this app names. Install the packages with it, then run ng build. With npm, the commands would be:`
-      : 'Install the packages manually, then run ng build:',
+      ? `pidrang cannot run ${plan.unsupportedManager}, the package manager this app names. Install the packages with it. With npm, the commands would be:`
+      : 'Install the packages manually:',
   );
   result.remaining.forEach((command) =>
     context.out(`  ${formatCommand(command)}`),
@@ -979,7 +989,7 @@ async function runInit(
     installPlan,
     options.skipInstall || planPath !== undefined,
   );
-  printInstructions(context, layout, {
+  const report: SetupReport = {
     setup: generation.setup,
     edits: editPlan.edits,
     environmentPath: environment.default,
@@ -991,8 +1001,10 @@ async function runInit(
       file: signIn.file !== null,
       reason: signIn.reason,
     },
-  });
+  };
+  printInstructions(context, layout, report);
   printInstallReport(context, installPlan, installResult);
+  printNextSteps(context, report);
   return INSTALL_STATUS[installResult.outcome];
 }
 
