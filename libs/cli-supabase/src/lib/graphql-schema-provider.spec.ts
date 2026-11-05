@@ -287,6 +287,30 @@ describe('createGraphQlSchemaProvider', () => {
     expect(unavailableActions).toEqual([]);
   });
 
+  it('gives a NOT NULL audit column without a visible default only the GraphQL reason', async () => {
+    stubServer({
+      schema: schemaWith(
+        collectionField('Note', [
+          { name: 'id', typeName: 'UUID' },
+          { name: 'title', typeName: 'String', nullable: true },
+          { name: 'updatedAt', typeName: 'Datetime' },
+        ]),
+      ),
+      insertInput: { NoteInsertInput: ['title', 'updatedAt'] },
+    });
+    const introspection =
+      await createGraphQlSchemaProvider(connection).introspectTable('Note');
+    const entries = createEntries(introspection);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].reason).toContain(
+      'GraphQL cannot show whether "updatedAt" has a server default',
+    );
+    expect(
+      introspection.fields.find((field) => field.name === 'updatedAt')
+        ?.readOnly,
+    ).toBe(true);
+  });
+
   it('makes create unavailable when the key cannot see the InsertInput type', async () => {
     stubServer({ insertInput: {} });
     const introspection =

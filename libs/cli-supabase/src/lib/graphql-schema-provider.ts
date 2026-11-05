@@ -324,6 +324,7 @@ export function createGraphQlSchemaProvider(
         table,
         columns,
         createAvailability(columns, insertable),
+        { defaultsVisible: false },
       );
       await assertRestNames(
         connection,

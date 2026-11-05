@@ -482,4 +482,64 @@ describe('createServiceRoleSchemaProvider', () => {
       'Table "named_key" has a primary key named "code", not "id"',
     );
   });
+
+  it('marks audit columns with a default read-only and keeps create available', async () => {
+    const noteSchema = {
+      definitions: {
+        Note: {
+          required: ['id', 'title', 'createdAt', 'updatedAt'],
+          properties: {
+            id: {
+              type: 'string',
+              format: 'text',
+              description: PRIMARY_KEY_DESCRIPTION,
+              default: 'gen_random_uuid()',
+            },
+            title: { type: 'string', format: 'text' },
+            createdAt: {
+              type: 'string',
+              format: 'timestamp with time zone',
+              default: 'now()',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'timestamp with time zone',
+              default: 'now()',
+            },
+          },
+        },
+      },
+      paths: { '/': { get: {} }, '/Note': ALL_METHODS },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve(noteSchema),
+      }),
+    );
+    const introspection =
+      await createServiceRoleSchemaProvider(connection).introspectTable('Note');
+    expect(
+      introspection.fields.filter(
+        (field) => field.name === 'createdAt' || field.name === 'updatedAt',
+      ),
+    ).toEqual([
+      {
+        name: 'createdAt',
+        type: 'timestamp',
+        readOnly: true,
+        hasDefault: true,
+      },
+      {
+        name: 'updatedAt',
+        type: 'timestamp',
+        readOnly: true,
+        hasDefault: true,
+      },
+    ]);
+    expect(introspection.unavailableActions).toEqual([]);
+  });
 });

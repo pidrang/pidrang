@@ -215,7 +215,35 @@ export const resources: Resource[] = [
     },
   );
 
-  it('emits no default sorters when the table has no created_at field', () => {
+  it.each([
+    ['a timestamp', 'timestamp', true],
+    ['a date', 'date', true],
+    ['text', 'text', false],
+  ] as const)(
+    'with createdAt as %s, emits default sorters: %s',
+    (_label, type, expected) => {
+      const plan: GenerationPlan = {
+        providerId: 'supabase',
+        tables: [
+          {
+            table: 'products',
+            fields: [
+              { name: 'id', type: 'number' },
+              { name: 'createdAt', type },
+            ],
+            actions: ['list'],
+            hiddenFields: [],
+          },
+        ],
+      };
+
+      expect(generateResourcesFile(plan).includes('defaultSorters')).toBe(
+        expected,
+      );
+    },
+  );
+
+  it('emits no default sorters when the table has neither created_at nor createdAt', () => {
     const plan: GenerationPlan = {
       providerId: 'supabase',
       tables: [
@@ -223,7 +251,8 @@ export const resources: Resource[] = [
           table: 'tags',
           fields: [
             { name: 'id', type: 'number' },
-            { name: 'createdAt', type: 'timestamp' },
+            { name: 'inserted_at', type: 'timestamp' },
+            { name: 'updatedAt', type: 'timestamp' },
             { name: 'updated_at', type: 'timestamp' },
           ],
           actions: ['list'],
@@ -233,6 +262,107 @@ export const resources: Resource[] = [
     };
 
     expect(generateResourcesFile(plan)).not.toContain('defaultSorters');
+  });
+
+  it('prefers created_at over createdAt when both exist', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'products',
+          fields: [
+            { name: 'id', type: 'number' },
+            { name: 'createdAt', type: 'timestamp' },
+            { name: 'created_at', type: 'timestamp' },
+          ],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    const output = generateResourcesFile(plan);
+
+    expect(output).toContain(`{ field: 'created_at', order: 'desc' },`);
+    expect(output).not.toContain(`{ field: 'createdAt'`);
+  });
+
+  it('falls back to createdAt when created_at is not sortable', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'products',
+          fields: [
+            { name: 'id', type: 'number' },
+            { name: 'created_at', type: 'text' },
+            { name: 'createdAt', type: 'timestamp' },
+          ],
+          actions: ['list'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    expect(generateResourcesFile(plan)).toContain(
+      `{ field: 'createdAt', order: 'desc' },`,
+    );
+  });
+
+  it('generates a Prisma-style table with read-only audit columns sorted on createdAt', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'Note',
+          fields: [
+            { name: 'id', type: 'text', readOnly: true, hasDefault: true },
+            { name: 'title', type: 'text' },
+            {
+              name: 'createdAt',
+              type: 'timestamp',
+              readOnly: true,
+              hasDefault: true,
+            },
+            {
+              name: 'updatedAt',
+              type: 'timestamp',
+              readOnly: true,
+              hasDefault: true,
+            },
+          ],
+          actions: ['list', 'create', 'show', 'edit', 'delete'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    expect(generateResourcesFile(plan)).toBe(
+      `import { Resource } from '@pidrang/core';
+
+export const resources: Resource[] = [
+  {
+    name: 'Note',
+    label: 'Note',
+    fields: [
+      { name: 'id', label: 'Id', type: 'text', readOnly: true, hasDefault: true },
+      { name: 'title', label: 'Title', type: 'text' },
+      { name: 'createdAt', label: 'Created at', type: 'timestamp', readOnly: true, hasDefault: true },
+      { name: 'updatedAt', label: 'Updated at', type: 'timestamp', readOnly: true, hasDefault: true },
+    ],
+    defaultSorters: [
+      { field: 'createdAt', order: 'desc' },
+      { field: 'id', order: 'asc' },
+    ],
+    list: true,
+    create: true,
+    show: true,
+    edit: true,
+    delete: true,
+  },
+];
+`,
+    );
   });
 
   it('gives each resource and field a label built from its name', () => {

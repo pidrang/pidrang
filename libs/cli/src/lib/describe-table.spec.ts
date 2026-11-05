@@ -31,7 +31,7 @@ describe('describeTable', () => {
     });
   });
 
-  it.each(['created_at', 'updated_at'])(
+  it.each(['created_at', 'updated_at', 'createdAt', 'updatedAt'])(
     'marks %s read-only when it is a timestamp with a default',
     (name) => {
       const result = describeTable('products', [
@@ -51,16 +51,105 @@ describe('describeTable', () => {
   );
 
   it.each([
-    ['without a default', { name: 'created_at', type: 'timestamp' }],
     ['as a date', { name: 'created_at', type: 'date', hasDefault: true }],
     ['as text', { name: 'created_at', type: 'text', hasDefault: true }],
     [
       'under another name',
       { name: 'deleted_at', type: 'timestamp', hasDefault: true },
     ],
+    [
+      'as a camelCase date',
+      { name: 'createdAt', type: 'date', hasDefault: true },
+    ],
+    [
+      'under another camelCase name',
+      { name: 'deletedAt', type: 'timestamp', hasDefault: true },
+    ],
   ] as const)('keeps an audit-like column %s editable', (_, column) => {
     const result = describeTable('products', [id, { ...column }]);
     expect(result.fields[1]).toEqual({ ...column });
+  });
+
+  it.each(['created_at', 'updated_at', 'createdAt', 'updatedAt'])(
+    'marks a NOT NULL %s without a default read-only and makes create unavailable',
+    (name) => {
+      const result = describeTable('Note', [
+        id,
+        title,
+        { name, type: 'timestamp' },
+      ]);
+      expect(result.fields[2]).toEqual({
+        name,
+        type: 'timestamp',
+        readOnly: true,
+      });
+      expect(result.unavailableActions).toEqual([
+        {
+          action: 'create',
+          reason: `"${name}" has no database default and the create form never asks for it: run alter table public."Note" alter column "${name}" set default now(); or, if a trigger already fills it, set create: true for "Note" in src/app/resources.ts`,
+        },
+      ]);
+    },
+  );
+
+  it('escapes quotes in the table name of the create reason', () => {
+    const result = describeTable('Odd"Table', [
+      id,
+      { name: 'updatedAt', type: 'timestamp' },
+    ]);
+    expect(result.unavailableActions[0].reason).toContain(
+      `alter table public."Odd""Table" alter column "updatedAt" set default now();`,
+    );
+  });
+
+  it.each(['created_at', 'updated_at', 'createdAt', 'updatedAt'])(
+    'marks a nullable %s without a default read-only and keeps create available',
+    (name) => {
+      const result = describeTable('Note', [
+        id,
+        title,
+        { name, type: 'timestamp', nullable: true },
+      ]);
+      expect(result.fields[2]).toEqual({
+        name,
+        type: 'timestamp',
+        readOnly: true,
+        nullable: true,
+      });
+      expect(result.unavailableActions).toEqual([]);
+    },
+  );
+
+  it('does not block create for an audit column the strategy already marks read-only', () => {
+    const result = describeTable('Note', [
+      id,
+      title,
+      { name: 'updatedAt', type: 'timestamp', readOnly: true },
+    ]);
+    expect(result.unavailableActions).toEqual([]);
+  });
+
+  it('marks a NOT NULL audit column read-only without a reason when defaults are not visible', () => {
+    const result = describeTable(
+      'Note',
+      [id, title, { name: 'updatedAt', type: 'timestamp' }],
+      [],
+      { defaultsVisible: false },
+    );
+    expect(result.fields[2].readOnly).toBe(true);
+    expect(result.unavailableActions).toEqual([]);
+  });
+
+  it('keeps the unavailable actions of the strategy before the audit reason', () => {
+    const result = describeTable(
+      'Note',
+      [id, title, { name: 'updatedAt', type: 'timestamp' }],
+      [{ action: 'edit', reason: 'read-only view' }],
+    );
+    expect(result.unavailableActions.map((entry) => entry.action)).toEqual([
+      'edit',
+      'create',
+    ]);
   });
 
   const omissibleCells: [string, Partial<IntrospectedColumn>][] = [

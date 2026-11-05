@@ -48,14 +48,26 @@ function generateResourceLiteral(table: TablePlan): string {
   ].join('\n');
 }
 
+const CREATED_AT_COLUMNS = ['created_at', 'createdAt'];
+
+function sortableCreatedAt(fields: Field[]): Field | undefined {
+  for (const name of CREATED_AT_COLUMNS) {
+    const field = fields.find((candidate) => candidate.name === name);
+    if (field?.type === 'timestamp' || field?.type === 'date') {
+      return field;
+    }
+  }
+  return undefined;
+}
+
 function defaultSortersLines(fields: Field[]): string[] {
-  const createdAt = fields.find((field) => field.name === 'created_at');
-  if (createdAt?.type !== 'timestamp' && createdAt?.type !== 'date') {
+  const createdAt = sortableCreatedAt(fields);
+  if (createdAt === undefined) {
     return [];
   }
   return [
     `    defaultSorters: [`,
-    `      { field: 'created_at', order: 'desc' },`,
+    `      { field: ${quote(createdAt.name)}, order: 'desc' },`,
     `      { field: 'id', order: 'asc' },`,
     `    ],`,
   ];
