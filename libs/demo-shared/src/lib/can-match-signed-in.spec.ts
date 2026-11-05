@@ -1,9 +1,11 @@
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import {
   GuardResult,
   PartialMatchRouteSnapshot,
   RedirectCommand,
   Route,
+  Routes,
   Router,
   UrlSegment,
   provideRouter,
@@ -16,6 +18,7 @@ import {
 } from '@pidrang/core';
 
 import { canMatchSignedIn } from './can-match-signed-in';
+import { injectSignedInResources } from './inject-signed-in-resources';
 import { provideSignInPath } from './provide-sign-in-path';
 
 const dataProvider: DataProvider = {
@@ -108,5 +111,81 @@ describe('canMatchSignedIn', () => {
 
   it('lets the visitor through when the identity cannot be read', async () => {
     expect(await matches(['orders'], 'orders', { rejects: true })).toBe(true);
+  });
+});
+
+@Component({ template: '' })
+class EmptyPage {}
+
+describe('injectSignedInResources', () => {
+  function guardedNames(routes: Routes): ReadonlySet<string> {
+    TestBed.configureTestingModule({ providers: [provideRouter(routes)] });
+    return TestBed.runInInjectionContext(() => injectSignedInResources());
+  }
+
+  it('reads the resources of a guard on a top-level route', () => {
+    const names = guardedNames([
+      {
+        path: 'products',
+        canMatch: [canMatchSignedIn(['products', 'orders'])],
+        component: EmptyPage,
+      },
+    ]);
+
+    expect([...names]).toEqual(['products', 'orders']);
+  });
+
+  it('reads the resources of a guard on a child route', () => {
+    const names = guardedNames([
+      {
+        path: '',
+        children: [
+          {
+            path: 'secrets',
+            canMatch: [canMatchSignedIn(['secrets'])],
+            component: EmptyPage,
+          },
+        ],
+      },
+    ]);
+
+    expect([...names]).toEqual(['secrets']);
+  });
+
+  it('ignores a guard given as a token', () => {
+    const names = guardedNames([
+      { path: 'products', canMatch: ['someToken'], component: EmptyPage },
+    ]);
+
+    expect([...names]).toEqual([]);
+  });
+
+  it('ignores a guard that is not built by canMatchSignedIn', () => {
+    const names = guardedNames([
+      { path: 'products', canMatch: [() => true], component: EmptyPage },
+    ]);
+
+    expect([...names]).toEqual([]);
+  });
+
+  it('reads nothing without routes', () => {
+    expect([...guardedNames([])]).toEqual([]);
+  });
+
+  it('unions the resources of two guards', () => {
+    const names = guardedNames([
+      {
+        path: 'products',
+        canMatch: [canMatchSignedIn(['products'])],
+        component: EmptyPage,
+      },
+      {
+        path: 'orders',
+        canMatch: [canMatchSignedIn(['orders', 'users'])],
+        component: EmptyPage,
+      },
+    ]);
+
+    expect([...names]).toEqual(['products', 'orders', 'users']);
   });
 });

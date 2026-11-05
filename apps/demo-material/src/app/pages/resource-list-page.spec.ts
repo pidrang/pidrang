@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import {
+  AuthIdentity,
   AuthProvider,
   DataProvider,
   PidrangError,
@@ -37,17 +38,18 @@ async function setup(
   remove: (id: string) => Promise<unknown>,
   providers: Provider[] = [],
   readError: Error | null = null,
+  identity: AuthIdentity | null = { id: 'writer' },
 ) {
   const deletes: string[] = [];
   let lists = 0;
-  let sessionChanged: () => void = () => undefined;
+  const listeners = new Set<() => void>();
   const authProvider: AuthProvider = {
     login: () => Promise.resolve(),
     logout: () => Promise.resolve(),
-    getIdentity: () => Promise.resolve(null),
+    getIdentity: () => Promise.resolve(identity),
     onSessionChange: (listener) => {
-      sessionChanged = listener;
-      return () => undefined;
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
   };
   const dataProvider: DataProvider = {
@@ -87,7 +89,11 @@ async function setup(
     fixture,
     deletes,
     listCalls: () => lists,
-    changeSession: () => sessionChanged(),
+    changeSession: () => {
+      for (const listener of listeners) {
+        listener();
+      }
+    },
   };
 }
 
@@ -637,6 +643,23 @@ describe('ResourceListPage errors', () => {
     }
     expect(alert.textContent).toContain('permission denied for table products');
     expect(getComputedStyle(alert).color).toContain('--mat-sys-error');
+  });
+});
+
+describe('ResourceListPage signed out', () => {
+  it('hides Create, Edit and Delete but keeps Show when nobody is signed in', async () => {
+    const { fixture } = await setup(() => Promise.resolve(), [], null, null);
+    const element = fixture.nativeElement as HTMLElement;
+    const linkTexts = Array.from(element.querySelectorAll('a'), (anchor) =>
+      (anchor.textContent ?? '').trim(),
+    );
+
+    expect(linkTexts).not.toContain('Create');
+    expect(linkTexts).not.toContain('Edit');
+    expect(deleteButtons(element)).toEqual([]);
+    expect(linkTexts.filter((text) => text === 'Show')).toHaveLength(
+      ROWS.length,
+    );
   });
 });
 

@@ -7,11 +7,14 @@ const DEMO_SHARED = 'libs/demo-shared/src/lib';
 export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
   ...[
     'auth-required-error.ts',
+    'auth-session-state.ts',
     'can-match-resource-action.ts',
     'can-match-signed-in.ts',
     'delete-failure.ts',
     'delete-failure-of.ts',
     'earlier-save.ts',
+    'guarded-resources.ts',
+    'inject-signed-in-resources.ts',
     'navigation-failure.ts',
     'parse-sign-in-path.ts',
     'provide-sign-in-path.ts',
@@ -34,6 +37,7 @@ export const PAGES_BUNDLE_SOURCES: PagesBundleSource[] = [
     'sign-in-state.ts',
     'sign-in-url.ts',
     'sign-in.ts',
+    'url-needs-sign-in.ts',
   ].map((file) => ({
     target: `src/app/pidrang/${file}`,
     source: `${DEMO_SHARED}/${file}`,

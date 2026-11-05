@@ -10,12 +10,10 @@ import { Router } from '@angular/router';
 import { injectDataProvider, isResourceActionEnabled } from '@pidrang/core';
 
 import { isAuthRequiredError } from './auth-required-error';
+import { injectAuthSessionState } from './auth-session-state';
 import { injectEarlierSave } from './earlier-save';
 import { navigationFailure } from './navigation-failure';
-import {
-  injectResourceDefinition,
-  resourceTitle,
-} from './resource-definition';
+import { injectResourceDefinition, resourceTitle } from './resource-definition';
 import { injectResourceRecord } from './resource-record';
 import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
@@ -35,6 +33,7 @@ export function injectResourceEditState(
   const destroyRef = inject(DestroyRef);
   const errorHandler = inject(ErrorHandler);
   const definition = injectResourceDefinition(resource);
+  const auth = injectAuthSessionState();
   const target = computed(() => JSON.stringify(['edit', resource(), id()]));
   const lock = injectSaveLock(target);
   const saving = lock.locked;
@@ -116,7 +115,7 @@ export function injectResourceEditState(
   }
 
   async function submit(data: Record<string, unknown>): Promise<void> {
-    if (!canEdit() || saving()) {
+    if (auth.signedOut() || !canEdit() || saving()) {
       return;
     }
     const currentResource = resource();
@@ -151,6 +150,8 @@ export function injectResourceEditState(
     earlierSave,
     stopped,
     saveFailure,
+    signedOut: auth.signedOut,
+    sessionPending: auth.sessionPending,
     record,
     label,
     canShow,

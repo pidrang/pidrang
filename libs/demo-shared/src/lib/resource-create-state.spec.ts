@@ -1,7 +1,12 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { AuthProvider, DataProvider, providePidrang } from '@pidrang/core';
+import {
+  AuthIdentity,
+  AuthProvider,
+  DataProvider,
+  providePidrang,
+} from '@pidrang/core';
 
 import { injectResourceCreateState } from './resource-create-state';
 
@@ -77,9 +82,9 @@ describe('injectResourceCreateState', () => {
   });
 });
 
-function setupCreate() {
+function setupCreate(identity: AuthIdentity | null = { id: 'writer' }) {
   const creates: ((row: unknown) => void)[] = [];
-  let sessionChanged: () => void = () => undefined;
+  const listeners = new Set<() => void>();
   const dataProvider: DataProvider = {
     getList: () => Promise.reject(new Error('unused')),
     getOne: () => Promise.reject(new Error('unused')),
@@ -91,10 +96,10 @@ function setupCreate() {
   const authProvider: AuthProvider = {
     login: () => Promise.resolve(),
     logout: () => Promise.resolve(),
-    getIdentity: () => Promise.resolve(null),
+    getIdentity: () => Promise.resolve(identity),
     onSessionChange: (listener) => {
-      sessionChanged = listener;
-      return () => undefined;
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
   };
   TestBed.configureTestingModule({
@@ -113,7 +118,16 @@ function setupCreate() {
   const state = TestBed.runInInjectionContext(() =>
     injectResourceCreateState(signal('products')),
   );
-  return { creates, navigate, state, changeSession: () => sessionChanged() };
+  return {
+    creates,
+    navigate,
+    state,
+    changeSession: () => {
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
 }
 
 describe('injectResourceCreateState across timeouts and sessions', () => {
@@ -230,5 +244,20 @@ describe('injectResourceCreateState field visibility', () => {
 
     expect(state.fields().map((field) => field.name)).toEqual(['name']);
     expect(state.initialValue()).toEqual({ name: '' });
+  });
+});
+
+describe('injectResourceCreateState signed out', () => {
+  it('sends nothing when nobody is signed in', async () => {
+    const { creates, navigate, state } = setupCreate(null);
+    TestBed.tick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(state.signedOut()).toBe(true);
+
+    await state.submit({ name: 'Webcam' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(creates).toHaveLength(0);
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

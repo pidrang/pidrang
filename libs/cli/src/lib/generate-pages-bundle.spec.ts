@@ -221,10 +221,10 @@ describe('generatePagesBundle', () => {
       'if (!canDelete() ||',
     );
     expect(content('src/app/pidrang/resource-create-state.ts')).toContain(
-      'if (!canCreate() || saving())',
+      '!canCreate() || saving())',
     );
     expect(content('src/app/pidrang/resource-edit-state.ts')).toContain(
-      'if (!canEdit() || saving())',
+      '!canEdit() || saving())',
     );
   });
 

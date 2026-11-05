@@ -14,12 +14,10 @@ import {
 } from '@pidrang/core';
 
 import { isAuthRequiredError } from './auth-required-error';
+import { injectAuthSessionState } from './auth-session-state';
 import { injectEarlierSave } from './earlier-save';
 import { navigationFailure } from './navigation-failure';
-import {
-  injectResourceDefinition,
-  resourceTitle,
-} from './resource-definition';
+import { injectResourceDefinition, resourceTitle } from './resource-definition';
 import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
 import { SaveTimeoutError } from './save-timeout-error';
@@ -41,6 +39,7 @@ export function injectResourceCreateState(resource: Signal<string>) {
   const destroyRef = inject(DestroyRef);
   const errorHandler = inject(ErrorHandler);
   const definition = injectResourceDefinition(resource);
+  const auth = injectAuthSessionState();
 
   const target = computed(() => JSON.stringify(['create', resource()]));
   const lock = injectSaveLock(target);
@@ -108,7 +107,7 @@ export function injectResourceCreateState(resource: Signal<string>) {
   }
 
   async function submit(data: Record<string, unknown>): Promise<void> {
-    if (!canCreate() || saving()) {
+    if (auth.signedOut() || !canCreate() || saving()) {
       return;
     }
     const current = resource();
@@ -146,6 +145,8 @@ export function injectResourceCreateState(resource: Signal<string>) {
     earlierSave,
     created,
     saveFailure,
+    signedOut: auth.signedOut,
+    sessionPending: auth.sessionPending,
     canList,
     fields,
     initialValue,

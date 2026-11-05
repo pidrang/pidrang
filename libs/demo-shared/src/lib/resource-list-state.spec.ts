@@ -2,6 +2,8 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import {
+  AuthIdentity,
+  AuthProvider,
   DataProvider,
   ListParams,
   Resource,
@@ -10,7 +12,7 @@ import {
 
 import { injectResourceListState } from './resource-list-state';
 
-function setUp(resources: Resource[]) {
+function setUp(resources: Resource[], authProvider?: AuthProvider) {
   const requests: { resource: string; params: ListParams | undefined }[] = [];
   const dataProvider: DataProvider = {
     getList: <T>(resource: string, params?: ListParams) => {
@@ -23,7 +25,14 @@ function setUp(resources: Resource[]) {
     delete: () => Promise.reject(new Error('unused')),
   };
   TestBed.configureTestingModule({
-    providers: [provideRouter([]), providePidrang({ dataProvider, resources })],
+    providers: [
+      provideRouter([]),
+      providePidrang({
+        dataProvider,
+        resources,
+        ...(authProvider === undefined ? {} : { authProvider }),
+      }),
+    ],
   });
   return requests;
 }
@@ -98,5 +107,116 @@ describe('injectResourceListState', () => {
       newestFirst,
       [{ field: 'id', order: 'asc' }],
     ]);
+  });
+});
+
+function identityProvider(
+  getIdentity: () => Promise<AuthIdentity | null>,
+): AuthProvider {
+  return {
+    login: () => Promise.resolve(),
+    logout: () => Promise.resolve(),
+    getIdentity,
+  };
+}
+
+function controlledIdentity(initial: AuthIdentity | null): {
+  provider: AuthProvider;
+  setIdentity(identity: AuthIdentity | null): void;
+} {
+  let identity = initial;
+  const listeners = new Set<() => void>();
+  return {
+    provider: {
+      ...identityProvider(() => Promise.resolve(identity)),
+      onSessionChange: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    },
+    setIdentity: (next) => {
+      identity = next;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+}
+
+async function settle(): Promise<void> {
+  for (let pass = 0; pass < 3; pass += 1) {
+    TestBed.tick();
+    await Promise.resolve();
+  }
+}
+
+function listState(authProvider?: AuthProvider) {
+  setUp([{ name: 'products' }], authProvider);
+  return TestBed.runInInjectionContext(() =>
+    injectResourceListState(signal('products')),
+  );
+}
+
+describe('injectResourceListState and the session', () => {
+  it('keeps every action for a signed-in user', async () => {
+    const state = listState(
+      identityProvider(() => Promise.resolve({ id: 'writer' })),
+    );
+    await settle();
+
+    expect([
+      state.canCreate(),
+      state.canShow(),
+      state.canEdit(),
+      state.canDelete(),
+    ]).toEqual([true, true, true, true]);
+  });
+
+  it('hides the write actions but keeps show when nobody is signed in', async () => {
+    const state = listState(identityProvider(() => Promise.resolve(null)));
+    await settle();
+
+    expect(state.canCreate()).toBe(false);
+    expect(state.canShow()).toBe(true);
+    expect(state.canEdit()).toBe(false);
+    expect(state.canDelete()).toBe(false);
+  });
+
+  it('hides the write actions while the session is being read', async () => {
+    const state = listState(
+      identityProvider(() => new Promise(() => undefined)),
+    );
+    await settle();
+
+    expect(state.canCreate()).toBe(false);
+    expect(state.canShow()).toBe(true);
+    expect(state.canEdit()).toBe(false);
+    expect(state.canDelete()).toBe(false);
+  });
+
+  it('keeps every action without an auth provider', async () => {
+    const state = listState();
+    await settle();
+
+    expect([
+      state.canCreate(),
+      state.canShow(),
+      state.canEdit(),
+      state.canDelete(),
+    ]).toEqual([true, true, true, true]);
+  });
+
+  it('brings the write actions back when the session changes', async () => {
+    const auth = controlledIdentity(null);
+    const state = listState(auth.provider);
+    await settle();
+    expect(state.canCreate()).toBe(false);
+
+    auth.setIdentity({ id: 'writer' });
+    await settle();
+
+    expect(state.canCreate()).toBe(true);
+    expect(state.canEdit()).toBe(true);
+    expect(state.canDelete()).toBe(true);
   });
 });

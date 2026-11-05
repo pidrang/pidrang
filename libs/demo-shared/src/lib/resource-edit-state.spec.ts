@@ -2,6 +2,7 @@ import { ErrorHandler, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import {
+  AuthIdentity,
   AuthProvider,
   DataProvider,
   PidrangError,
@@ -92,10 +93,13 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function setup(options: { withAuth: boolean } = { withAuth: true }) {
+function setup({
+  withAuth = true,
+  identity = { id: 'writer' },
+}: { withAuth?: boolean; identity?: AuthIdentity | null } = {}) {
   const updates: ReturnType<typeof deferred<unknown>>[] = [];
   let reads = 0;
-  let sessionChanged: () => void = () => undefined;
+  const listeners = new Set<() => void>();
   const dataProvider: DataProvider = {
     getList: () => Promise.reject(new Error('unused')),
     getOne: <T>() => {
@@ -113,10 +117,10 @@ function setup(options: { withAuth: boolean } = { withAuth: true }) {
   const authProvider: AuthProvider = {
     login: () => Promise.resolve(),
     logout: () => Promise.resolve(),
-    getIdentity: () => Promise.resolve(null),
+    getIdentity: () => Promise.resolve(identity),
     onSessionChange: (listener) => {
-      sessionChanged = listener;
-      return () => undefined;
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
   };
   TestBed.configureTestingModule({
@@ -125,7 +129,7 @@ function setup(options: { withAuth: boolean } = { withAuth: true }) {
       providePidrang({
         dataProvider,
         resources: [{ name: 'products' }],
-        ...(options.withAuth ? { authProvider } : {}),
+        ...(withAuth ? { authProvider } : {}),
       }),
     ],
   });
@@ -148,7 +152,11 @@ function setup(options: { withAuth: boolean } = { withAuth: true }) {
   return {
     updates,
     reads: () => reads,
-    changeSession: () => sessionChanged(),
+    changeSession: () => {
+      for (const listener of listeners) {
+        listener();
+      }
+    },
     navigate,
     page,
     observe,
@@ -409,6 +417,19 @@ describe('injectResourceEditState across timeouts and sessions', () => {
     await flush();
 
     expect(owner.saveFailure()).toBeNull();
+  });
+
+  it('sends nothing when nobody is signed in', async () => {
+    const { updates, navigate, page, flush } = setup({ identity: null });
+    const state = page();
+    await flush();
+    expect(state.signedOut()).toBe(true);
+
+    await state.submit({ name: 'First' });
+    await flush();
+
+    expect(updates).toHaveLength(0);
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
 

@@ -2,10 +2,11 @@ import { inject } from '@angular/core';
 import { CanMatchFn, RedirectCommand } from '@angular/router';
 import { AUTH_PROVIDER } from '@pidrang/core';
 
+import { registerGuardedResources } from './guarded-resources';
 import { injectSignInUrl } from './sign-in-url';
 
 export function canMatchSignedIn(resources: readonly string[]): CanMatchFn {
-  return async (_route, segments) => {
+  const guard: CanMatchFn = async (_route, segments) => {
     const authProvider = inject(AUTH_PROVIDER, { optional: true });
     const signIn = injectSignInUrl();
     const name = segments[0]?.path;
@@ -25,4 +26,6 @@ export function canMatchSignedIn(resources: readonly string[]): CanMatchFn {
     }
     return identity !== null || new RedirectCommand(signIn);
   };
+  registerGuardedResources(guard, resources);
+  return guard;
 }

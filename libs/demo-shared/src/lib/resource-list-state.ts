@@ -14,13 +14,11 @@ import {
   isResourceActionEnabled,
 } from '@pidrang/core';
 
+import { injectAuthSessionState } from './auth-session-state';
 import { DeleteFailure } from './delete-failure';
 import { deleteFailureOf } from './delete-failure-of';
 import { injectEarlierSave } from './earlier-save';
-import {
-  injectResourceDefinition,
-  resourceTitle,
-} from './resource-definition';
+import { injectResourceDefinition, resourceTitle } from './resource-definition';
 import { recordLabel } from './record-label';
 import { ResourceRow } from './resource-row';
 import { injectSaveLock } from './save-lock';
@@ -43,6 +41,8 @@ export function injectResourceListState(resource: Signal<string>) {
   const destroyRef = inject(DestroyRef);
   const store = inject(SAVE_STORE);
   const definition = injectResourceDefinition(resource);
+  const auth = injectAuthSessionState();
+  const mayWrite = computed(() => !auth.signedOut() && !auth.sessionPending());
 
   const target = computed(() => JSON.stringify(['delete', resource()]));
   const lock = injectSaveLock(target);
@@ -113,13 +113,15 @@ export function injectResourceListState(resource: Signal<string>) {
   const lastPage = computed(() =>
     Math.max(1, Math.ceil((total() ?? 0) / pageSize())),
   );
-  const canCreate = computed(() =>
-    isResourceActionEnabled(definition(), 'create'),
+  const canCreate = computed(
+    () => mayWrite() && isResourceActionEnabled(definition(), 'create'),
   );
   const canShow = computed(() => isResourceActionEnabled(definition(), 'show'));
-  const canEdit = computed(() => isResourceActionEnabled(definition(), 'edit'));
-  const canDelete = computed(() =>
-    isResourceActionEnabled(definition(), 'delete'),
+  const canEdit = computed(
+    () => mayWrite() && isResourceActionEnabled(definition(), 'edit'),
+  );
+  const canDelete = computed(
+    () => mayWrite() && isResourceActionEnabled(definition(), 'delete'),
   );
   const fields = computed(
     () => definition()?.fields?.filter((field) => !field.hidden) ?? [],
