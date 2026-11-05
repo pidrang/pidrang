@@ -495,7 +495,11 @@ function printInstructions(
   context.out(SIGN_IN_PATH_SNIPPET);
 }
 
-function printNextSteps(context: CliContext, report: SetupReport): void {
+function printNextSteps(
+  context: CliContext,
+  report: SetupReport,
+  outcome: InstallOutcome,
+): void {
   const placeholders = report.createdEnvironment
     ? report.setup.environment.filter((entry) => entry.placeholder === true)
     : [];
@@ -513,7 +517,10 @@ function printNextSteps(context: CliContext, report: SetupReport): void {
     );
     step += 1;
   }
-  context.out(`  ${step}. Run ng serve and open http://localhost:4200.`);
+  const installed = outcome === 'installed' || outcome === 'present';
+  context.out(
+    `  ${step}. ${installed ? 'Run ng serve and open http://localhost:4200.' : 'Install the packages with the commands above, then run ng serve and open http://localhost:4200.'}`,
+  );
 }
 
 interface InstallPlan {
@@ -1004,7 +1011,7 @@ async function runInit(
   };
   printInstructions(context, layout, report);
   printInstallReport(context, installPlan, installResult);
-  printNextSteps(context, report);
+  printNextSteps(context, report, installResult.outcome);
   return INSTALL_STATUS[installResult.outcome];
 }
 

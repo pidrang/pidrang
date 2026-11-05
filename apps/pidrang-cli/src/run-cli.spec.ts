@@ -506,7 +506,7 @@ export const routes: Routes = [
       );
       expect(out).toContain('Next steps:');
       expect(out.at(-1)).toBe(
-        '  1. Run ng serve and open http://localhost:4200.',
+        '  1. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
       expect(out.join('\n')).not.toContain('replace YOUR-PUBLISHABLE-KEY');
     });
@@ -593,7 +593,7 @@ export const routes: Routes = [
         '  1. In src/environments/environment.ts and src/environments/environment.development.ts, replace YOUR-PUBLISHABLE-KEY with the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard.',
       );
       expect(out.at(-1)).toBe(
-        '  2. Run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
       expect(out.join('\n')).not.toContain('your project URL');
     });
@@ -619,7 +619,7 @@ export const routes: Routes = [
         '  1. In src/environments/environment.ts and src/environments/environment.development.ts, replace https://YOUR-PROJECT-REF.supabase.co with your project URL, from the Connect button at the top of the Supabase dashboard, and YOUR-PUBLISHABLE-KEY with the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard.',
       );
       expect(out.at(-1)).toBe(
-        '  2. Run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
     });
 
@@ -635,7 +635,7 @@ export const routes: Routes = [
       expect(out).toContain('Nothing to write: every file already matches.');
       expect(out.filter((line) => line.startsWith('Wrote'))).toEqual([]);
       expect(out.at(-1)).toBe(
-        '  1. Run ng serve and open http://localhost:4200.',
+        '  1. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
     });
 
@@ -2656,7 +2656,7 @@ export const routes: Routes = [
       expect(runCommand).not.toHaveBeenCalled();
       expect(out.join('\n')).toContain(MANUAL.join('\n'));
       expect(out.at(-1)).toBe(
-        '  2. Run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
     });
 
@@ -2671,7 +2671,7 @@ export const routes: Routes = [
       );
       expect(out.join('\n')).toContain(MANUAL.join('\n'));
       expect(out.at(-1)).toBe(
-        '  2. Run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
       expect(await listFiles()).toEqual(
         expect.arrayContaining(['src/app/resources.ts']),
@@ -2688,7 +2688,7 @@ export const routes: Routes = [
       expect(runCommand).not.toHaveBeenCalled();
       expect(out.join('\n')).toContain(MANUAL.join('\n'));
       expect(out.at(-1)).toBe(
-        '  2. Run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
       expect(output()).not.toContain('nothing was written');
     });
@@ -2706,7 +2706,7 @@ export const routes: Routes = [
       expect(runCommand).not.toHaveBeenCalled();
       expect(out.join('\n')).toContain(MANUAL.join('\n'));
       expect(out.at(-1)).toBe(
-        '  2. Run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
     });
 
@@ -2805,7 +2805,7 @@ export const routes: Routes = [
         ].join('\n'),
       );
       expect(out.at(-1)).toBe(
-        '  2. Run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
     });
 
@@ -2830,7 +2830,7 @@ export const routes: Routes = [
         ].join('\n'),
       );
       expect(out.at(-1)).toBe(
-        '  2. Run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
       expect(output()).not.toContain('failed: see its output above');
     });
