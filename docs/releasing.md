@@ -34,6 +34,11 @@ Steps:
 2. Open Actions, Release, Run workflow on `main` and enter the version. Leave `dry-run` checked first and read the log: the gate result, the version and changelog entry of the `tag` job, and the `npm publish --dry-run` output of each package in the `publish` job.
 3. Run it again with `dry-run` unchecked.
 4. Check the tag, the GitHub Release and the npm pages, including the provenance badge on each package page.
+5. Deploy the docs from the tag:
+   1. In this repository, run `Docs artifacts` (`.github/workflows/docs-artifacts.yml`) with Run workflow and `ref` set to `vX.Y.Z`.
+   2. In `pidrang/pidrang.github.io`, run `Deploy docs` (`.github/workflows/deploy-docs.yml`) with `run-id` set to the id of that run. It checks the run, then opens a `deploy/docs-<sha>` pull request; merge it.
+
+   The docs on `pidrang.dev` follow the latest release, not `main`, by design.
 
 For the very first release, set `first-release`, because no version tag exists yet.
 

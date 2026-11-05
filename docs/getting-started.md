@@ -35,6 +35,8 @@ npx pidrang init
 4. Whether to add the navigation layout and the sign-in page, both yes by default, and whether your tables need a signed-in user to be read.
 5. Whether to install the packages the app is missing among `@pidrang/core`, `@pidrang/supabase`, `@supabase/supabase-js` and `@pidrang/material`, and to run `ng add @angular/material`.
 
+`hidden` removes a field from the list and the edit form; the create form shows every writable field and the show page keeps every field. Set `readOnly` on a column only the database writes, such as the primary key or `created_at`; set `hasDefault` on a column the database fills when the create form leaves it unchanged.
+
 It writes `src/environments/environment.ts` and `environment.development.ts` with your project URL and a placeholder for the key. Replace `supabasePublishableKey` in both with the publishable key of the project: the app runs in the browser, so never put the secret key or the database password there.
 
 ```bash
