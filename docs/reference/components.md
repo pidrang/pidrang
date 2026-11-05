@@ -26,7 +26,7 @@ Mat table columns use positional names (`field-N`) rather than field names for i
 
 The table sits in a scroll container of its own: a `div` with `overflow-x: auto`, `role="region"`, `tabindex="0"` and `aria-label="Resource table"`. On a narrow screen only the table scrolls sideways, so the page stays in place and the `Actions` column is reachable by scrolling the table, and a keyboard user can focus the container even when no row has a focusable element. On a wide screen the container never scrolls and the table keeps the full width of its parent. Source: `libs/material/src/lib/resource-table/resource-table.html` and `resource-table.css`; `libs/tailwind/src/lib/resource-table/resource-table.html`.
 
-Long values in a data cell stay on one line, cut at 20rem with an ellipsis, and the full value is in the cell's `title`; the Show page renders the whole value. Cells align to the top, and the actions column is not truncated. Source: `libs/material/src/lib/resource-table/resource-table.css` and `resource-table.html`; `libs/tailwind/src/lib/resource-table/resource-table.html`.
+Long values in a data cell stay on one line, cut at 12rem with an ellipsis, and the full value is in the cell's `title`; the Show page renders the whole value. Cells align to the top, the actions column is not truncated and does not wrap, so its buttons stay on one line. Source: `libs/material/src/lib/resource-table/resource-table.css` and `resource-table.html`; `libs/tailwind/src/lib/resource-table/resource-table.html`.
 
 ## ResourceForm
 

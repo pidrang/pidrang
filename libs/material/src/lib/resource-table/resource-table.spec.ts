@@ -197,9 +197,38 @@ describe('ResourceTable', () => {
     }
     const style = getComputedStyle(text);
     expect(style.display).toBe('block');
-    expect(style.maxWidth).toBe('20rem');
+    expect(style.maxWidth).toBe('12rem');
     expect(style.overflow).toBe('hidden');
     expect(style.textOverflow).toBe('ellipsis');
     expect(style.whiteSpace).toBe('nowrap');
+  });
+
+  it('keeps the projected actions on one line', async () => {
+    @Component({
+      imports: [ResourceTable],
+      template: `
+        <pidrang-material-resource-table [fields]="fields" [data]="data">
+          <ng-template #actions let-row>
+            <a href="/">Show</a>
+            <a href="/">Edit</a>
+            <button type="button">Delete {{ row.name }}</button>
+          </ng-template>
+        </pidrang-material-resource-table>
+      `,
+    })
+    class HostWithNowrapActions {
+      protected readonly fields = [{ name: 'name', type: 'text' as const }];
+      protected readonly data = [{ name: 'Alice' }];
+    }
+
+    TestBed.configureTestingModule({ imports: [HostWithNowrapActions] });
+
+    const fixture = TestBed.createComponent(HostWithNowrapActions);
+    await fixture.whenStable();
+
+    const actionsCell = fixture.nativeElement.querySelector(
+      'tbody tr td:last-child',
+    ) as HTMLElement;
+    expect(getComputedStyle(actionsCell).whiteSpace).toBe('nowrap');
   });
 });

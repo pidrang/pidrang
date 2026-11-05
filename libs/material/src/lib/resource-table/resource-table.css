@@ -12,8 +12,12 @@ td.mat-mdc-cell {
 
 .cell-text {
   display: block;
-  max-width: 20rem;
+  max-width: 12rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions-cell {
   white-space: nowrap;
 }

@@ -201,7 +201,38 @@ describe('ResourceTable', () => {
     }
     expect(text.textContent?.trim()).toBe(longText);
     expect(text.className).toContain('block');
-    expect(text.className).toContain('max-w-xs');
+    expect(text.className).toContain('max-w-[12rem]');
     expect(text.className).toContain('truncate');
+  });
+
+  it('keeps the projected actions on one line', async () => {
+    @Component({
+      imports: [ResourceTable],
+      template: `
+        <pidrang-tailwind-resource-table [fields]="fields" [data]="data">
+          <ng-template #actions let-row>
+            <span class="flex gap-3">
+              <a href="/">Show</a>
+              <a href="/">Edit</a>
+              <button type="button">Delete {{ row.name }}</button>
+            </span>
+          </ng-template>
+        </pidrang-tailwind-resource-table>
+      `,
+    })
+    class HostWithNowrapActions {
+      protected readonly fields = [{ name: 'name', type: 'text' as const }];
+      protected readonly data = [{ name: 'Alice' }];
+    }
+
+    TestBed.configureTestingModule({ imports: [HostWithNowrapActions] });
+
+    const fixture = TestBed.createComponent(HostWithNowrapActions);
+    await fixture.whenStable();
+
+    const actionsCell = fixture.nativeElement.querySelector(
+      'tbody tr td:last-child',
+    ) as HTMLElement;
+    expect(actionsCell.className).toContain('whitespace-nowrap');
   });
 });
