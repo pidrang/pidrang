@@ -1,7 +1,13 @@
-import { Component, ViewEncapsulation } from '@angular/core';
+import { Component, Provider, ViewEncapsulation } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { AuthProvider, DataProvider, providePidrang } from '@pidrang/core';
+import { Router, Routes, provideRouter } from '@angular/router';
+import {
+  AuthIdentity,
+  AuthProvider,
+  DataProvider,
+  providePidrang,
+} from '@pidrang/core';
+import { canMatchSignedIn, provideSignInPath } from '@pidrang/demo-shared';
 
 import { AppLayout } from './app-layout';
 
@@ -17,7 +23,7 @@ const noopDataProvider: DataProvider = {
 const noopAuthProvider: AuthProvider = {
   login: () => Promise.resolve(),
   logout: () => Promise.resolve(),
-  getIdentity: () => Promise.resolve(null),
+  getIdentity: () => Promise.resolve({ id: 'writer' }),
 };
 
 @Component({ template: '' })
@@ -53,13 +59,24 @@ function stubWidth(width: Width | null): void {
   });
 }
 
-async function render(): Promise<ComponentFixture<AppLayout>> {
+interface RenderOptions {
+  routes?: Routes;
+  authProvider?: AuthProvider | null;
+  providers?: Provider[];
+}
+
+async function render(
+  options: RenderOptions = {},
+): Promise<ComponentFixture<AppLayout>> {
   TestBed.configureTestingModule({
     providers: [
-      provideRouter([{ path: '**', component: EmptyPage }]),
+      provideRouter(options.routes ?? [{ path: '**', component: EmptyPage }]),
+      ...(options.providers ?? []),
       providePidrang({
         dataProvider: noopDataProvider,
-        authProvider: noopAuthProvider,
+        ...(options.authProvider === null
+          ? {}
+          : { authProvider: options.authProvider ?? noopAuthProvider }),
         resources: [
           { name: 'products', label: 'Products' },
           { name: 'notes', label: 'Notes', list: false },
@@ -71,6 +88,52 @@ async function render(): Promise<ComponentFixture<AppLayout>> {
   fixture.componentRef.setInput('appName', 'Demo');
   await fixture.whenStable();
   return fixture;
+}
+
+async function settle(fixture: ComponentFixture<AppLayout>): Promise<void> {
+  fixture.detectChanges();
+  await fixture.whenStable();
+  await new Promise((resolve) => setTimeout(resolve));
+  fixture.detectChanges();
+}
+
+function menuLinks(fixture: ComponentFixture<AppLayout>): string[] {
+  return Array.from(
+    fixture.nativeElement.querySelectorAll('#app-menu a'),
+    (anchor) => (anchor as HTMLElement).textContent?.trim() ?? '',
+  );
+}
+
+function controlledAuth(initial: AuthIdentity | null): {
+  provider: AuthProvider;
+  setIdentity(identity: AuthIdentity | null): void;
+} {
+  let identity = initial;
+  const listeners = new Set<() => void>();
+  const notify = (): void => {
+    for (const listener of listeners) {
+      listener();
+    }
+  };
+  return {
+    provider: {
+      login: () => Promise.resolve(),
+      logout: () => {
+        identity = null;
+        notify();
+        return Promise.resolve();
+      },
+      getIdentity: () => Promise.resolve(identity),
+      onSessionChange: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    },
+    setIdentity: (next) => {
+      identity = next;
+      notify();
+    },
+  };
 }
 
 function menu(fixture: ComponentFixture<AppLayout>): HTMLElement | null {
@@ -248,5 +311,118 @@ describe('AppLayout', () => {
     const fixture = await render();
 
     expect(menu(fixture)).not.toBeNull();
+  });
+});
+
+function signOutButton(fixture: ComponentFixture<AppLayout>): HTMLElement {
+  const button = Array.from(
+    fixture.nativeElement.querySelectorAll('button'),
+  ).find(
+    (candidate) =>
+      (candidate as HTMLElement).textContent?.trim() === 'Sign out',
+  );
+  if (!(button instanceof HTMLElement)) {
+    throw new Error('No Sign out button');
+  }
+  return button;
+}
+
+describe('AppLayout and the session', () => {
+  const original = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+
+  afterEach(() => {
+    if (original === undefined) {
+      Reflect.deleteProperty(window, 'matchMedia');
+    } else {
+      Object.defineProperty(window, 'matchMedia', original);
+    }
+  });
+
+  it('hides the guarded resources from the menu until someone signs in', async () => {
+    stubWidth({ matches: false });
+    const auth = controlledAuth(null);
+    const fixture = await render({
+      authProvider: auth.provider,
+      routes: [
+        {
+          path: 'products',
+          canMatch: [canMatchSignedIn(['products'])],
+          component: EmptyPage,
+        },
+        { path: '**', component: EmptyPage },
+      ],
+    });
+    await settle(fixture);
+
+    expect(menuLinks(fixture)).toEqual(['Home']);
+
+    auth.setIdentity({ id: 'writer' });
+    await settle(fixture);
+
+    expect(menuLinks(fixture)).toEqual(['Home', 'Products', 'Create Notes']);
+  });
+
+  it('keeps the readable resources in the menu when nothing is guarded', async () => {
+    stubWidth({ matches: false });
+    const fixture = await render({
+      authProvider: controlledAuth(null).provider,
+    });
+    await settle(fixture);
+
+    expect(menuLinks(fixture)).toEqual(['Home', 'Products']);
+  });
+
+  it('shows the whole menu and no sign-in controls without an auth provider', async () => {
+    stubWidth({ matches: false });
+    const fixture = await render({
+      authProvider: null,
+      providers: [provideSignInPath('sign-in')],
+    });
+    await settle(fixture);
+
+    expect(menuLinks(fixture)).toEqual(['Home', 'Products', 'Create Notes']);
+    const texts = Array.from(
+      fixture.nativeElement.querySelectorAll('a, button'),
+      (element) => (element as HTMLElement).textContent?.trim() ?? '',
+    );
+    expect(texts).not.toContain('Sign in');
+    expect(texts).not.toContain('Sign out');
+  });
+
+  it('opens the sign-in page after a sign-out on a create page', async () => {
+    stubWidth({ matches: false });
+    const auth = controlledAuth({ id: 'writer' });
+    const fixture = await render({
+      authProvider: auth.provider,
+      providers: [provideSignInPath('sign-in')],
+    });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/products/create');
+    await settle(fixture);
+    const navigate = vi.spyOn(router, 'navigateByUrl');
+
+    signOutButton(fixture).click();
+    await settle(fixture);
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(String(navigate.mock.calls[0]?.[0])).toBe('/sign-in');
+  });
+
+  it('stays on a list page after a sign-out', async () => {
+    stubWidth({ matches: false });
+    const auth = controlledAuth({ id: 'writer' });
+    const fixture = await render({
+      authProvider: auth.provider,
+      providers: [provideSignInPath('sign-in')],
+    });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/products');
+    await settle(fixture);
+    const navigate = vi.spyOn(router, 'navigateByUrl');
+
+    signOutButton(fixture).click();
+    await settle(fixture);
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

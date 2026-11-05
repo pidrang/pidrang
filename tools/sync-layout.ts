@@ -13,9 +13,8 @@ export type BuildLayoutModule = (
   replaceImports: (imports: string) => string[],
 ) => string[];
 
-const SHARED_IMPORT = "import { injectSignInUrl } from '@pidrang/demo-shared';";
-const PAGE_HELPERS_IMPORT =
-  "import { injectSignInUrl } from '../pidrang/index';";
+const SHARED_MODULE = "'@pidrang/demo-shared'";
+const PAGE_HELPERS_MODULE = "'../pidrang/index'";
 const SIGN_IN_URL_EXPORT = "export * from './sign-in-url';";
 
 function withPageHelpers(imports: string): string[] {
@@ -28,10 +27,10 @@ function withPageHelpers(imports: string): string[] {
   ) {
     throw new Error('The page helpers export no injectSignInUrl');
   }
-  if (!imports.split('\n').includes(SHARED_IMPORT)) {
-    throw new Error('The demo layout does not import @pidrang/demo-shared');
+  if (imports.split(SHARED_MODULE).length !== 2) {
+    throw new Error('The demo layout must import @pidrang/demo-shared once');
   }
-  return [imports.replace(SHARED_IMPORT, () => PAGE_HELPERS_IMPORT)];
+  return [imports.replace(SHARED_MODULE, () => PAGE_HELPERS_MODULE)];
 }
 
 const demoLayout = (app: string): string =>

@@ -2,19 +2,25 @@ import {
   Component,
   DOCUMENT,
   ElementRef,
+  computed,
   inject,
   input,
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
-  injectAuthProvider,
-  injectAuthSession,
-  injectResources,
-  isResourceActionEnabled,
-} from '@pidrang/core';
-import { injectSignInUrl } from '@pidrang/demo-shared';
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
+import { injectResources, isResourceActionEnabled } from '@pidrang/core';
+import {
+  injectAuthSessionState,
+  injectSignedInResources,
+  injectSignInUrl,
+  urlNeedsSignIn,
+} from '@pidrang/demo-shared';
 
 const TEMPLATE = `
   <header
@@ -36,7 +42,7 @@ const TEMPLATE = `
     <span
       class="ml-auto text-sm text-gray-700 max-[48rem]:flex max-[48rem]:min-w-0 max-[48rem]:items-center"
     >
-      @if (session.value(); as identity) {
+      @if (currentIdentity(); as identity) {
         <span class="min-w-0 max-[48rem]:truncate">{{
           identity.email ?? identity.id
         }}</span>
@@ -47,7 +53,7 @@ const TEMPLATE = `
         >
           Sign out
         </button>
-      } @else if (signInUrl; as path) {
+      } @else if (signInLink; as path) {
         <a
           [routerLink]="path"
           class="shrink-0 rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
@@ -72,7 +78,7 @@ const TEMPLATE = `
           class="block rounded px-3 py-2 text-sm break-words text-gray-800 hover:bg-gray-200"
           >Home</a
         >
-        @for (resource of resources; track resource.name) {
+        @for (resource of visibleResources(); track resource.name) {
           @if (isResourceActionEnabled(resource, 'list')) {
             <a
               [routerLink]="['/', resource.name]"
@@ -81,7 +87,7 @@ const TEMPLATE = `
               class="block rounded px-3 py-2 text-sm break-words text-gray-800 hover:bg-gray-200"
               >{{ resource.label ?? resource.name }}</a
             >
-          } @else if (isResourceActionEnabled(resource, 'create')) {
+          } @else if (mayWrite() && isResourceActionEnabled(resource, 'create')) {
             <a
               [routerLink]="['/', resource.name, 'create']"
               routerLinkActive="bg-gray-200 font-semibold"
@@ -108,15 +114,28 @@ const TEMPLATE = `
 export class AppLayout {
   readonly appName = input.required<string>();
 
-  protected readonly session = injectAuthSession();
-  protected readonly signInUrl = injectSignInUrl();
+  private readonly auth = injectAuthSessionState();
+  private readonly router = inject(Router);
+  private readonly guarded = injectSignedInResources();
+  private readonly signInUrl = injectSignInUrl();
+  protected readonly signInLink =
+    this.auth.session === null ? null : this.signInUrl;
+  protected readonly currentIdentity = computed(
+    () => this.auth.session?.value() ?? null,
+  );
+  protected readonly mayWrite = computed(
+    () => !this.auth.signedOut() && !this.auth.sessionPending(),
+  );
   private readonly narrow =
     inject(DOCUMENT).defaultView?.matchMedia?.('(width < 48rem)');
   protected readonly menuOpen = signal(this.narrow?.matches !== true);
   protected readonly isResourceActionEnabled = isResourceActionEnabled;
   protected readonly resources = injectResources();
-
-  private readonly authProvider = injectAuthProvider();
+  protected readonly visibleResources = computed(() =>
+    this.auth.signedOut()
+      ? this.resources.filter((resource) => !this.guarded.has(resource.name))
+      : this.resources,
+  );
 
   private readonly menuButton = viewChild.required('menuButton', {
     read: ElementRef<HTMLElement>,
@@ -145,6 +164,12 @@ export class AppLayout {
   }
 
   protected async signOut(): Promise<void> {
-    await this.authProvider.logout();
+    await this.auth.signOut();
+    if (
+      this.signInUrl !== null &&
+      urlNeedsSignIn(this.router.url, this.guarded)
+    ) {
+      await this.router.navigateByUrl(this.signInUrl);
+    }
   }
 }

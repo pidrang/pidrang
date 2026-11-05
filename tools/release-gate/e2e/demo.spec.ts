@@ -26,12 +26,51 @@ test('opens the home page and the products list up to row eleven', async ({
   await expect(page.locator('tbody tr').first()).toContainText(newest[10]);
 });
 
-test('opens the show, edit and create pages of a record', async ({ page }) => {
+test('shows a record to an anonymous visitor', async ({ page }) => {
   await page.goto(`/products/${products.firstId}`);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'products — ',
   );
   await expect(page.locator('dd').first()).toHaveText(products.firstId);
+
+  await page.goto('/products');
+  await expect(page.locator('tbody tr').first()).toBeVisible();
+  await expect(
+    page.getByRole('main').getByRole('link', { name: 'Create' }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Edit' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Show' }).first()).toBeVisible();
+});
+
+test('asks an anonymous visitor to sign in before a write', async ({
+  page,
+}) => {
+  for (const path of [
+    `/products/${products.firstId}/edit`,
+    '/products/create',
+  ]) {
+    await page.goto(path);
+    const status = page
+      .getByRole('status')
+      .filter({ hasText: 'to make changes.' });
+    await expect(status).toBeVisible();
+    await expect(status.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      /\/login$/,
+    );
+    await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+  }
+});
+
+test('opens the edit and create forms once signed in', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(expectations.writer.email);
+  await page.getByLabel('Password').fill(expectations.writer.password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(
+    page.getByText(`Signed in as ${expectations.writer.email}`),
+  ).toBeVisible();
 
   await page.goto(`/products/${products.firstId}/edit`);
   await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
@@ -40,6 +79,7 @@ test('opens the show, edit and create pages of a record', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'Create products' }),
   ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
 });
 
 test('signs in with the fixture writer and deletes a record', async ({

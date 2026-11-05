@@ -221,37 +221,45 @@ test('reports a write that row-level security refuses and keeps the row', async 
   expect((await storedAsText(page, id)).name).toBe(name);
 });
 
-test('asks an anonymous user to sign in, then lets the write through', async ({
-  page,
-}) => {
+test('asks an anonymous user to sign in before a write', async ({ page }) => {
   await page.goto('/fixture_items');
-  page.on('dialog', (dialog) => dialog.accept());
-  await page
-    .locator('tbody tr')
-    .first()
-    .getByRole('button', { name: 'Delete' })
-    .click();
+  await expect(page.locator('tbody tr').first()).toBeVisible();
+  await expect(
+    page.getByRole('main').getByRole('link', { name: 'Create' }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Edit' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Show' }).first()).toBeVisible();
 
-  const link = page.getByRole('alert').getByRole('link', { name: 'sign in' });
-  await expect(link).toHaveAttribute('href', '/sign-in');
-  await link.click();
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  for (const path of [
+    '/fixture_items/create',
+    `/fixture_items/${fixture_items.lockedId}/edit`,
+  ]) {
+    await page.goto(path);
+    const status = page
+      .getByRole('status')
+      .filter({ hasText: 'to make changes.' });
+    await expect(status).toBeVisible();
+    await expect(status.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/sign-in',
+    );
+    await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+  }
+
+  await page.getByRole('status').getByRole('link', { name: 'Sign in' }).click();
   await page.getByLabel('Email').fill(expectations.writer.email);
   await page.getByLabel('Password').fill(expectations.writer.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.locator('.identity')).toBeVisible();
-
-  const [newestId] = await productIdsNewestFirst(page);
-  await page.goto('/products');
-  await page
-    .locator('tbody tr')
-    .first()
-    .getByRole('button', { name: 'Delete' })
-    .click();
-  await expect(page.locator('tbody tr').first()).not.toContainText(newestId);
+  await page.getByLabel('Password').press('Enter');
+  await expect(page.locator('.identity')).toHaveText(expectations.writer.email);
+  await page.goto('/fixture_items');
+  await expect(
+    page.getByRole('main').getByRole('link', { name: 'Create' }),
+  ).toBeVisible();
 });
 
 test('honours the generated action flags', async ({ page }) => {
+  await signIn(page);
   const requested: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/rest/v1/')) {
@@ -312,6 +320,7 @@ test('renders a record into the show page through route input binding', async ({
 });
 
 test('styles the generated pages with the Material theme', async ({ page }) => {
+  await signIn(page);
   await page.goto('/products');
   const create = page.getByRole('main').getByRole('link', { name: 'Create' });
   await expect(create).toBeVisible();

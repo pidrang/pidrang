@@ -15,51 +15,21 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
       <a mat-button [routerLink]="['/', resource()]">Back to list</a>
     }
 
-    @if (earlierSave.failure(); as earlierFailure) {
-      <p role="alert">The earlier save failed: {{ earlierFailure.message }}</p>
-      @if (earlierFailure.authRequired) {
-        <p>
-          You may need to
-          @if (signInUrl; as path) {
-            <a [routerLink]="path">sign in</a>
-          } @else {
-            sign in
-          }
-          to make changes.
-        </p>
-      }
-    }
-    @if (earlierSave.finished()) {
-      <p role="status">The earlier save finished.</p>
-    }
-    @if (record.isLoading()) {
-      <p role="status">Loading…</p>
-    }
-    @if (stopped(); as message) {
-      <p role="alert">{{ message }}</p>
-    }
-    @if (record.error(); as loadError) {
-      <p role="alert">{{ loadError.message }}</p>
-      <button mat-stroked-button type="button" (click)="record.reload()">
-        Retry
-      </button>
-    } @else if (savingElsewhere()) {
+    @if (signedOut()) {
       <p role="status">
-        This record is being saved. The form comes back when that save finishes.
+        @if (signInUrl; as path) {
+          <a [routerLink]="path">Sign in</a>
+        } @else {
+          Sign in
+        }
+        to make changes.
       </p>
-    } @else if (value(); as value) {
-      @for (r of [resource() + ':' + id()]; track r) {
-        <pidrang-material-resource-form
-          mode="edit"
-          [fields]="fields()"
-          [value]="value"
-          [pending]="saving()"
-          (save)="submit($event)"
-        />
-      }
-      @if (saveFailure(); as failure) {
-        <p role="alert">{{ failure.message }}</p>
-        @if (failure.authRequired) {
+    } @else if (!sessionPending()) {
+      @if (earlierSave.failure(); as earlierFailure) {
+        <p role="alert">
+          The earlier save failed: {{ earlierFailure.message }}
+        </p>
+        @if (earlierFailure.authRequired) {
           <p>
             You may need to
             @if (signInUrl; as path) {
@@ -69,6 +39,50 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
             }
             to make changes.
           </p>
+        }
+      }
+      @if (earlierSave.finished()) {
+        <p role="status">The earlier save finished.</p>
+      }
+      @if (record.isLoading()) {
+        <p role="status">Loading…</p>
+      }
+      @if (stopped(); as message) {
+        <p role="alert">{{ message }}</p>
+      }
+      @if (record.error(); as loadError) {
+        <p role="alert">{{ loadError.message }}</p>
+        <button mat-stroked-button type="button" (click)="record.reload()">
+          Retry
+        </button>
+      } @else if (savingElsewhere()) {
+        <p role="status">
+          This record is being saved. The form comes back when that save
+          finishes.
+        </p>
+      } @else if (value(); as value) {
+        @for (r of [resource() + ':' + id()]; track r) {
+          <pidrang-material-resource-form
+            mode="edit"
+            [fields]="fields()"
+            [value]="value"
+            [pending]="saving()"
+            (save)="submit($event)"
+          />
+        }
+        @if (saveFailure(); as failure) {
+          <p role="alert">{{ failure.message }}</p>
+          @if (failure.authRequired) {
+            <p>
+              You may need to
+              @if (signInUrl; as path) {
+                <a [routerLink]="path">sign in</a>
+              } @else {
+                sign in
+              }
+              to make changes.
+            </p>
+          }
         }
       }
     }
@@ -85,6 +99,8 @@ export class ResourceEditPage {
 
   private readonly state = injectResourceEditState(this.resource, this.id);
   protected readonly signInUrl = injectSignInUrl();
+  protected readonly signedOut = this.state.signedOut;
+  protected readonly sessionPending = this.state.sessionPending;
   protected readonly title = this.state.title;
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;

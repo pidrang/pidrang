@@ -73,7 +73,7 @@ describe('generateLayoutFile', () => {
 
       expect(file.path).toBe('src/app/layout/app-layout.ts');
       expect(file.content).toContain("selector: 'app-layout'");
-      expect(file.content).toContain(PAGE_HELPERS_IMPORT);
+      expect(file.content).toContain("from '../pidrang/index';");
       expect(file.content).not.toContain('InjectionToken');
       expect(file.content).not.toContain('@pidrang/demo-shared');
       expect(file.content.trimEnd().endsWith('}')).toBe(true);
@@ -87,9 +87,15 @@ describe('generateLayoutFile', () => {
     expect(barrel?.content).toContain("export * from './sign-in-url';");
     for (const ui of ['material', 'tailwind'] as const) {
       const content = generateLayoutFile(ui).content;
-      expect(
-        content.match(/^import .* from '\.\.\/pidrang\/index';$/gm),
-      ).toEqual([PAGE_HELPERS_IMPORT]);
+      expect(content.match(/from '\.\.\/pidrang\/index';/g)).toHaveLength(1);
+      for (const name of [
+        'injectAuthSessionState',
+        'injectSignedInResources',
+        'injectSignInUrl',
+        'urlNeedsSignIn',
+      ]) {
+        expect(content).toContain(name);
+      }
       expect(content).toContain('injectSignInUrl();');
     }
   });

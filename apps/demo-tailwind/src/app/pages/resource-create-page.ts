@@ -10,76 +10,87 @@ import {
   selector: 'app-resource-create-page',
   imports: [RouterLink, ResourceForm],
   template: `
-    <h1 class="text-2xl font-semibold text-gray-900">
-      Create {{ title() }}
-    </h1>
+    <h1 class="text-2xl font-semibold text-gray-900">Create {{ title() }}</h1>
     @if (canList()) {
       <a [routerLink]="['/', resource()]" class="text-blue-600 hover:underline"
         >Back to list</a
       >
     }
 
-    @if (earlierSave.failure(); as earlierFailure) {
-      <p role="alert" class="mt-4 text-red-600">
-        The earlier create failed: {{ earlierFailure.message }}
+    @if (signedOut()) {
+      <p role="status" class="mt-4 text-gray-600">
+        @if (signInUrl; as path) {
+          <a [routerLink]="path" class="text-blue-600 hover:underline"
+            >Sign in</a
+          >
+        } @else {
+          Sign in
+        }
+        to make changes.
       </p>
-      @if (earlierFailure.authRequired) {
-        <p class="text-gray-700">
-          You may need to
-          @if (signInUrl; as path) {
-            <a [routerLink]="path" class="text-blue-600 hover:underline"
-              >sign in</a
-            >
-          } @else {
-            sign in
-          }
-          to make changes.
+    } @else if (!sessionPending()) {
+      @if (earlierSave.failure(); as earlierFailure) {
+        <p role="alert" class="mt-4 text-red-600">
+          The earlier create failed: {{ earlierFailure.message }}
+        </p>
+        @if (earlierFailure.authRequired) {
+          <p class="text-gray-700">
+            You may need to
+            @if (signInUrl; as path) {
+              <a [routerLink]="path" class="text-blue-600 hover:underline"
+                >sign in</a
+              >
+            } @else {
+              sign in
+            }
+            to make changes.
+          </p>
+        }
+      }
+      @if (earlierSave.finished()) {
+        <p role="status" class="mt-4 text-gray-600">
+          The earlier create finished.
         </p>
       }
-    }
-    @if (earlierSave.finished()) {
-      <p role="status" class="mt-4 text-gray-600">
-        The earlier create finished.
-      </p>
-    }
-    @if (stopped(); as message) {
-      <p role="alert" class="mt-4 text-red-600">{{ message }}</p>
-    }
-    @if (savingElsewhere()) {
-      <p role="status" class="mt-4 text-gray-600">
-        A create on this resource is still running. The form comes back when it
-        finishes.
-      </p>
-    } @else if (!created()) {
-      <div class="mt-4">
-        @for (r of [resource()]; track r) {
-          <pidrang-tailwind-resource-form
-            mode="create"
-            [fields]="fields()"
-            [value]="initialValue()"
-            [pending]="saving()"
-            (save)="submit($event)"
-          />
-        }
-      </div>
-    } @else if (!saveFailure()) {
-      <p role="status" class="mt-4 text-gray-600">Created.</p>
-    }
-
-    @if (saveFailure(); as failure) {
-      <p role="alert" class="mt-4 text-red-600">{{ failure.message }}</p>
-      @if (failure.authRequired) {
-        <p class="text-gray-700">
-          You may need to
-          @if (signInUrl; as path) {
-            <a [routerLink]="path" class="text-blue-600 hover:underline"
-              >sign in</a
-            >
-          } @else {
-            sign in
-          }
-          to make changes.
+      @if (stopped(); as message) {
+        <p role="alert" class="mt-4 text-red-600">{{ message }}</p>
+      }
+      @if (savingElsewhere()) {
+        <p role="status" class="mt-4 text-gray-600">
+          A create on this resource is still running. The form comes back when
+          it finishes.
         </p>
+      } @else if (!created()) {
+        <div class="mt-4">
+          @for (r of [resource()]; track r) {
+            <pidrang-tailwind-resource-form
+              mode="create"
+              [fields]="fields()"
+              [value]="initialValue()"
+              [pending]="saving()"
+              (save)="submit($event)"
+            />
+          }
+        </div>
+      } @else if (!saveFailure()) {
+        <p role="status" class="mt-4 text-gray-600">Created.</p>
+      }
+
+      @if (saveFailure(); as failure) {
+        <p role="alert" class="mt-4 text-red-600">{{ failure.message }}</p>
+        @if (failure.authRequired) {
+          <p class="text-gray-700">
+            You may need to
+            @if (signInUrl; as path) {
+              <a [routerLink]="path" class="text-blue-600 hover:underline"
+                >sign in</a
+              >
+            } @else {
+              sign in
+            }
+            to make changes.
+          </p>
+        }
       }
     }
   `,
@@ -89,6 +100,8 @@ export class ResourceCreatePage {
 
   private readonly state = injectResourceCreateState(this.resource);
   protected readonly signInUrl = injectSignInUrl();
+  protected readonly signedOut = this.state.signedOut;
+  protected readonly sessionPending = this.state.sessionPending;
   protected readonly title = this.state.title;
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;

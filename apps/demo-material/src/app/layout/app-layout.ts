@@ -2,19 +2,25 @@ import {
   Component,
   DOCUMENT,
   ElementRef,
+  computed,
   inject,
   input,
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
-  injectAuthProvider,
-  injectAuthSession,
-  injectResources,
-  isResourceActionEnabled,
-} from '@pidrang/core';
-import { injectSignInUrl } from '@pidrang/demo-shared';
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
+import { injectResources, isResourceActionEnabled } from '@pidrang/core';
+import {
+  injectAuthSessionState,
+  injectSignedInResources,
+  injectSignInUrl,
+  urlNeedsSignIn,
+} from '@pidrang/demo-shared';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -33,7 +39,7 @@ const TEMPLATE = `
           (click)="closeOnNarrow()"
           >Home</a
         >
-        @for (resource of resources; track resource.name) {
+        @for (resource of visibleResources(); track resource.name) {
           @if (isResourceActionEnabled(resource, 'list')) {
             <a
               mat-list-item
@@ -44,7 +50,7 @@ const TEMPLATE = `
               (click)="closeOnNarrow()"
               >{{ resource.label ?? resource.name }}</a
             >
-          } @else if (isResourceActionEnabled(resource, 'create')) {
+          } @else if (mayWrite() && isResourceActionEnabled(resource, 'create')) {
             <a
               mat-list-item
               [routerLink]="['/', resource.name, 'create']"
@@ -69,12 +75,12 @@ const TEMPLATE = `
         </button>
         <span class="app-name">{{ appName() }}</span>
         <span class="spacer"></span>
-        @if (session.value(); as identity) {
+        @if (currentIdentity(); as identity) {
           <span class="identity">{{ identity.email ?? identity.id }}</span>
           <button mat-stroked-button type="button" (click)="signOut()">
             Sign out
           </button>
-        } @else if (signInUrl; as path) {
+        } @else if (signInLink; as path) {
           <a mat-flat-button color="primary" [routerLink]="path">Sign in</a>
         }
       </mat-toolbar>
@@ -176,15 +182,28 @@ const STYLES = `
 export class AppLayout {
   readonly appName = input.required<string>();
 
-  protected readonly session = injectAuthSession();
-  protected readonly signInUrl = injectSignInUrl();
+  private readonly auth = injectAuthSessionState();
+  private readonly router = inject(Router);
+  private readonly guarded = injectSignedInResources();
+  private readonly signInUrl = injectSignInUrl();
+  protected readonly signInLink =
+    this.auth.session === null ? null : this.signInUrl;
+  protected readonly currentIdentity = computed(
+    () => this.auth.session?.value() ?? null,
+  );
+  protected readonly mayWrite = computed(
+    () => !this.auth.signedOut() && !this.auth.sessionPending(),
+  );
   private readonly narrow =
     inject(DOCUMENT).defaultView?.matchMedia?.('(width < 48rem)');
   protected readonly menuOpen = signal(this.narrow?.matches !== true);
   protected readonly resources = injectResources();
+  protected readonly visibleResources = computed(() =>
+    this.auth.signedOut()
+      ? this.resources.filter((resource) => !this.guarded.has(resource.name))
+      : this.resources,
+  );
   protected readonly isResourceActionEnabled = isResourceActionEnabled;
-
-  private readonly authProvider = injectAuthProvider();
 
   private readonly menuButton = viewChild.required('menuButton', {
     read: ElementRef<HTMLElement>,
@@ -213,6 +232,12 @@ export class AppLayout {
   }
 
   protected async signOut(): Promise<void> {
-    await this.authProvider.logout();
+    await this.auth.signOut();
+    if (
+      this.signInUrl !== null &&
+      urlNeedsSignIn(this.router.url, this.guarded)
+    ) {
+      await this.router.navigateByUrl(this.signInUrl);
+    }
   }
 }

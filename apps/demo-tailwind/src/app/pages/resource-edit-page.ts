@@ -22,61 +22,23 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
       >
     }
 
-    @if (earlierSave.failure(); as earlierFailure) {
-      <p role="alert" class="mt-4 text-red-600">
-        The earlier save failed: {{ earlierFailure.message }}
-      </p>
-      @if (earlierFailure.authRequired) {
-        <p class="text-gray-700">
-          You may need to
-          @if (signInUrl; as path) {
-            <a [routerLink]="path" class="text-blue-600 hover:underline"
-              >sign in</a
-            >
-          } @else {
-            sign in
-          }
-          to make changes.
-        </p>
-      }
-    }
-    @if (earlierSave.finished()) {
-      <p role="status" class="mt-4 text-gray-600">The earlier save finished.</p>
-    }
-    @if (record.isLoading()) {
-      <p role="status" class="mt-4 text-gray-600">Loading…</p>
-    }
-    @if (stopped(); as message) {
-      <p role="alert" class="mt-4 text-red-600">{{ message }}</p>
-    }
-    @if (record.error(); as loadError) {
-      <p role="alert" class="mt-4 text-red-600">{{ loadError.message }}</p>
-      <button
-        type="button"
-        (click)="record.reload()"
-        class="mt-2 rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-      >
-        Retry
-      </button>
-    } @else if (savingElsewhere()) {
+    @if (signedOut()) {
       <p role="status" class="mt-4 text-gray-600">
-        This record is being saved. The form comes back when that save finishes.
-      </p>
-    } @else if (value(); as value) {
-      <div class="mt-4">
-        @for (r of [resource() + ':' + id()]; track r) {
-          <pidrang-tailwind-resource-form
-            mode="edit"
-            [fields]="fields()"
-            [value]="value"
-            [pending]="saving()"
-            (save)="submit($event)"
-          />
+        @if (signInUrl; as path) {
+          <a [routerLink]="path" class="text-blue-600 hover:underline"
+            >Sign in</a
+          >
+        } @else {
+          Sign in
         }
-      </div>
-      @if (saveFailure(); as failure) {
-        <p role="alert" class="mt-4 text-red-600">{{ failure.message }}</p>
-        @if (failure.authRequired) {
+        to make changes.
+      </p>
+    } @else if (!sessionPending()) {
+      @if (earlierSave.failure(); as earlierFailure) {
+        <p role="alert" class="mt-4 text-red-600">
+          The earlier save failed: {{ earlierFailure.message }}
+        </p>
+        @if (earlierFailure.authRequired) {
           <p class="text-gray-700">
             You may need to
             @if (signInUrl; as path) {
@@ -90,6 +52,60 @@ import { injectSignInUrl, injectResourceEditState } from '@pidrang/demo-shared';
           </p>
         }
       }
+      @if (earlierSave.finished()) {
+        <p role="status" class="mt-4 text-gray-600">
+          The earlier save finished.
+        </p>
+      }
+      @if (record.isLoading()) {
+        <p role="status" class="mt-4 text-gray-600">Loading…</p>
+      }
+      @if (stopped(); as message) {
+        <p role="alert" class="mt-4 text-red-600">{{ message }}</p>
+      }
+      @if (record.error(); as loadError) {
+        <p role="alert" class="mt-4 text-red-600">{{ loadError.message }}</p>
+        <button
+          type="button"
+          (click)="record.reload()"
+          class="mt-2 rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+        >
+          Retry
+        </button>
+      } @else if (savingElsewhere()) {
+        <p role="status" class="mt-4 text-gray-600">
+          This record is being saved. The form comes back when that save
+          finishes.
+        </p>
+      } @else if (value(); as value) {
+        <div class="mt-4">
+          @for (r of [resource() + ':' + id()]; track r) {
+            <pidrang-tailwind-resource-form
+              mode="edit"
+              [fields]="fields()"
+              [value]="value"
+              [pending]="saving()"
+              (save)="submit($event)"
+            />
+          }
+        </div>
+        @if (saveFailure(); as failure) {
+          <p role="alert" class="mt-4 text-red-600">{{ failure.message }}</p>
+          @if (failure.authRequired) {
+            <p class="text-gray-700">
+              You may need to
+              @if (signInUrl; as path) {
+                <a [routerLink]="path" class="text-blue-600 hover:underline"
+                  >sign in</a
+                >
+              } @else {
+                sign in
+              }
+              to make changes.
+            </p>
+          }
+        }
+      }
     }
   `,
 })
@@ -99,6 +115,8 @@ export class ResourceEditPage {
 
   private readonly state = injectResourceEditState(this.resource, this.id);
   protected readonly signInUrl = injectSignInUrl();
+  protected readonly signedOut = this.state.signedOut;
+  protected readonly sessionPending = this.state.sessionPending;
   protected readonly title = this.state.title;
   protected readonly saving = this.state.saving;
   protected readonly savingElsewhere = this.state.savingElsewhere;
