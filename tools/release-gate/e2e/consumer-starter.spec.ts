@@ -31,9 +31,10 @@ test('opens the first generated page of a new app inside the layout', async ({
   await expect(page).toHaveURL(/\/orders$/);
   await expect(page.locator('mat-toolbar')).toContainText('Pidrang starter');
   const menu = page.locator('#app-menu');
-  for (const name of ['Create Users', 'Orders', 'Products', 'Fixture items']) {
+  for (const name of ['Orders', 'Products', 'Fixture items']) {
     await expect(menu.getByRole('link', { name })).toBeVisible();
   }
+  await expect(menu.getByRole('link', { name: 'Create Users' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -78,6 +79,9 @@ test('signs in from the generated page, then creates and edits', async ({
   await expect(page.locator('mat-toolbar')).toContainText(
     expectations.writer.email,
   );
+  await expect(
+    page.locator('#app-menu').getByRole('link', { name: 'Create Users' }),
+  ).toBeVisible();
 
   const name = `Starter sign-in ${Date.now()}`;
   await page.goto('/fixture_items/create');
