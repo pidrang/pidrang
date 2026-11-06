@@ -62,6 +62,7 @@ import {
   environmentImportPath,
   environmentLines,
   environmentPaths,
+  environmentPlaceholders,
 } from './edit-environments';
 import { formatDiff } from './line-diff';
 import { nodeVersionProblem } from './node-version';
@@ -443,10 +444,11 @@ interface SetupReport {
   setup: AppSetup;
   signIn: { path: string | null; generated: boolean; reason: string };
   edits: FileEditPlan[];
-  environmentPath: string;
-  environmentDevelopmentPath: string;
-  createdEnvironment: boolean;
-  environmentLines: string[];
+  environments: {
+    path: string;
+    lines: string[];
+    placeholders: AppSetup['environment'];
+  }[];
 }
 
 function printInstructions(
@@ -464,10 +466,12 @@ function printInstructions(
       context.out(`  ${edit.path}: ${edit.reason ?? 'see the comment'}`),
     );
   }
-  if (!report.createdEnvironment && report.environmentLines.length > 0) {
-    context.out('');
-    context.out(`Add these lines to ${report.environmentPath}:`);
-    report.environmentLines.forEach((line) => context.out(line));
+  for (const { path, lines } of report.environments) {
+    if (lines.length > 0) {
+      context.out('');
+      context.out(`Add these lines to ${path}:`);
+      lines.forEach((line) => context.out(line));
+    }
   }
   report.setup.notes.forEach((note) => context.out(`\n${note}`));
   context.out('');
@@ -498,20 +502,25 @@ function printNextSteps(
   report: SetupReport,
   outcome: InstallOutcome,
 ): void {
-  const placeholders = report.createdEnvironment
-    ? report.setup.environment.filter((entry) => entry.placeholder === true)
-    : [];
   context.out('');
   context.out('Next steps:');
   let step = 1;
-  if (placeholders.length > 0) {
+  const replacementPaths = new Map<string, string[]>();
+  for (const { path, placeholders } of report.environments) {
+    if (placeholders.length === 0) continue;
     const replacements = placeholders.map((entry) =>
       entry.hint === undefined
         ? entry.value
         : `${entry.value} with ${entry.hint}`,
     );
+    const instruction = replacements.join(', and ');
+    const paths = replacementPaths.get(instruction) ?? [];
+    paths.push(path);
+    replacementPaths.set(instruction, paths);
+  }
+  for (const [instruction, paths] of replacementPaths) {
     context.out(
-      `  ${step}. In ${report.environmentPath} and ${report.environmentDevelopmentPath}, replace ${replacements.join(', and ')}.`,
+      `  ${step}. In ${paths.join(' and ')}, replace ${instruction}.`,
     );
     step += 1;
   }
@@ -791,11 +800,31 @@ async function runInit(
   const environmentFilesToWrite = createdEnvironment
     ? environmentFiles(layout.sourceRoot, generation.setup.environment)
     : [];
-  const noticeSource = existingEnvironment ?? existingDevelopment;
-  const environmentLinesToAdd =
-    createdEnvironment || noticeSource === null
-      ? []
-      : environmentLines(generation.setup.environment, noticeSource);
+  const setupEnvironment = generation.setup.environment;
+  const environments = [
+    { path: environment.default, content: existingEnvironment },
+    { path: environment.development, content: existingDevelopment },
+  ].flatMap(({ path, content }) => {
+    if (createdEnvironment) {
+      return [
+        {
+          path,
+          lines: [],
+          placeholders: setupEnvironment.filter(
+            (entry) => entry.placeholder === true,
+          ),
+        },
+      ];
+    }
+    if (content === null) return [];
+    return [
+      {
+        path,
+        lines: environmentLines(setupEnvironment, content),
+        placeholders: environmentPlaceholders(setupEnvironment, content),
+      },
+    ];
+  });
 
   const configSource = await readFile(
     join(context.cwd, layout.configFile),
@@ -997,10 +1026,7 @@ async function runInit(
   const report: SetupReport = {
     setup: generation.setup,
     edits: editPlan.edits,
-    environmentPath: environment.default,
-    environmentDevelopmentPath: environment.development,
-    createdEnvironment,
-    environmentLines: environmentLinesToAdd,
+    environments,
     signIn: {
       path: signInPath ?? null,
       generated: signIn.file !== null,

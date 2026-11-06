@@ -68,7 +68,7 @@ It asks the same questions, except the layout, which an existing app never gets,
 - Writes `resources.ts`, `resource-routes.ts`, the pages and the helpers, as on a new app. A file that already exists with other content stops `init` before it writes anything, and lists the paths: move or rename yours, then run it again.
 - Adds `...resourceRoutes` at the top of the routes array of `app.routes.ts`, and registers Pidrang and `withComponentInputBinding()` in `app.config.ts`.
 - Replaces the welcome page of `app.html` with `<router-outlet />`, and leaves a template that already has an outlet as it is.
-- Writes the environment files when the app has none. When it has, `init` prints the `supabaseUrl` and `supabasePublishableKey` lines to add to `src/environments/environment.ts`.
+- Writes the environment files when the app has none. When environment files already exist, `init` reports missing values for each file and reminds you which placeholders still need replacing.
 
 When a file cannot be edited safely, `init` adds a `pidrang` comment at its top that lists the exact change to make.
 

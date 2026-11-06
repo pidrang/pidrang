@@ -61,6 +61,26 @@ export function environmentLines(
   );
 }
 
+function escapePattern(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function environmentPlaceholders(
+  entries: EnvironmentEntry[],
+  existing: string,
+): EnvironmentEntry[] {
+  return entries.filter((entry) => {
+    if (entry.placeholder !== true) return false;
+    const name = escapePattern(entry.name);
+    const single = escapePattern(quote(entry.value));
+    const double = escapePattern(JSON.stringify(entry.value));
+    return new RegExp(
+      `(?:^|[,{])\\s*(?:${name}|'${name}'|"${name}")\\s*:\\s*(?:${single}|${double})(?=\\s*[,}])`,
+      'm',
+    ).test(existing);
+  });
+}
+
 export function addEnvironmentFileReplacements(
   workspaceText: string,
   project: string,

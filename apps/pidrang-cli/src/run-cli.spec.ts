@@ -623,6 +623,40 @@ export const routes: Routes = [
       );
     });
 
+    it('reports missing values and remaining placeholders for the affected file', async () => {
+      const production =
+        "export const environment = { supabaseUrl: 'https://abc.supabase.co', supabasePublishableKey: 'sb_publishable_example' };\n";
+      const development =
+        'export const environment = { supabasePublishableKey: "YOUR-PUBLISHABLE-KEY" };\n';
+      await put({
+        'src/environments/environment.ts': production,
+        'src/environments/environment.development.ts': development,
+      });
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+
+      expect(out).toContain(
+        'Add these lines to src/environments/environment.development.ts:',
+      );
+      expect(out).toContain("  supabaseUrl: 'https://abc.supabase.co',");
+      expect(out).not.toContain(
+        'Add these lines to src/environments/environment.ts:',
+      );
+      expect(out).toContain(
+        '  1. In src/environments/environment.development.ts, replace YOUR-PUBLISHABLE-KEY with the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard.',
+      );
+      expect(
+        await readFile(join(root, 'src/environments/environment.ts'), 'utf8'),
+      ).toBe(production);
+      expect(
+        await readFile(
+          join(root, 'src/environments/environment.development.ts'),
+          'utf8',
+        ),
+      ).toBe(development);
+    });
+
     it('leaves everything as it is on a second identical run', async () => {
       const plan = await planFile(PLAN);
       await runCli(['init', '--plan', plan], context());
@@ -634,8 +668,11 @@ export const routes: Routes = [
       expect(await snapshot()).toEqual(before);
       expect(out).toContain('Nothing to write: every file already matches.');
       expect(out.filter((line) => line.startsWith('Wrote'))).toEqual([]);
+      expect(out).toContain(
+        '  1. In src/environments/environment.ts and src/environments/environment.development.ts, replace YOUR-PUBLISHABLE-KEY with the publishable key (sb_publishable_..., or the legacy anon key), from the Connect button at the top of the Supabase dashboard.',
+      );
       expect(out.at(-1)).toBe(
-        '  1. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
+        '  2. Install the packages with the commands above, then run ng serve and open http://localhost:4200.',
       );
     });
 
