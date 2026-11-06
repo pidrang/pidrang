@@ -66,7 +66,7 @@ When the connection attempt fails, the wizard repeats the question with the reje
 | `app.config.ts` | Adds `providePidrang()`, provides `provideSignInPath()` if configured. | Every run. |
 | `app.routes.ts` | Appends the resource routes import, entry redirect for new apps (to the first page the final `resources.ts` enables). | Every run. |
 | `angular.json` | Adds environment file replacements. | When the app had neither `environment.ts` nor `environment.development.ts`, on a new or an existing app. |
-| `src/environments/environment.ts` and `environment.development.ts` | Supabase URL and a placeholder for the publishable key. | Same as `angular.json`. Otherwise `init` prints missing lines for each existing environment file. Next steps name the files with placeholders still to replace, followed by `ng serve` and any required install commands. |
+| `src/environments/environment.ts` and `environment.development.ts` | Supabase URL and a placeholder for the publishable key. | Same as `angular.json`. Otherwise `init` prints the missing `supabaseUrl` and `supabasePublishableKey` lines for each existing environment file. Next steps name the files with placeholders still to replace, then show any required install commands before `ng serve`. |
 
 How it wires the app itself is described in [Getting started](../getting-started.md#existing-app). The resource routes guard every `:resource` action with both `canMatchResourceAction(...)` and `canMatchSignedIn([...])` when the corresponding tables need a signed-in user. A file it writes is never overwritten: one that already exists with other content stops `init` before any write. An existing `resources.ts` is edited instead: a second run appends the tables it does not list yet and leaves the others as they are.
 
