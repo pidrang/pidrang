@@ -441,7 +441,7 @@ async function writeFiles(
 
 interface SetupReport {
   setup: AppSetup;
-  signIn: { path: string | null; file: boolean; reason: string };
+  signIn: { path: string | null; generated: boolean; reason: string };
   edits: FileEditPlan[];
   environmentPath: string;
   environmentDevelopmentPath: string;
@@ -473,15 +473,13 @@ function printInstructions(
   context.out('');
   if (report.signIn.path !== null) {
     const route = `provideSignInPath(${quote(report.signIn.path)}) in ${layout.configFile}`;
-    if (report.signIn.file) {
-      context.out(
-        `The Sign in link of the layout and the sign-in prompts of the pages open ${report.signIn.path}, set by ${route}. pidrang generated the sign-in page at ${join(layout.appDirectory, 'pages', 'sign-in-page.ts')}.`,
-      );
-    } else {
-      context.out(
-        `The Sign in link of the layout and the sign-in prompts of the pages open ${report.signIn.path}, set by ${route}. pidrang did not generate the page there: ${report.signIn.reason}.`,
-      );
-    }
+    const page = join(layout.appDirectory, 'pages', 'sign-in-page.ts');
+    const pageMessage = report.signIn.generated
+      ? `pidrang generated the sign-in page at ${page}.`
+      : `The sign-in page at ${page} is already in place.`;
+    context.out(
+      `The Sign in link of the layout and the sign-in prompts of the pages open ${report.signIn.path}, set by ${route}. ${pageMessage}`,
+    );
     return;
   }
   if (report.signIn.reason !== '') {
@@ -1005,7 +1003,7 @@ async function runInit(
     environmentLines: environmentLinesToAdd,
     signIn: {
       path: signInPath ?? null,
-      file: signIn.file !== null,
+      generated: signIn.file !== null,
       reason: signIn.reason,
     },
   };

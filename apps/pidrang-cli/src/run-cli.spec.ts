@@ -639,6 +639,25 @@ export const routes: Routes = [
       );
     });
 
+    it('says the sign-in page is already in place on a second run', async () => {
+      const plan = await planFile(PLAN);
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+      expect(output()).toContain(
+        'pidrang generated the sign-in page at src/app/pages/sign-in-page.ts.',
+      );
+
+      out = [];
+      err = [];
+
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+
+      expect(output()).not.toContain('did not generate the page there: .');
+      expect(output()).toContain(
+        "The Sign in link of the layout and the sign-in prompts of the pages open /sign-in, set by provideSignInPath('/sign-in') in src/app/app.config.ts. The sign-in page at src/app/pages/sign-in-page.ts is already in place.",
+      );
+    });
+
     it('writes only the missing files when the others already match', async () => {
       const plan = await planFile(PLAN);
       await runCli(['init', '--plan', plan], context());
