@@ -2,7 +2,10 @@
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "analytics": false,
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
     "production": [
       "default",
       "!{projectRoot}/.eslintrc.json",
@@ -15,8 +18,13 @@
   "targetDefaults": {
     "@angular/build:application": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
     },
     "@nx/eslint:lint": {
       "cache": true,
@@ -31,26 +39,47 @@
     },
     "@angular/build:unit-test": {
       "cache": true,
-      "inputs": ["default", "^production"]
+      "inputs": [
+        "default",
+        "^production"
+      ]
     },
     "@nx/angular:package": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
     },
     "@nx/angular:unit-test": {
       "cache": true,
-      "inputs": ["default", "^production"]
+      "inputs": [
+        "default",
+        "^production"
+      ]
     },
     "@nx/js:tsc": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
     },
     "@nx/angular:ng-packagr-lite": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production",
+        "^production"
+      ]
     }
   },
   "plugins": [
@@ -114,22 +143,27 @@
           "preserveLocalDependencyProtocols": false
         }
       ],
-      "versionPrefix": "^"
+      "versionPrefix": "^",
+      "git": {
+        "stageChanges": false,
+        "commit": false,
+        "tag": false
+      }
     },
     "changelog": {
       "workspaceChangelog": {
         "file": "CHANGELOG.md",
-        "createRelease": "github",
+        "createRelease": false,
         "renderer": "{workspaceRoot}/tools/changelog-renderer.mjs",
         "renderOptions": {
           "authors": false
         }
+      },
+      "git": {
+        "commit": false,
+        "tag": false,
+        "push": false
       }
-    },
-    "git": {
-      "commit": true,
-      "tag": true,
-      "commitMessage": "chore(release): v{version}"
     },
     "conventionalCommits": {
       "types": {
