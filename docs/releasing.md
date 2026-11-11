@@ -23,12 +23,12 @@ Releases run from the `Release` GitHub Actions workflow on `main`, never from a 
 
 The `prepare` step writes the release commit and leaves it on a branch:
 
-1. `check` refuses a version that is not exact (`0.1.0` or `0.2.0-rc.1`).
+1. `check` refuses a run started from another branch than `main`, and a version that is not exact (`0.1.0` or `0.2.0-rc.1`).
 2. `prepare` lints and tests, then runs `nx release <version> --skip-publish`. That builds the packages, writes the version to each `package.json`, prepends the new section to `CHANGELOG.md` and commits `chore(release): vX.Y.Z`. It tags, pushes and publishes nothing. `tools/release/release.mjs branch` then pushes that commit to `release/vX.Y.Z`, never to `main`, and prints the link that opens the pull request, also shown in the run summary. A second `prepare` run of the same version replaces that branch.
 
 The `publish` step runs on `main` once that pull request is merged:
 
-1. `check` refuses a version that is not exact, and a version that the seven `package.json` files do not hold yet (`release.mjs check-version`), which means the release pull request is not merged. It also refuses a `main` whose last commit is not the release commit (subject `chore(release): vX.Y.Z`, followed by `(#NNN)` after the squash merge).
+1. `check` refuses a run started from another branch than `main`, a version that is not exact, and a version that the seven `package.json` files do not hold yet (`release.mjs check-version`), which means the release pull request is not merged. It also refuses a `main` whose last commit is not the release commit (subject `chore(release): vX.Y.Z`, followed by `(#NNN)` after the squash merge).
 2. `gate` runs the full [release gate](#the-release-gate) at that version and uploads the tested tarballs as the `release-gate-<commit>` artifact.
 3. `tag` downloads the artifact, checks it with `verify-identities.mjs --version --commit`, lints and tests. `release.mjs tag` checks that the commit is on `origin/main` and is the release commit, creates the annotated tag `vX.Y.Z` and pushes only that tag. `release.mjs github-release` creates the GitHub Release from the `CHANGELOG.md` section of the version, as a prerelease when the version has a `-`.
 4. `publish` runs in the `npm` environment. It downloads the same artifact and runs `tools/release-gate/publish.mjs`, which checks the artifact again and publishes the seven tested tarballs with `npm publish <tarball> --access public --provenance`, in dependency order: core, supabase, material, tailwind, cli, cli-supabase, then `pidrang` last. A version with a `-` goes to the `next` tag, any other one to `latest`.

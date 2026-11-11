@@ -35,9 +35,17 @@ concurrency:
 
 jobs:
   check:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - name: Check the branch
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "Run the Release workflow on main, not on $REF."
+            exit 1
+          fi
+
       - name: Check the version
         env:
           VERSION: ${{ inputs.version }}
