@@ -69,15 +69,17 @@ export function environmentPlaceholders(
   entries: EnvironmentEntry[],
   existing: string,
 ): EnvironmentEntry[] {
-  return entries.filter((entry) => {
-    if (entry.placeholder !== true) return false;
+  return entries.flatMap((entry) => {
+    const placeholder = entry.placeholder ? entry : entry.previousPlaceholder;
+    if (placeholder === undefined) return [];
     const name = escapePattern(entry.name);
-    const single = escapePattern(quote(entry.value));
-    const double = escapePattern(JSON.stringify(entry.value));
-    return new RegExp(
+    const single = escapePattern(quote(placeholder.value));
+    const double = escapePattern(JSON.stringify(placeholder.value));
+    const matches = new RegExp(
       `(?:^|[,{])\\s*(?:${name}|'${name}'|"${name}")\\s*:\\s*(?:${single}|${double})(?=\\s*[,}])`,
       'm',
     ).test(existing);
+    return matches ? [{ ...entry, ...placeholder }] : [];
   });
 }
 

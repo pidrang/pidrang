@@ -51,6 +51,10 @@ describe('supabaseAppSetup', () => {
     expect(supabaseAppSetup(connection).environment[0]).toEqual({
       name: 'supabaseUrl',
       value: url,
+      previousPlaceholder: {
+        value: PROJECT_URL_PLACEHOLDER,
+        hint: 'your project URL, from the Connect button at the top of the Supabase dashboard',
+      },
     });
   });
 
@@ -72,6 +76,10 @@ describe('supabaseAppSetup', () => {
     expect(supabaseAppSetup(connection).environment[0]).toEqual({
       name: 'supabaseUrl',
       value: url,
+      previousPlaceholder: {
+        value: PROJECT_URL_PLACEHOLDER,
+        hint: 'your project URL, from the Connect button at the top of the Supabase dashboard',
+      },
     });
   });
 

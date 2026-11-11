@@ -18,6 +18,7 @@ export interface EnvironmentEntry {
   value: string;
   hint?: string;
   placeholder?: boolean;
+  previousPlaceholder?: { value: string; hint?: string };
 }
 
 export interface AppSetup {

@@ -623,6 +623,38 @@ export const routes: Routes = [
       );
     });
 
+    it('reminds only for the environment file that still has the old URL placeholder', async () => {
+      const placeholderUrl = 'https://YOUR-PROJECT-REF.supabase.co';
+      const realUrl = 'https://abc.supabase.co';
+      const environment = [
+        {
+          name: 'supabaseUrl',
+          value: realUrl,
+          previousPlaceholder: {
+            value: placeholderUrl,
+            hint: 'your project URL',
+          },
+        },
+        SETUP.environment[1],
+      ];
+      vi.mocked(provider.appSetup).mockReturnValue({ ...SETUP, environment });
+      await put({
+        'src/environments/environment.ts': `export const environment = { supabaseUrl: '${realUrl}', supabasePublishableKey: 'sb_publishable_example' };
+`,
+        'src/environments/environment.development.ts': `export const environment = { supabaseUrl: "${placeholderUrl}", supabasePublishableKey: 'sb_publishable_example' };
+`,
+      });
+
+      const plan = await planFile(PLAN);
+      expect(await runCli(['init', '--plan', plan], context())).toBe(0);
+
+      expect(
+        out.filter((line) => line.includes(`replace ${placeholderUrl}`)),
+      ).toEqual([
+        `  1. In src/environments/environment.development.ts, replace ${placeholderUrl} with your project URL.`,
+      ]);
+    });
+
     it('reports missing values and remaining placeholders for the affected file', async () => {
       const production =
         "export const environment = { supabaseUrl: 'https://abc.supabase.co', supabasePublishableKey: 'sb_publishable_example' };\n";

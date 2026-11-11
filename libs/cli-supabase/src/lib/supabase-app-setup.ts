@@ -3,6 +3,8 @@ import { PostgresConnection, SupabaseConnection } from './supabase-connection';
 
 export const PROJECT_URL_PLACEHOLDER = 'https://YOUR-PROJECT-REF.supabase.co';
 export const PUBLISHABLE_KEY_PLACEHOLDER = 'YOUR-SUPABASE-PUBLISHABLE-KEY';
+const PROJECT_URL_HINT =
+  'your project URL, from the Connect button at the top of the Supabase dashboard';
 
 const DIRECT_HOST = /^db\.([a-z0-9]+)\.supabase\.co$/i;
 const POOLER_HOST = /\.pooler\.supabase\.com$/i;
@@ -57,10 +59,17 @@ export function supabaseAppSetup(connection: SupabaseConnection): AppSetup {
         ? {
             name: 'supabaseUrl',
             value: PROJECT_URL_PLACEHOLDER,
-            hint: 'your project URL, from the Connect button at the top of the Supabase dashboard',
+            hint: PROJECT_URL_HINT,
             placeholder: true,
           }
-        : { name: 'supabaseUrl', value: url },
+        : {
+            name: 'supabaseUrl',
+            value: url,
+            previousPlaceholder: {
+              value: PROJECT_URL_PLACEHOLDER,
+              hint: PROJECT_URL_HINT,
+            },
+          },
       {
         name: 'supabasePublishableKey',
         value: PUBLISHABLE_KEY_PLACEHOLDER,
