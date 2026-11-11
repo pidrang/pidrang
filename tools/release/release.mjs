@@ -17,6 +17,7 @@ import {
   githubReleaseAction,
   isPrerelease,
   pushReleaseBranch,
+  releaseCommitProblem,
   releaseTag,
   tagRelease,
   versionProblems,
@@ -75,7 +76,19 @@ function checkVersion() {
       `${problems.join('; ')}. Merge the release pull request of ${version}, then run the publish step on main.`,
     );
   }
-  console.log(`All ${packages.length} packages are at ${version}.`);
+  const problem = releaseCommitProblem(
+    execFileSync('git', ['log', '-1', '--format=%s'], {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim(),
+    version,
+  );
+  if (problem !== null) {
+    fail(problem);
+  }
+  console.log(
+    `All ${packages.length} packages are at ${version}, on the release commit.`,
+  );
 }
 
 function branch() {

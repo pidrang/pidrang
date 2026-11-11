@@ -18,6 +18,14 @@ export function isPrerelease(version) {
   return version.includes('-');
 }
 
+export function releaseCommitProblem(subject, version) {
+  const expected = releaseSubject(version);
+  if (subject === expected || subject.startsWith(`${expected} (#`)) {
+    return null;
+  }
+  return `HEAD is "${subject}", not the release commit of ${version} ("${expected} (#NNN)"): run the publish step right after merging the release pull request, before anything else is merged`;
+}
+
 export function compareUrl(repository, version) {
   const title = encodeURIComponent(releaseSubject(version));
   return `https://github.com/${repository}/compare/main...${releaseBranch(version)}?quick_pull=1&title=${title}`;
@@ -160,6 +168,13 @@ export function tagRelease({
     throw new Error(
       `${head} is not on ${remote}/main: merge the release pull request, then run the publish step on main`,
     );
+  }
+  const problem = releaseCommitProblem(
+    git(cwd, ['log', '-1', '--format=%s', head]),
+    version,
+  );
+  if (problem !== null) {
+    throw new Error(problem);
   }
   const pushed = remoteTagCommit(cwd, remote, tag);
   if (pushed !== null) {

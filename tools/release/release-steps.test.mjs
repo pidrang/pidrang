@@ -16,6 +16,7 @@ import {
   compareUrl,
   githubReleaseAction,
   pushReleaseBranch,
+  releaseCommitProblem,
   releaseBranch,
   releaseSubject,
   releaseTag,
@@ -161,6 +162,8 @@ test('refuses to push a branch when HEAD is not the release commit', () => {
 });
 
 test('pushes nothing on a dry run', () => {
+  commit('chore(release): v0.1.2 (#200)');
+  git(clone, 'push', 'origin', 'main');
   assert.equal(
     tagRelease({ cwd: clone, version: '0.1.2', dryRun: true, log: quiet }),
     'dry-run',
@@ -208,6 +211,8 @@ test('refuses to tag a commit that is not on main', () => {
 });
 
 test('keeps a tag already pushed on the same commit', () => {
+  commit('chore(release): v0.1.2 (#200)');
+  git(clone, 'push', 'origin', 'main');
   protectMain();
   tagRelease({ cwd: clone, version: '0.1.2', log: quiet });
 
@@ -222,7 +227,7 @@ test('refuses a tag that already points to another commit', () => {
   git(clone, 'tag', '-a', 'v0.1.2', '-m', 'v0.1.2');
   git(clone, 'push', 'origin', 'refs/tags/v0.1.2');
   git(clone, 'tag', '-d', 'v0.1.2');
-  commit('fix(core): later');
+  commit('chore(release): v0.1.2 (#201)');
   git(clone, 'push', 'origin', 'main');
   protectMain();
 
@@ -231,6 +236,36 @@ test('refuses a tag that already points to another commit', () => {
     new RegExp(`v0\\.1\\.2 already points to ${first}`),
   );
   assert.equal(remoteRef('refs/tags/v0.1.2'), first);
+});
+
+test('refuses to tag a commit of main that is not the release commit', () => {
+  commit('chore(release): v0.1.2 (#200)');
+  commit('fix(core): merged after the release (#201)');
+  git(clone, 'push', 'origin', 'main');
+  protectMain();
+
+  assert.throws(
+    () => tagRelease({ cwd: clone, version: '0.1.2', log: quiet }),
+    /HEAD is "fix\(core\): merged after the release \(#201\)", not the release commit of 0\.1\.2/,
+  );
+  assert.equal(remoteRef('refs/tags/v0.1.2'), null);
+  assert.equal(git(clone, 'tag', '--list', 'v0.1.2'), '');
+});
+
+test('recognises the release commit before and after the squash merge', () => {
+  assert.equal(releaseCommitProblem('chore(release): v0.1.2', '0.1.2'), null);
+  assert.equal(
+    releaseCommitProblem('chore(release): v0.1.2 (#200)', '0.1.2'),
+    null,
+  );
+  assert.match(
+    releaseCommitProblem('chore(release): v0.1.20 (#200)', '0.1.2'),
+    /not the release commit of 0\.1\.2/,
+  );
+  assert.match(
+    releaseCommitProblem('fix(core): x (#201)', '0.1.2'),
+    /not the release commit of 0\.1\.2/,
+  );
 });
 
 test('reads the changelog section of a version', () => {
