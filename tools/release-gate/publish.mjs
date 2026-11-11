@@ -8,6 +8,7 @@ import { MANIFEST } from './identities.mjs';
 import {
   distTag,
   integrity,
+  npmViewFailure,
   publishAction,
   publishOrder,
 } from './publishing.mjs';
@@ -38,7 +39,7 @@ function publishedIntegrity(name, version) {
     if (String(error.stderr).includes('E404')) {
       return null;
     }
-    throw error;
+    fail(npmViewFailure(name, version, error));
   }
 }
 
@@ -64,6 +65,7 @@ const manifest = JSON.parse(readFileSync(join(directory, MANIFEST), 'utf8'));
 const tag = distTag(manifest.version);
 const dryRun = values['dry-run'];
 let published = 0;
+let skipped = 0;
 
 for (const entry of publishOrder(
   manifest.tarballs,
@@ -83,6 +85,7 @@ for (const entry of publishOrder(
     console.log(
       `${entry.name}@${entry.version} is already on npm with the same content.`,
     );
+    skipped += 1;
     continue;
   }
   run('npm', [
@@ -98,5 +101,5 @@ for (const entry of publishOrder(
 }
 
 console.log(
-  `${dryRun ? 'Dry run: would publish' : 'Published'} ${published} of ${manifest.tarballs.length} package(s) at ${manifest.version} with the ${tag} tag.`,
+  `${dryRun ? 'Dry run: would publish' : 'Published'} ${published} of ${manifest.tarballs.length} package(s) at ${manifest.version} with the ${tag} tag; ${skipped} already on npm.`,
 );

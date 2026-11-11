@@ -19,36 +19,48 @@ How a new version of the published packages reaches npm. Maintainers only.
 
 ## Cutting a release
 
-Releases run from the `Release` GitHub Actions workflow on `main`, never from a laptop. It runs four jobs, each only when the previous one passed:
+Releases run from the `Release` GitHub Actions workflow on `main`, never from a laptop. `main` only takes pull requests and the workflow never writes to it, so a release takes two runs of the workflow with one pull request in between. The `step` input picks the run: `prepare`, the default, or `publish`. Each job runs only when the previous one passed.
+
+The `prepare` step writes the release commit and leaves it on a branch:
 
 1. `check` refuses a version that is not exact (`0.1.0` or `0.2.0-rc.1`).
+2. `prepare` lints and tests, then runs `nx release <version> --skip-publish`. That builds the packages, writes the version to each `package.json`, prepends the new section to `CHANGELOG.md` and commits `chore(release): vX.Y.Z`. It tags, pushes and publishes nothing. `tools/release/release.mjs branch` then pushes that commit to `release/vX.Y.Z`, never to `main`, and prints the link that opens the pull request, also shown in the run summary. A second `prepare` run of the same version replaces that branch.
+
+The `publish` step runs on `main` once that pull request is merged:
+
+1. `check` refuses a version that is not exact, and a version that the seven `package.json` files do not hold yet (`release.mjs check-version`), which means the release pull request is not merged.
 2. `gate` runs the full [release gate](#the-release-gate) at that version and uploads the tested tarballs as the `release-gate-<commit>` artifact.
-3. `tag` downloads the artifact, checks it with `verify-identities.mjs --version --commit`, lints and tests, then runs `nx release <version> --skip-publish`. That builds the packages, writes the version to each `package.json`, prepends the new section to `CHANGELOG.md`, commits `chore(release): vX.Y.Z`, tags `vX.Y.Z`, pushes both and creates the GitHub Release. It publishes nothing.
+3. `tag` downloads the artifact, checks it with `verify-identities.mjs --version --commit`, lints and tests. `release.mjs tag` checks that the commit is on `origin/main`, creates the annotated tag `vX.Y.Z` and pushes only that tag. `release.mjs github-release` creates the GitHub Release from the `CHANGELOG.md` section of the version, as a prerelease when the version has a `-`.
 4. `publish` runs in the `npm` environment. It downloads the same artifact and runs `tools/release-gate/publish.mjs`, which checks the artifact again and publishes the seven tested tarballs with `npm publish <tarball> --access public --provenance`, in dependency order: core, supabase, material, tailwind, cli, cli-supabase, then `pidrang` last. A version with a `-` goes to the `next` tag, any other one to `latest`.
 
-The tagged commit differs from the tested commit only by the version bump and the changelog: the gate packed the tarballs from the tested commit with the same `nx release version` rewrite, so their manifests already hold the release version and the caret ranges.
+The gate, the tag and the publish all use the same commit: the release commit merged on `main`, whose manifests already hold the version. The gate still packs it through the `nx release version` rewrite, so the tarballs carry the caret ranges.
+
+The tag is created after the merge, not on the release branch, because `main` takes squash merges only: a commit of the release branch never reaches the history of `main`, and Nx looks for the last version tag among the tags merged into the current branch. A tag left outside `main` would make the next release start from the previous tag again.
 
 Steps:
 
 1. Make sure `main` is green and contains everything meant for the release.
-2. Open Actions, Release, Run workflow on `main` and enter the version. Leave `dry-run` checked first and read the log: the gate result, the version and changelog entry of the `tag` job, and the `npm publish --dry-run` output of each package in the `publish` job.
-3. Run it again with `dry-run` unchecked.
-4. Check the tag, the GitHub Release and the npm pages, including the provenance badge on each package page.
-5. Deploy the docs from the tag:
+2. Open Actions, Release, Run workflow on `main`, enter the version and keep `step` on `prepare`. Leave `dry-run` checked first and read the version and changelog entry in the log.
+3. Run it again with `dry-run` unchecked, then open the pull request from the link in the run summary, titled `chore(release): vX.Y.Z`. The workflow does not open it: GitHub Actions is not allowed to create pull requests in this repository, and a pull request created with the workflow token would start neither `CI` nor `Release gate`.
+4. Wait for `CI` and `Release gate` on the pull request, get an approval or merge it as an administrator, and squash merge it. The squashed commit takes the pull request title followed by `(#NNN)`, so `main` gets `chore(release): vX.Y.Z (#NNN)`.
+5. Run the workflow on `main` with the same version and `step` set to `publish`. Leave `dry-run` checked first and read the log: the gate result, the tag and the GitHub Release notes the `tag` job would create, and the `npm publish --dry-run` output of each package in the `publish` job.
+6. Run it again with `dry-run` unchecked.
+7. Check the tag, the GitHub Release and the npm pages, including the provenance badge on each package page.
+8. Deploy the docs from the tag:
    1. In this repository, run `Docs artifacts` (`.github/workflows/docs-artifacts.yml`) with Run workflow and `ref` set to `vX.Y.Z`.
    2. In `pidrang/pidrang.github.io`, run `Deploy docs` (`.github/workflows/deploy-docs.yml`) with `run-id` set to the id of that run. It checks the run, then opens a `deploy/docs-<sha>` pull request; merge it.
 
    The docs on `pidrang.dev` follow the latest release, not `main`, by design.
 
-For the very first release, set `first-release`, because no version tag exists yet.
+For the very first release, set `first-release` on the `prepare` step, because no version tag exists yet.
 
-To preview locally, without committing, tagging, pushing or publishing:
+To preview locally, without committing or publishing:
 
 ```bash
 pnpm exec nx release --skip-publish --dry-run
 ```
 
-Do not run `nx release` without `--dry-run` on a laptop: it commits, tags, pushes and publishes.
+Do not run `nx release` without `--dry-run` on a laptop: it commits the release, and without `--skip-publish` it also publishes.
 
 ## Verifying the artifacts
 
@@ -124,12 +136,13 @@ The workflow checks out pidrang/supabase with the `SUPABASE_FIXTURES_TOKEN` secr
 - The `publish` job authenticates to npm with trusted publishing (OIDC), not a token: it grants `id-token: write` and installs npm 11.21.1 (trusted publishing needs npm 11.5.1 or later and Node 22.14 or later). Each of the seven packages has a trusted publisher on npmjs.com, under the package's Settings: publisher GitHub Actions, organization `pidrang`, repository `pidrang`, workflow filename `release.yml`, environment `npm`. `Allow npm publish` is checked, since the job runs `npm publish` directly; `Allow npm dist-tag` is not, since the dist-tag is set by `npm publish --tag`. A trusted publisher can only be added to a package that already exists on npm, so a new package needs a first publish with a short-lived granular token (`NODE_AUTH_TOKEN` on that step) before it gets one; remove the token afterwards. A trusted publisher cannot be edited: to change it, delete it and create a new one.
 - The `publish` job runs in the `npm` environment. GitHub creates it on the first run if it does not exist; add required reviewers to it to approve each publish by hand.
 - Provenance requires a public repository. Make the repository public before the first publish.
-- If `main` is protected, allow the release workflow's `github-actions[bot]` to push to it, or the `chore(release)` commit and tag push will be rejected.
+- `main` requires a pull request, and the workflow never pushes to it: it pushes the `release/vX.Y.Z` branch and the `vX.Y.Z` tag only. Keep tags matching `v*` free of rulesets, or the `tag` job cannot push the tag. "Allow GitHub Actions to create and approve pull requests" can stay off: the maintainer opens the release pull request.
 
 ## If something goes wrong
 
-- **Publish failed after the tag was pushed:** npm versions cannot be reused once published, but a version that never reached npm can be published again. Use Re-run failed jobs on the same workflow run: only `publish` runs again, with the same artifact, and it skips the packages npm already holds with the same content. Do not create a new version. The artifact is kept 30 days.
+- **Publish failed after the tag was pushed:** npm versions cannot be reused once published, but a version that never reached npm can be published again. Use Re-run failed jobs on the same workflow run: only `publish` runs again, with the same artifact, and it skips the packages npm already holds with the same content. Do not create a new version. A new run of the publish step repacks the tarballs, so use Re-run failed jobs instead. The artifact is kept 30 days.
 - **npm refuses to authenticate the publish** (`ENEEDAUTH`, or a 404 or 403 on `npm publish`): check the trusted publisher of that package on npmjs.com. The organization, repository, workflow filename (`release.yml`, without its folder) and environment (`npm`) must match exactly, and `Allow npm publish` must be checked. Fix it, then use Re-run failed jobs as above.
-- **The `tag` job failed after pushing the tag** (for example while creating the GitHub Release): `publish` does not run, and re-running `tag` fails because the tag already exists. The workflow has no automated recovery for this case yet: create the GitHub Release by hand from the `CHANGELOG.md` section and open an issue before publishing that version.
+- **The `tag` job failed after pushing the tag** (for example while creating the GitHub Release): use Re-run failed jobs. `release.mjs tag` keeps a `vX.Y.Z` tag that already points to the release commit, and `release.mjs github-release` keeps a GitHub Release that already exists for that tag, is not a draft and has the right prerelease flag. A tag on another commit, or a release that does not match, stops the job: fix it by hand before running it again.
+- **The release pull request needs a change** (for example a commit merged into `main` that belongs in the release): close it, run the `prepare` step again with the same version from the new `main`, and open a new pull request from the new link. `release/vX.Y.Z` is replaced.
 - **A bad version reached npm:** publish a fixed patch version and, if needed, `npm deprecate` the bad one. Avoid `npm unpublish`.
-- **Wrong changelog entry:** edit `CHANGELOG.md` and the GitHub Release by hand in a follow-up commit.
+- **Wrong changelog entry:** edit `CHANGELOG.md` and the GitHub Release by hand in a follow-up pull request.
