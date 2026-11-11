@@ -3,6 +3,7 @@ import {
   appendFileSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -78,7 +79,9 @@ function checkVersion() {
 }
 
 function branch() {
-  pushReleaseBranch({ cwd: root, version, dryRun });
+  if (pushReleaseBranch({ cwd: root, version, dryRun }) === 'dry-run') {
+    return;
+  }
   const message = `Open the release pull request: ${compareUrl(repository, version)}`;
   console.log(message);
   summary(message);
@@ -94,11 +97,7 @@ function githubRelease() {
     console.log(`The ${tag} GitHub release already exists.`);
     return;
   }
-  const file = join(
-    mkdtempSync(join(tmpdir(), 'pidrang-release-notes-')),
-    'notes.md',
-  );
-  const args = [
+  const createArgs = (notesFile) => [
     'release',
     'create',
     tag,
@@ -108,17 +107,23 @@ function githubRelease() {
     '--title',
     tag,
     '--notes-file',
-    file,
+    notesFile,
     ...(isPrerelease(version) ? ['--prerelease'] : []),
   ];
   if (dryRun) {
     console.log(
-      `Dry run: would run gh ${args.join(' ')} with these notes:\n\n${notes}`,
+      `Dry run: would run gh ${createArgs('notes.md').join(' ')} with these notes:\n\n${notes}`,
     );
     return;
   }
-  writeFileSync(file, `${notes}\n`);
-  execFileSync('gh', args, { cwd: root, stdio: 'inherit' });
+  const directory = mkdtempSync(join(tmpdir(), 'pidrang-release-notes-'));
+  try {
+    const file = join(directory, 'notes.md');
+    writeFileSync(file, `${notes}\n`);
+    execFileSync('gh', createArgs(file), { cwd: root, stdio: 'inherit' });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 const steps = {
@@ -128,7 +133,7 @@ const steps = {
   'github-release': githubRelease,
 };
 
-if (!version || !(step in steps)) {
+if (!version || !Object.hasOwn(steps, step)) {
   fail(
     'usage: release.mjs <check-version|branch|tag|github-release> <version> [--dry-run]',
   );
