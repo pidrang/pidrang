@@ -1615,6 +1615,108 @@ export class App {
     });
 
   describe('the navigation layout', () => {
+    const ngNewAngularJson = (maximumWarning = '500kB') =>
+      JSON.stringify({
+        projects: {
+          shop: {
+            projectType: 'application',
+            sourceRoot: 'src',
+            architect: {
+              build: {
+                defaultConfiguration: 'production',
+                configurations: {
+                  production: {
+                    budgets: [
+                      { type: 'initial', maximumWarning, maximumError: '1MB' },
+                      {
+                        type: 'anyComponentStyle',
+                        maximumWarning: '4kB',
+                        maximumError: '8kB',
+                      },
+                    ],
+                  },
+                  development: { optimization: false },
+                },
+              },
+            },
+          },
+        },
+      });
+
+    const initialBudgetOf = async () => {
+      const workspace = JSON.parse(
+        await readFile(join(root, 'angular.json'), 'utf8'),
+      );
+      return workspace.projects.shop.architect.build.configurations.production
+        .budgets[0];
+    };
+
+    it('raises the initial budget warning of a new app that gets the layout', async () => {
+      await put(newAppFiles());
+      await put({ 'angular.json': ngNewAngularJson() });
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      expect(await initialBudgetOf()).toEqual({
+        type: 'initial',
+        maximumWarning: '850kB',
+        maximumError: '1MB',
+      });
+      const workspace = JSON.parse(
+        await readFile(join(root, 'angular.json'), 'utf8'),
+      );
+      expect(
+        workspace.projects.shop.architect.build.configurations.development
+          .fileReplacements,
+      ).toEqual([
+        {
+          replace: 'src/environments/environment.ts',
+          with: 'src/environments/environment.development.ts',
+        },
+      ]);
+      expect(output()).toContain(
+        'Raised the warning of the initial bundle budget in angular.json from 500kB to 850kB: Angular, the Supabase client and the layout start a new app above 500kB, even with the pages loaded lazily. The error budget stays at 1MB.',
+      );
+    });
+
+    it('leaves a customized initial budget alone and says how to raise it', async () => {
+      await put(newAppFiles());
+      await put({ 'angular.json': ngNewAngularJson('600kB') });
+      const plan = await planFile({ ...PLAN, layout: 'sidebar' });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      expect(await initialBudgetOf()).toEqual({
+        type: 'initial',
+        maximumWarning: '600kB',
+        maximumError: '1MB',
+      });
+      expect(output()).toContain(
+        'raise maximumWarning of the initial budget in angular.json',
+      );
+      expect(output()).not.toContain('Raised the warning');
+    });
+
+    it('never changes the budget of an app without the layout', async () => {
+      await put(newAppFiles());
+      await put({ 'angular.json': ngNewAngularJson() });
+      const plan = await planFile({ ...PLAN, layout: 'none' });
+
+      expect(await runCli(['init', '--plan', plan], STRUCTURAL_CONTEXT())).toBe(
+        0,
+      );
+
+      expect((await initialBudgetOf()).maximumWarning).toBe('500kB');
+      expect(output()).toContain(
+        'Angular, the Supabase client and Angular Material can bring the initial bundle above the 500kB warning budget',
+      );
+    });
+
     it('writes the Material layout into a new app that asks for it', async () => {
       await put(newAppFiles());
       const plan = await planFile({ ...PLAN, layout: 'sidebar' });
