@@ -94,6 +94,39 @@ function primaryKeyColumns(
     .map(([name]) => name);
 }
 
+const FOREIGN_KEY_MARKER = '<fk ';
+
+function isForeignKey(property: OpenApiProperty): boolean {
+  return property.description?.includes(FOREIGN_KEY_MARKER) ?? false;
+}
+
+function sequenceReason(column: string): string {
+  return `PostgREST does not show whether "${column}" is filled by a sequence (serial or identity); use the direct database connection strategy, or set create: true in resources.ts if it has no default`;
+}
+
+function sequenceBlindCreate(
+  properties: Record<string, OpenApiProperty>,
+  required: string[],
+  primaryKey: string[],
+): UnavailableAction[] {
+  return Object.entries(properties)
+    .filter(
+      ([name, property]) =>
+        property.type === 'integer' &&
+        required.includes(name) &&
+        !('default' in property) &&
+        !primaryKey.includes(name) &&
+        !isForeignKey(property) &&
+        postgrestNameProblem(name) === null,
+    )
+    .map(
+      ([name]): UnavailableAction => ({
+        action: 'create',
+        reason: sequenceReason(name),
+      }),
+    );
+}
+
 export function createServiceRoleSchemaProvider(
   connection: ServiceRoleConnection,
 ): SchemaProvider {
@@ -155,7 +188,10 @@ export function createServiceRoleSchemaProvider(
           reason: `PostgREST does not accept ${method.toUpperCase()} on "${table}", for example a view that cannot be updated`,
         }),
       );
-      return describeTable(table, columns, unavailableActions);
+      return describeTable(table, columns, [
+        ...unavailableActions,
+        ...sequenceBlindCreate(properties, required, primaryKey),
+      ]);
     },
   };
 }
