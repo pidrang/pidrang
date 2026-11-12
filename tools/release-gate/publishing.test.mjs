@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   distTag,
   integrity,
+  npmViewFailure,
   publishAction,
   publishOrder,
 } from './publishing.mjs';
@@ -71,4 +72,13 @@ test('publishes a new version, skips the same content, refuses other content', (
   assert.equal(publishAction(null, 'sha512-a'), 'publish');
   assert.equal(publishAction('sha512-a', 'sha512-a'), 'skip');
   assert.equal(publishAction('sha512-b', 'sha512-a'), 'conflict');
+});
+
+test('explains an npm view failure with its first error line', () => {
+  assert.equal(
+    npmViewFailure('@pidrang/core', '0.1.2', {
+      stderr: '\nnpm error code ETIMEDOUT\nnpm error network timeout\n',
+    }),
+    'could not check @pidrang/core@0.1.2 on npm (npm error code ETIMEDOUT). The packages listed above are on npm; use Re-run failed jobs to continue with the same tarballs.',
+  );
 });

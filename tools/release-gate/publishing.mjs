@@ -25,3 +25,12 @@ export function publishAction(published, local) {
   }
   return published === local ? 'skip' : 'conflict';
 }
+
+export function npmViewFailure(name, version, error) {
+  const detail =
+    String(error?.stderr ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line !== '') ?? String(error?.message ?? error);
+  return `could not check ${name}@${version} on npm (${detail}). The packages listed above are on npm; use Re-run failed jobs to continue with the same tarballs.`;
+}

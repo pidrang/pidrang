@@ -4,16 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact version to release (for example 0.1.0). The gate packs and tests the tarballs at this version before anything is tagged or published.
+        description: Exact version to release (for example 0.1.0). Use the same version for both steps.
         required: true
         type: string
+      step:
+        description: prepare pushes the release commit to release/vX.Y.Z for a pull request; publish runs on main once that pull request is merged, then tags and publishes.
+        required: true
+        default: prepare
+        type: choice
+        options:
+          - prepare
+          - publish
       first-release:
-        description: Set for the very first release, when no version tag exists yet.
+        description: Set on the prepare step of the very first release, when no version tag exists yet.
         required: false
         default: false
         type: boolean
       dry-run:
-        description: Preview the release without committing, tagging, pushing or publishing.
+        description: Preview the step without pushing, tagging or publishing.
         required: false
         default: true
         type: boolean
@@ -27,9 +35,17 @@ concurrency:
 
 jobs:
   check:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - name: Check the branch
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "Run the Release workflow on main, not on $REF."
+            exit 1
+          fi
+
       - name: Check the version
         env:
           VERSION: ${{ inputs.version }}
@@ -39,8 +55,70 @@ jobs:
             exit 1
           fi
 
+      - if: inputs.step == 'publish'
+        uses: actions/checkout@v7
+
+      - if: inputs.step == 'publish'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - if: inputs.step == 'publish'
+        name: Check that the release pull request is merged
+        env:
+          VERSION: ${{ inputs.version }}
+        run: node tools/release/release.mjs check-version "$VERSION"
+
+  prepare:
+    needs: check
+    if: inputs.step == 'prepare'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec nx run-many -t lint test
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Version and changelog
+        env:
+          VERSION: ${{ inputs.version }}
+          FIRST_RELEASE: ${{ inputs.first-release }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          args=("$VERSION" --skip-publish)
+          if [ "$FIRST_RELEASE" = "true" ]; then args+=("--first-release"); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=("--dry-run"); fi
+          pnpm exec nx release "${args[@]}"
+
+      - name: Push the release branch
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          args=(branch "$VERSION")
+          if [ "$DRY_RUN" = "true" ]; then args+=("--dry-run"); fi
+          node tools/release/release.mjs "${args[@]}"
+
   gate:
     needs: check
+    if: inputs.step == 'publish'
     uses: ./.github/workflows/release-gate.yml
     with:
       version: ${{ inputs.version }}
@@ -83,17 +161,24 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Version, changelog, tag and GitHub release
+      - name: Tag the release commit
         env:
           VERSION: ${{ inputs.version }}
-          FIRST_RELEASE: ${{ inputs.first-release }}
           DRY_RUN: ${{ inputs.dry-run }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          args=("$VERSION" --skip-publish)
-          if [ "$FIRST_RELEASE" = "true" ]; then args+=("--first-release"); fi
+          args=(tag "$VERSION")
           if [ "$DRY_RUN" = "true" ]; then args+=("--dry-run"); fi
-          pnpm exec nx release "${args[@]}"
+          node tools/release/release.mjs "${args[@]}"
+
+      - name: GitHub release
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=(github-release "$VERSION")
+          if [ "$DRY_RUN" = "true" ]; then args+=("--dry-run"); fi
+          node tools/release/release.mjs "${args[@]}"
 
   publish:
     needs: tag

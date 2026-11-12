@@ -28,9 +28,9 @@ jobs:
 
       - run: pnpm run sync:layout -- --check
 
-      - run: pnpm exec eslint tools/release-gate tools/shared.mjs tools/versioned-packages.mjs tools/verify-artifacts.mjs tools/changelog-renderer.mjs tools/changelog-renderer.test.mjs
+      - run: pnpm exec eslint tools/release-gate tools/release tools/shared.mjs tools/versioned-packages.mjs tools/verify-artifacts.mjs tools/changelog-renderer.mjs tools/changelog-renderer.test.mjs
 
-      - run: node --test tools/changelog-renderer.test.mjs
+      - run: node --test tools/changelog-renderer.test.mjs tools/release/release-steps.test.mjs
 
       - run: node tools/release-gate/run.mjs --mode build
 

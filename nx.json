@@ -119,7 +119,6 @@
     "changelog": {
       "workspaceChangelog": {
         "file": "CHANGELOG.md",
-        "createRelease": "github",
         "renderer": "{workspaceRoot}/tools/changelog-renderer.mjs",
         "renderOptions": {
           "authors": false
@@ -128,7 +127,7 @@
     },
     "git": {
       "commit": true,
-      "tag": true,
+      "tag": false,
       "commitMessage": "chore(release): v{version}"
     },
     "conventionalCommits": {
