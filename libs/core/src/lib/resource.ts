@@ -4,6 +4,7 @@ import { ListParams } from './list-params';
 export interface Resource {
   name: string;
   label?: string;
+  labelSingular?: string;
   fields?: Field[];
   defaultSorters?: ListParams['sorters'];
 

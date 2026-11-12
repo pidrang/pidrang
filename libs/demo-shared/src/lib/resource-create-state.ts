@@ -17,7 +17,10 @@ import { isAuthRequiredError } from './auth-required-error';
 import { injectAuthSessionState } from './auth-session-state';
 import { injectEarlierSave } from './earlier-save';
 import { navigationFailure } from './navigation-failure';
-import { injectResourceDefinition, resourceTitle } from './resource-definition';
+import {
+  injectResourceDefinition,
+  resourceSingularTitle,
+} from './resource-definition';
 import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
 import { SaveTimeoutError } from './save-timeout-error';
@@ -138,7 +141,7 @@ export function injectResourceCreateState(resource: Signal<string>) {
   }
 
   return {
-    title: resourceTitle(definition),
+    title: resourceSingularTitle(definition),
     saving,
     savingElsewhere,
     stopped,

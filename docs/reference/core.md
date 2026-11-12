@@ -62,13 +62,14 @@ Source: `libs/core/src/lib/auth-session-ref.ts` lines 5–10 (interface definiti
 |----------|------|---------|-------------|
 | `name` | `string` | — | Table name, resource name, and URL segment. Must not collide with existing routes. Source: `libs/core/src/lib/resource.ts` line 5. |
 | `label` | `string` | Derived from `name` | Display label for titles, menu items, headers. Generated from the table name by `readable-label.ts` in the CLI: split on `_`, `-`, `.`, case boundaries, capitalize first word, lowercase others. |
-| `fields` | `Field[]` | — | Typed field definitions rendered by `ResourceForm` and `ResourceTable`. Source: same file, line 7. |
-| `defaultSorters` | `ListParams['sorters']` | `[ { field: 'id', order: 'asc' } ]` | Order applied when the page has no user-set sort. The CLI adds `{ field: 'created_at', order: 'desc' }, { field: 'id', order: 'asc' }` when a `timestamp` or `date` `created_at` column exists, or the same on `createdAt` when only that one does. Source: `libs/cli/src/lib/generate-resources-file.ts` lines 53–74 (`sortableCreatedAt` and `defaultSortersLines`). The `id` default itself comes from `libs/demo-shared/src/lib/resource-list-state.ts` line 96, copied into the generated helper `src/app/pidrang/resource-list-state.ts` at `libs/cli/src/lib/generated-pages.ts` line 72. |
-| `list` | `boolean` | `true` | Enable/disable the generic list page and its route. Source: `libs/core/src/lib/resource.ts` line 10. |
-| `create` | `boolean` | `true` | Enable/disable create. Source: same file, line 11. |
-| `show` | `boolean` | `true` | Enable/disable show. Source: same file, line 12. |
-| `edit` | `boolean` | `true` | Enable/disable edit. Source: same file, line 13. |
-| `delete` | `boolean` | `true` | Enable/disable delete. Source: same file, line 14. |
+| `labelSingular` | `string` | `label`, then `name` | Singular display label for the create, edit and show titles (`Create user`, `Edit user — Ada`). The list title keeps `label`. The library never derives it from `label`; `pidrang init` writes a first value (see the CLI reference). Source: `libs/core/src/lib/resource.ts` line 7. |
+| `fields` | `Field[]` | — | Typed field definitions rendered by `ResourceForm` and `ResourceTable`. Source: same file, line 8. |
+| `defaultSorters` | `ListParams['sorters']` | `[ { field: 'id', order: 'asc' } ]` | Order applied when the page has no user-set sort. The CLI adds `{ field: 'created_at', order: 'desc' }, { field: 'id', order: 'asc' }` when a `timestamp` or `date` `created_at` column exists, or the same on `createdAt` when only that one does. Source: `libs/cli/src/lib/generate-resources-file.ts` lines 53–74 (`sortableCreatedAt` and `defaultSortersLines`). The `id` default itself comes from `libs/demo-shared/src/lib/resource-list-state.ts` line 96, copied into the generated helper `src/app/pidrang/resource-list-state.ts` at `libs/cli/src/lib/generated-pages.ts` line 86. |
+| `list` | `boolean` | `true` | Enable/disable the generic list page and its route. Source: `libs/core/src/lib/resource.ts` line 11. |
+| `create` | `boolean` | `true` | Enable/disable create. Source: same file, line 12. |
+| `show` | `boolean` | `true` | Enable/disable show. Source: same file, line 13. |
+| `edit` | `boolean` | `true` | Enable/disable edit. Source: same file, line 14. |
+| `delete` | `boolean` | `true` | Enable/disable delete. Source: same file, line 15. |
 
 `isResourceActionEnabled(resource: Resource \| undefined, action: ResourceAction): boolean` returns `false` when `resource` is `undefined` or `resource[action] === false`; `true` otherwise (enabled by default). Source: `libs/core/src/lib/is-resource-action-enabled.ts` lines 4–9.
 

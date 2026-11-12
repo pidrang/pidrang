@@ -35,9 +35,9 @@ const DEMOS = [
 
 const DEEP_LINKS = [
   { route: 'products', heading: /^\s*products\s*$/ },
-  { route: 'products/create', heading: /^\s*Create products\s*$/ },
-  { route: 'products/1', heading: /^\s*products — Keyboard\s*$/ },
-  { route: 'products/1/edit', heading: /^\s*Edit products — Keyboard\s*$/ },
+  { route: 'products/create', heading: /^\s*Create product\s*$/ },
+  { route: 'products/1', heading: /^\s*product — Keyboard\s*$/ },
+  { route: 'products/1/edit', heading: /^\s*Edit product — Keyboard\s*$/ },
   { route: 'login', heading: /^\s*Sign in\s*$/ },
 ];
 
@@ -141,10 +141,10 @@ for (const demo of DEMOS) {
       const pages = [
         { route: '', heading: 'Pidrang demo' },
         { route: 'products', heading: /^\s*products\s*$/ },
-        { route: 'products/1', heading: /^\s*products — Keyboard\s*$/ },
+        { route: 'products/1', heading: /^\s*product — Keyboard\s*$/ },
         {
           route: 'products/1/edit',
-          heading: /^\s*Edit products — Keyboard\s*$/,
+          heading: /^\s*Edit product — Keyboard\s*$/,
         },
       ];
       for (const entry of pages) {

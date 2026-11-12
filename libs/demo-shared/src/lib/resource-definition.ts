@@ -10,6 +10,15 @@ export function resourceTitle(
   });
 }
 
+export function resourceSingularTitle(
+  definition: Signal<Resource | undefined>,
+): Signal<string> {
+  return computed(() => {
+    const resource = definition();
+    return resource?.labelSingular ?? resource?.label ?? resource?.name ?? '';
+  });
+}
+
 export function injectResourceDefinition(
   resource: Signal<string>,
 ): Signal<Resource | undefined> {

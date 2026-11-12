@@ -301,4 +301,33 @@ describe('injectResourceCreateState signed out', () => {
     expect(creates).toHaveLength(0);
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it('titles the page with the singular label, falling back to the label', () => {
+    const dataProvider: DataProvider = {
+      getList: () => Promise.reject(new Error('unused')),
+      getOne: () => Promise.reject(new Error('unused')),
+      create: () => Promise.reject(new Error('unused')),
+      update: () => Promise.reject(new Error('unused')),
+      delete: () => Promise.reject(new Error('unused')),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        providePidrang({
+          dataProvider,
+          resources: [
+            { name: 'products', label: 'Products', labelSingular: 'Product' },
+            { name: 'orders', label: 'Orders' },
+          ],
+        }),
+      ],
+    });
+    const [product, order] = TestBed.runInInjectionContext(() => [
+      injectResourceCreateState(signal('products')),
+      injectResourceCreateState(signal('orders')),
+    ]);
+
+    expect(product.title()).toBe('Product');
+    expect(order.title()).toBe('Orders');
+  });
 });

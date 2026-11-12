@@ -29,7 +29,7 @@ test('opens the home page and the products list up to row eleven', async ({
 test('shows a record to an anonymous visitor', async ({ page }) => {
   await page.goto(`/products/${products.firstId}`);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'products — ',
+    'product — ',
   );
   await expect(page.locator('dd').first()).toHaveText(products.firstId);
 
@@ -77,7 +77,7 @@ test('opens the edit and create forms once signed in', async ({ page }) => {
 
   await page.goto('/products/create');
   await expect(
-    page.getByRole('heading', { name: 'Create products' }),
+    page.getByRole('heading', { name: 'Create product' }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
 });
