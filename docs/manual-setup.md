@@ -204,7 +204,7 @@ export class ResourceCreatePage {
 
   protected readonly fields = computed(() => this.resources.find((resource) => resource.name === this.resource())?.fields?.filter((field) => !field.readOnly) ?? []);
 
-  protected readonly initialValue = computed(() => Object.fromEntries(this.fields().map((field) => [field.name, field.type === 'number' ? 0 : field.type === 'boolean' ? false : ''])));
+  protected readonly initialValue = computed(() => Object.fromEntries(this.fields().map((field) => [field.name, field.type === 'number' ? (field.hasDefault ? null : 0) : field.type === 'boolean' ? false : ''])));
 
   protected readonly pending = signal(false);
   protected readonly saveError = signal<string | null>(null);

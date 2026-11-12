@@ -247,6 +247,47 @@ describe('injectResourceCreateState field visibility', () => {
   });
 });
 
+describe('injectResourceCreateState initial value', () => {
+  it('starts a number field with a database default empty, and one without at 0', () => {
+    const dataProvider: DataProvider = {
+      getList: () => Promise.reject(new Error('unused')),
+      getOne: () => Promise.reject(new Error('unused')),
+      create: () => Promise.reject(new Error('unused')),
+      update: () => Promise.reject(new Error('unused')),
+      delete: () => Promise.reject(new Error('unused')),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        providePidrang({
+          dataProvider,
+          resources: [
+            {
+              name: 'items',
+              fields: [
+                { name: 'quantity', type: 'number' },
+                { name: 'rank', type: 'number', hasDefault: true },
+                { name: 'active', type: 'boolean', hasDefault: true },
+                { name: 'label', type: 'text', hasDefault: true },
+              ],
+            },
+          ],
+        }),
+      ],
+    });
+    const state = TestBed.runInInjectionContext(() =>
+      injectResourceCreateState(signal('items')),
+    );
+
+    expect(state.initialValue()).toEqual({
+      quantity: 0,
+      rank: null,
+      active: false,
+      label: '',
+    });
+  });
+});
+
 describe('injectResourceCreateState signed out', () => {
   it('sends nothing when nobody is signed in', async () => {
     const { creates, navigate, state } = setupCreate(null);

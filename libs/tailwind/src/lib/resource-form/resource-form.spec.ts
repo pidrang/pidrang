@@ -872,6 +872,40 @@ describe('ResourceForm', () => {
     expect(saved).toEqual([{ name: 'Widget', quantity: 0, rating: 0 }]);
   });
 
+  it('starts a number with a database default empty, shows the hint and leaves it out of the insert', async () => {
+    TestBed.configureTestingModule({ imports: [ResourceForm] });
+
+    const fixture = TestBed.createComponent(ResourceForm);
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('fields', [
+      { name: 'name', type: 'text' },
+      { name: 'rank', type: 'number', hasDefault: true },
+    ]);
+    fixture.componentRef.setInput('value', { name: '', rank: null });
+    await fixture.whenStable();
+
+    const inputs: NodeListOf<HTMLInputElement> =
+      fixture.nativeElement.querySelectorAll('input');
+    expect(inputs[1].value).toBe('');
+    expect(fixture.nativeElement.textContent).toContain(
+      'Leave unchanged to use the database default.',
+    );
+
+    const saved: unknown[] = [];
+    fixture.componentInstance.save.subscribe((value: unknown) =>
+      saved.push(value),
+    );
+
+    inputs[0].value = 'Widget';
+    inputs[0].dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    fixture.nativeElement.querySelector('button').click();
+    await fixture.whenStable();
+
+    expect(saved).toEqual([{ name: 'Widget' }]);
+  });
+
   it('sends only the renamed field on edit, not an untouched number without a default', async () => {
     TestBed.configureTestingModule({ imports: [ResourceForm] });
 
