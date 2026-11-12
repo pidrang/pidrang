@@ -1678,7 +1678,7 @@ export class App {
         },
       ]);
       expect(output()).toContain(
-        'Raised the warning of the initial bundle budget in angular.json from 500kB to 850kB',
+        'Raised the warning of the initial bundle budget in angular.json from 500kB to 850kB: Angular, the Supabase client and the layout start a new app above 500kB, even with the pages loaded lazily. The error budget stays at 1MB.',
       );
     });
 

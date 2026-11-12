@@ -462,7 +462,7 @@ interface SetupReport {
 function initialBudgetMessage(outcome: InitialBudgetOutcome): string {
   switch (outcome) {
     case 'raised':
-      return `\nRaised the warning of the initial bundle budget in angular.json from ${NG_NEW_INITIAL_WARNING} to ${RAISED_INITIAL_WARNING}: Angular, the Supabase client and the Material layout start a new app above ${NG_NEW_INITIAL_WARNING}, even with the pages loaded lazily. The error budget stays at 1MB.`;
+      return `\nRaised the warning of the initial bundle budget in angular.json from ${NG_NEW_INITIAL_WARNING} to ${RAISED_INITIAL_WARNING}: Angular, the Supabase client and the layout start a new app above ${NG_NEW_INITIAL_WARNING}, even with the pages loaded lazily. The error budget stays at 1MB.`;
     case 'unchanged':
       return `\nAngular, the Supabase client and Angular Material can bring the initial bundle above the ${NG_NEW_INITIAL_WARNING} warning budget that ng new sets. If ng build warns about it, raise maximumWarning of the initial budget in angular.json.`;
   }
