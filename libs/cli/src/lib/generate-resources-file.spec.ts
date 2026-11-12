@@ -26,6 +26,7 @@ export const resources: Resource[] = [
   {
     name: 'products',
     label: 'Products',
+    labelSingular: 'Product',
     fields: [
       { name: 'id', label: 'Id', type: 'number' },
       { name: 'name', label: 'Name', type: 'text' },
@@ -164,6 +165,7 @@ export const resources: Resource[] = [
   {
     name: 'products',
     label: 'Products',
+    labelSingular: 'Product',
     fields: [
       { name: 'id', label: 'Id', type: 'text', readOnly: true },
       { name: 'created_at', label: 'Created at', type: 'timestamp', hasDefault: true },
@@ -386,6 +388,25 @@ export const resources: Resource[] = [
     expect(output).toContain(`label: 'Order items',`);
     expect(output).toContain(`name: 'userId', label: 'User id',`);
     expect(output).toContain(`name: 'created_at', label: 'Created at',`);
+  });
+
+  it('writes no singular label for a table whose name it cannot make singular', () => {
+    const plan: GenerationPlan = {
+      providerId: 'supabase',
+      tables: [
+        {
+          table: 'status',
+          fields: [{ name: 'id', type: 'number' }],
+          actions: ['list', 'create', 'show', 'edit', 'delete'],
+          hiddenFields: [],
+        },
+      ],
+    };
+
+    const output = generateResourcesFile(plan);
+
+    expect(output).toContain(`label: 'Status',`);
+    expect(output).not.toContain('labelSingular');
   });
 
   it('generates the same file again from the same plan', () => {

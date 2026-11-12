@@ -117,7 +117,7 @@ test('creates, shows, edits and deletes a record as the writer', async ({
 
   await page.goto(`/products/${id}`);
   await expect(
-    page.getByRole('heading', { name: 'Products — Gate keyboard' }),
+    page.getByRole('heading', { name: 'Product — Gate keyboard' }),
   ).toBeVisible();
   await expect(page.locator('dd').nth(2)).toHaveText('42');
 
@@ -125,7 +125,7 @@ test('creates, shows, edits and deletes a record as the writer', async ({
   await page.getByLabel('name').fill('Gate keyboard renamed');
   await page.getByLabel('name').press('Enter');
   await expect(
-    page.getByRole('heading', { name: 'Products — Gate keyboard renamed' }),
+    page.getByRole('heading', { name: 'Product — Gate keyboard renamed' }),
   ).toBeVisible();
 
   await page.goto('/products');
@@ -289,7 +289,7 @@ test('honours the generated action flags', async ({ page }) => {
 
   await page.goto(`/users/create`);
   await expect(
-    page.getByRole('heading', { name: 'Create Users' }),
+    page.getByRole('heading', { name: 'Create User' }),
   ).toBeVisible();
 });
 
@@ -314,7 +314,7 @@ test('renders a record into the show page through route input binding', async ({
 }) => {
   await page.goto(`/fixture_items/${fixture_items.lockedId}`);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    'Fixture items — ',
+    'Fixture item — ',
   );
   await expect(page.locator('dd').first()).toHaveText(fixture_items.lockedId);
 });
@@ -431,7 +431,7 @@ test('edits only the changed field and leaves a precise value untouched', async 
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(
     page.getByRole('heading', {
-      name: 'Fixture items — Gate renamed precise row',
+      name: 'Fixture item — Gate renamed precise row',
     }),
   ).toBeVisible();
   expect(body()).toEqual({ name: 'Gate renamed precise row' });

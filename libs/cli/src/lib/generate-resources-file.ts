@@ -3,6 +3,7 @@ import { CRUD_ACTIONS } from './crud-action';
 import { GenerationPlan, TablePlan } from './generation-plan';
 import { quote } from './quote';
 import { readableLabel } from './readable-label';
+import { singularName } from './singular-name';
 
 export function generateResourcesFile(plan: GenerationPlan): string {
   const resources = plan.tables.map(generateResourceLiteral).join('\n');
@@ -18,6 +19,7 @@ export function generateResourcesFile(plan: GenerationPlan): string {
 }
 
 function generateResourceLiteral(table: TablePlan): string {
+  const singular = singularName(table.table);
   const fields = table.fields
     .map((field) => {
       const hidden = table.hiddenFields.includes(field.name);
@@ -39,6 +41,9 @@ function generateResourceLiteral(table: TablePlan): string {
     `  {`,
     `    name: ${quote(table.table)},`,
     `    label: ${quote(readableLabel(table.table))},`,
+    ...(singular === undefined
+      ? []
+      : [`    labelSingular: ${quote(readableLabel(singular))},`]),
     `    fields: [`,
     fields,
     `    ],`,
