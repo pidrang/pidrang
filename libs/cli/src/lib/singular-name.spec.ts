@@ -21,4 +21,12 @@ describe('singularName', () => {
       expect(singularName(name)).toBeUndefined();
     },
   );
+
+  it.each([
+    ['movies', 'movy'],
+    ['cookies', 'cooky'],
+    ['statuses', 'statuse'],
+  ])('keeps the known miss of %s, which gives %s', (name, singular) => {
+    expect(singularName(name)).toBe(singular);
+  });
 });
