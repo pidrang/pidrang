@@ -51,6 +51,7 @@ What `init` wrote:
 - `src/app/resource-routes.ts`: the routes `:resource`, `:resource/create`, `:resource/:id` and `:resource/:id/edit`, with their guards, and the `sign-in` route.
 - `src/app/pages/` and `src/app/pidrang/`: the List, Create, Show, Edit and sign-in pages, and the helpers they call.
 - `src/app/layout/`: the navigation layout.
+- `angular.json`: the development environment file in `fileReplacements`, and the warning of the `initial` budget raised from the 500kB `ng new` sets to 850kB, which init prints.
 - `app.config.ts`, `app.routes.ts` and `app.html`, edited to register Pidrang, add the routes and host the layout.
 
 The pages are rendered with Angular Material. The layout follows the UI layer of the app: Tailwind when `package.json` declares `@pidrang/tailwind`, Angular Material otherwise. Every file and every option is in [the CLI reference](./reference/cli.md).
@@ -91,7 +92,7 @@ To add a table later, run `init` again: see [A second run](./reference/cli.md#a-
 
 The app still shows the Angular welcome page: `app.html` still holds it. Init replaces that template with `<router-outlet />` or the navigation layout; if you had already changed the file and it has no outlet, the page renders nothing below your content, so add `<router-outlet />` where the pages should appear.
 
-`ng build` warns that the initial bundle exceeded its budget: the budget `ng new` sets warns above 500 kB, and an app with the Supabase client, Angular Material and the layout starts above it (about 690 kB with the layout) even though the pages load lazily. It is a warning, the build succeeds; raise `maximumWarning` in the `budgets` of `angular.json` if you want it gone.
+`ng build` warns that the initial bundle exceeded its budget. Angular, `@supabase/supabase-js` and the Material modules of the layout come to about 700 kB on a new app, even though the pages load lazily, above the 500kB warning `ng new` sets. On a new app that gets the layout, init raises that warning to 850kB in `angular.json` and prints it; the error budget stays at 1MB. It leaves a budget you already changed as it is. On an existing app, init never changes the budgets: raise `maximumWarning` of the `initial` budget in `angular.json` if you want the warning gone. The build succeeds either way.
 
 The Sign in button does nothing and the console shows the router error `NG04002` (`Cannot match any routes. URL Segment: 'sign-in'` in a development build): `provideSignInPath('/sign-in')` is set but no sign-in route is, and the resource routes do not match a name that is not a resource. Run `pidrang generate auth`, which writes the page and adds its route to `resource-routes.ts`, add your own sign-in page at `/sign-in`, or change the path in `app.config.ts`.
 

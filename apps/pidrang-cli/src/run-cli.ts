@@ -57,6 +57,11 @@ import {
   plannedEntryActions,
 } from './entry-redirect';
 import {
+  NG_NEW_INITIAL_WARNING,
+  RAISED_INITIAL_WARNING,
+  raiseInitialBudget,
+} from './edit-budget';
+import {
   addEnvironmentFileReplacements,
   environmentFiles,
   environmentImportPath,
@@ -440,6 +445,8 @@ async function writeFiles(
   }
 }
 
+type InitialBudgetOutcome = 'raised' | 'unchanged';
+
 interface SetupReport {
   setup: AppSetup;
   signIn: { path: string | null; generated: boolean; reason: string };
@@ -449,6 +456,16 @@ interface SetupReport {
     lines: string[];
     placeholders: AppSetup['environment'];
   }[];
+  initialBudget: InitialBudgetOutcome;
+}
+
+function initialBudgetMessage(outcome: InitialBudgetOutcome): string {
+  switch (outcome) {
+    case 'raised':
+      return `\nRaised the warning of the initial bundle budget in angular.json from ${NG_NEW_INITIAL_WARNING} to ${RAISED_INITIAL_WARNING}: Angular, the Supabase client and the Material layout start a new app above ${NG_NEW_INITIAL_WARNING}, even with the pages loaded lazily. The error budget stays at 1MB.`;
+    case 'unchanged':
+      return `\nAngular, the Supabase client and Angular Material can bring the initial bundle above the ${NG_NEW_INITIAL_WARNING} warning budget that ng new sets. If ng build warns about it, raise maximumWarning of the initial budget in angular.json.`;
+  }
 }
 
 function printInstructions(
@@ -474,6 +491,7 @@ function printInstructions(
     }
   }
   report.setup.notes.forEach((note) => context.out(`\n${note}`));
+  context.out(initialBudgetMessage(report.initialBudget));
   context.out('');
   if (report.signIn.path !== null) {
     const route = `provideSignInPath(${quote(report.signIn.path)}) in ${layout.configFile}`;
@@ -964,25 +982,34 @@ async function runInit(
         )),
   ];
 
-  if (createdEnvironment) {
-    const workspaceSource = await readOptional(context.cwd, 'angular.json');
-    const workspaceAfter =
-      workspaceSource === null
-        ? null
-        : addEnvironmentFileReplacements(
-            workspaceSource,
-            layout.project,
-            layout.sourceRoot,
-          );
-    if (workspaceSource !== null && workspaceAfter !== null) {
-      candidates.push({
-        path: 'angular.json',
-        before: workspaceSource,
-        after: workspaceAfter,
-        manual: false,
-      });
-    }
+  const workspaceSource = await readOptional(context.cwd, 'angular.json');
+  const withReplacements =
+    workspaceSource !== null && createdEnvironment
+      ? (addEnvironmentFileReplacements(
+          workspaceSource,
+          layout.project,
+          layout.sourceRoot,
+        ) ?? workspaceSource)
+      : workspaceSource;
+  const withRaisedBudget =
+    withReplacements !== null && withLayout
+      ? raiseInitialBudget(withReplacements, layout.project)
+      : null;
+  const workspaceAfter = withRaisedBudget ?? withReplacements;
+  if (
+    workspaceSource !== null &&
+    workspaceAfter !== null &&
+    workspaceAfter !== workspaceSource
+  ) {
+    candidates.push({
+      path: 'angular.json',
+      before: workspaceSource,
+      after: workspaceAfter,
+      manual: false,
+    });
   }
+  const initialBudget: InitialBudgetOutcome =
+    withRaisedBudget === null ? 'unchanged' : 'raised';
 
   const layoutFiles = withLayout
     ? relocateFiles([generateLayoutFile(tooling.layoutUi)], layout.appDirectory)
@@ -1032,6 +1059,7 @@ async function runInit(
       generated: signIn.file !== null,
       reason: signIn.reason,
     },
+    initialBudget,
   };
   printInstructions(context, layout, report);
   printInstallReport(context, installPlan, installResult);
