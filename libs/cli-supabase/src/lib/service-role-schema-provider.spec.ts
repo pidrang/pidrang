@@ -542,4 +542,124 @@ describe('createServiceRoleSchemaProvider', () => {
     ]);
     expect(introspection.unavailableActions).toEqual([]);
   });
+
+  describe('integer columns PostgREST shows without a default', () => {
+    const FOREIGN_KEY_DESCRIPTION =
+      "Note:\nThis is a Foreign Key to `categories.id`.<fk table='categories' column='id'/>";
+
+    const primaryKey = {
+      type: 'integer',
+      format: 'bigint',
+      description: PRIMARY_KEY_DESCRIPTION,
+    };
+
+    const integerSchema = {
+      definitions: {
+        tickets: {
+          required: ['id', 'number'],
+          properties: {
+            id: primaryKey,
+            number: { type: 'integer', format: 'bigint' },
+            rank: { type: 'integer', format: 'integer' },
+          },
+        },
+        line_items: {
+          required: ['id', 'category_id'],
+          properties: {
+            id: primaryKey,
+            category_id: {
+              type: 'integer',
+              format: 'bigint',
+              description: FOREIGN_KEY_DESCRIPTION,
+            },
+          },
+        },
+        priced_items: {
+          required: ['id', 'priced'],
+          properties: {
+            id: primaryKey,
+            priced: { type: 'integer', format: 'integer', default: 3 },
+          },
+        },
+        mixed_items: {
+          required: ['id', 'category_id', 'number', 'priced'],
+          properties: {
+            id: primaryKey,
+            category_id: {
+              type: 'integer',
+              format: 'bigint',
+              description: FOREIGN_KEY_DESCRIPTION,
+            },
+            number: { type: 'integer', format: 'bigint' },
+            priced: { type: 'integer', format: 'integer', default: 3 },
+            rank: { type: 'integer', format: 'integer' },
+          },
+        },
+      },
+      paths: {
+        '/': { get: {} },
+        '/tickets': ALL_METHODS,
+        '/line_items': ALL_METHODS,
+        '/priced_items': ALL_METHODS,
+        '/mixed_items': ALL_METHODS,
+      },
+    };
+
+    function sequenceReason(column: string): string {
+      return `PostgREST does not show whether "${column}" is filled by a sequence (serial or identity); use the direct database connection strategy, or set create: true in resources.ts if it has no default`;
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: () => Promise.resolve(integerSchema),
+        }),
+      );
+    });
+
+    it('makes create unavailable for a required integer column with no default key, since a serial or identity column looks the same', async () => {
+      const introspection =
+        await createServiceRoleSchemaProvider(connection).introspectTable(
+          'tickets',
+        );
+      expect(introspection.fields).toEqual([
+        { name: 'id', type: 'numeric', readOnly: true },
+        { name: 'number', type: 'numeric' },
+        { name: 'rank', type: 'number', nullable: true },
+      ]);
+      expect(createEntries(introspection)).toEqual([
+        { action: 'create', reason: sequenceReason('number') },
+      ]);
+    });
+
+    it('keeps create available for a required integer foreign key', async () => {
+      const introspection =
+        await createServiceRoleSchemaProvider(connection).introspectTable(
+          'line_items',
+        );
+      expect(introspection.unavailableActions).toEqual([]);
+    });
+
+    it('keeps create available for a required integer column with a default key', async () => {
+      const introspection =
+        await createServiceRoleSchemaProvider(connection).introspectTable(
+          'priced_items',
+        );
+      expect(introspection.unavailableActions).toEqual([]);
+    });
+
+    it('names only the required integer column that is neither a key nor defaulted', async () => {
+      const introspection =
+        await createServiceRoleSchemaProvider(connection).introspectTable(
+          'mixed_items',
+        );
+      expect(createEntries(introspection)).toEqual([
+        { action: 'create', reason: sequenceReason('number') },
+      ]);
+    });
+  });
 });
