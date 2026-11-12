@@ -393,6 +393,14 @@ function checkTailwindClasses(site) {
   }
 }
 
+function budgetWarnings(output) {
+  return output
+    .split('\n')
+    .filter((line) => line.includes('exceeded maximum budget'))
+    .map((line) => line.replace(/\x1b\[[0-9;]*m/g, '').trim())
+    .join('; ');
+}
+
 const output_directory = join(gateDirectory, 'consumers', values.adapter);
 rmSync(output_directory, { recursive: true, force: true });
 mkdirSync(output_directory, { recursive: true });
@@ -511,9 +519,19 @@ try {
     );
   }
 
-  execute('build', join(consumer, 'node_modules/.bin/ng'), ['build'], {
-    cwd: consumer,
-  });
+  const buildOutput = execute(
+    'build',
+    join(consumer, 'node_modules/.bin/ng'),
+    ['build'],
+    {
+      cwd: consumer,
+    },
+  );
+  if (isStarter && buildOutput.includes('exceeded maximum budget')) {
+    throw new Error(
+      `ng build of the new app warns about a budget: ${budgetWarnings(buildOutput)} (log: ${join(output_directory, 'build.log')})`,
+    );
+  }
   const site = join(output_directory, 'site');
   const built = isStarter
     ? join(consumer, 'dist', STARTER_NAME, 'browser')
