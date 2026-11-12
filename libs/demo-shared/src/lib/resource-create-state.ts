@@ -25,7 +25,7 @@ import { SaveTimeoutError } from './save-timeout-error';
 function defaultValueForField(field: Field): unknown {
   switch (field.type) {
     case 'number':
-      return 0;
+      return field.hasDefault ? null : 0;
     case 'boolean':
       return false;
     default:
