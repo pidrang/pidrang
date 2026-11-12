@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
-import { parseArgs } from 'node:util';
+import { parseArgs, stripVTControlCharacters } from 'node:util';
 
 import { root } from '../shared.mjs';
 import { MANIFEST } from './identities.mjs';
@@ -397,7 +397,7 @@ function budgetWarnings(output) {
   return output
     .split('\n')
     .filter((line) => line.includes('exceeded maximum budget'))
-    .map((line) => line.replace(/\x1b\[[0-9;]*m/g, '').trim())
+    .map((line) => stripVTControlCharacters(line).trim())
     .join('; ');
 }
 
