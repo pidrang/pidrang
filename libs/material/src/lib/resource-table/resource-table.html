@@ -4,15 +4,31 @@
   tabindex="0"
   aria-label="Resource table"
 >
-  <table mat-table [dataSource]="data()">
-    @for (field of fields(); track $index) {
+  <table
+    mat-table
+    [dataSource]="data()"
+    matSort
+    [matSortActive]="sortActive()"
+    [matSortDirection]="sortDirection()"
+    (matSortChange)="changeSort($event)"
+  >
+    @for (field of fields(); track $index) { @if (isSortable(field)) {
+    <ng-container [matColumnDef]="fieldColumn($index)">
+      <th mat-header-cell *matHeaderCellDef [mat-sort-header]="field.name">
+        {{ columnHeader(field) }}
+      </th>
+      <td mat-cell *matCellDef="let row" [attr.title]="row[field.name]">
+        <span class="cell-text">{{ row[field.name] }}</span>
+      </td>
+    </ng-container>
+    } @else {
     <ng-container [matColumnDef]="fieldColumn($index)">
       <th mat-header-cell *matHeaderCellDef>{{ columnHeader(field) }}</th>
       <td mat-cell *matCellDef="let row" [attr.title]="row[field.name]">
         <span class="cell-text">{{ row[field.name] }}</span>
       </td>
     </ng-container>
-    } @if (actions(); as actionsTemplate) {
+    } } @if (actions(); as actionsTemplate) {
     <ng-container [matColumnDef]="actionsColumn">
       <th mat-header-cell *matHeaderCellDef>Actions</th>
       <td mat-cell *matCellDef="let row" class="actions-cell">

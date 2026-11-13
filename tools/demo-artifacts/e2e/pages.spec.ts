@@ -16,6 +16,37 @@ const PRODUCT = {
   created_at: '2026-09-01T00:00:00Z',
 };
 
+const PRODUCTS = [
+  PRODUCT,
+  { id: '2', name: 'Mouse', price: 19, created_at: '2026-09-03T00:00:00Z' },
+  { id: '3', name: 'Monitor', price: 199, created_at: '2026-09-02T00:00:00Z' },
+];
+
+function isProductKey(key: string): key is keyof typeof PRODUCT {
+  return key in PRODUCT;
+}
+
+function compareValues(a: string | number, b: string | number): number {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return a - b;
+  }
+  return String(a).localeCompare(String(b));
+}
+
+function sortedProducts(url: string): typeof PRODUCTS {
+  const order = new URL(url).searchParams.get('order');
+  if (order === null) {
+    return PRODUCTS;
+  }
+  const [term = ''] = order.split(',');
+  const [key = '', direction = ''] = term.split('.');
+  if (!isProductKey(key)) {
+    return PRODUCTS;
+  }
+  const factor = direction === 'desc' ? -1 : 1;
+  return [...PRODUCTS].sort((a, b) => factor * compareValues(a[key], b[key]));
+}
+
 const DEMO_USER = {
   id: '00000000-0000-0000-0000-000000000001',
   aud: 'authenticated',
@@ -84,11 +115,19 @@ async function mockSupabase(page: Page): Promise<void> {
     const wantsSingle = (request.headers()['accept'] ?? '').includes(
       'vnd.pgrst.object',
     );
+    if (wantsSingle) {
+      return route.fulfill({
+        status: 200,
+        headers: { ...CORS_HEADERS, 'content-range': '0-0/1' },
+        contentType: 'application/json',
+        body: JSON.stringify(PRODUCT),
+      });
+    }
     return route.fulfill({
       status: 200,
-      headers: { ...CORS_HEADERS, 'content-range': '0-0/1' },
+      headers: { ...CORS_HEADERS, 'content-range': '0-2/3' },
       contentType: 'application/json',
-      body: JSON.stringify(wantsSingle ? PRODUCT : [PRODUCT]),
+      body: JSON.stringify(sortedProducts(request.url())),
     });
   });
 }
@@ -202,6 +241,36 @@ for (const demo of DEMOS) {
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(
         'products',
       );
+    });
+
+    test('sorts the products list by clicking a column header', async ({
+      page,
+    }) => {
+      await page.goto(`/${demo.path}/products`);
+
+      const names = page.locator('tr:has(td) > td:nth-child(2)');
+      const header = page.getByRole('columnheader', {
+        name: 'price',
+        exact: true,
+      });
+      const button = header.getByRole('button');
+
+      await expect(header).toHaveAttribute('aria-sort', 'none');
+      await expect(names).toHaveText(['Mouse', 'Monitor', 'Keyboard']);
+
+      await button.click();
+      await expect(header).toHaveAttribute('aria-sort', 'ascending');
+      await expect(names).toHaveText(['Mouse', 'Keyboard', 'Monitor']);
+
+      await button.press('Enter');
+      await expect(header).toHaveAttribute('aria-sort', 'descending');
+      await expect(names).toHaveText(['Monitor', 'Keyboard', 'Mouse']);
+      await expect(button).toBeFocused();
+
+      await button.press(' ');
+      await expect(header).toHaveAttribute('aria-sort', 'none');
+      await expect(names).toHaveText(['Mouse', 'Monitor', 'Keyboard']);
+      await expect(button).toBeFocused();
     });
   });
 }

@@ -75,10 +75,12 @@ import { injectSignInUrl, injectResourceListState } from '@pidrang/demo-shared';
     } @else {
       @if (total() === 0) {
         <p>No records yet.</p>
-      } @else if (list.hasValue()) {
+      } @else if (rows(); as currentRows) {
         <pidrang-material-resource-table
           [fields]="fields()"
-          [data]="list.value().data"
+          [data]="currentRows"
+          [sort]="sort()"
+          (sortChange)="sort.set($event)"
         >
           @if (canShow() || canEdit() || canDelete()) {
             <ng-template #actions let-row>
@@ -132,6 +134,8 @@ export class ResourceListPage {
   protected readonly pageSize = this.state.pageSize;
   protected readonly page = this.state.page;
   protected readonly list = this.state.list;
+  protected readonly rows = this.state.rows;
+  protected readonly sort = this.state.sort;
   protected readonly total = this.state.total;
   protected readonly deleting = this.state.deleting;
   protected readonly deleteLocked = this.state.deleteLocked;
