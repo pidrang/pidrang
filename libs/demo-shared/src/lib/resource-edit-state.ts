@@ -13,7 +13,10 @@ import { isAuthRequiredError } from './auth-required-error';
 import { injectAuthSessionState } from './auth-session-state';
 import { injectEarlierSave } from './earlier-save';
 import { navigationFailure } from './navigation-failure';
-import { injectResourceDefinition, resourceTitle } from './resource-definition';
+import {
+  injectResourceDefinition,
+  resourceSingularTitle,
+} from './resource-definition';
 import { injectResourceRecord } from './resource-record';
 import { injectSaveLock } from './save-lock';
 import { SaveFailure } from './save-failure';
@@ -144,7 +147,7 @@ export function injectResourceEditState(
   }
 
   return {
-    title: resourceTitle(definition),
+    title: resourceSingularTitle(definition),
     saving,
     savingElsewhere,
     earlierSave,

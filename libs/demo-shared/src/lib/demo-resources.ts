@@ -3,6 +3,7 @@ import { Resource } from '@pidrang/core';
 export const DEMO_RESOURCES: Resource[] = [
   {
     name: 'users',
+    labelSingular: 'user',
     fields: [
       { name: 'id', type: 'text', readOnly: true },
       { name: 'name', type: 'text' },
@@ -21,6 +22,7 @@ export const DEMO_RESOURCES: Resource[] = [
   },
   {
     name: 'products',
+    labelSingular: 'product',
     fields: [
       { name: 'id', type: 'text', readOnly: true },
       { name: 'name', type: 'text' },
@@ -39,6 +41,7 @@ export const DEMO_RESOURCES: Resource[] = [
   },
   {
     name: 'orders',
+    labelSingular: 'order',
     fields: [
       { name: 'id', type: 'text', readOnly: true },
       { name: 'user_id', label: 'User', type: 'text' },

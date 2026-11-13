@@ -12,7 +12,7 @@ const PROJECT: { root: string; tsConfig: string | null } = {
 };
 const CORE_TYPES = [
   "export interface Field { name: string; label?: string; type: 'text' | 'number'; readOnly?: boolean }",
-  'export interface Resource { name: string; label?: string; fields?: readonly Field[]; list?: boolean; create?: boolean; show?: boolean; edit?: boolean; delete?: boolean }',
+  'export interface Resource { name: string; label?: string; labelSingular?: string; fields?: readonly Field[]; list?: boolean; create?: boolean; show?: boolean; edit?: boolean; delete?: boolean }',
   'export interface PidrangConfig { resources: Resource[] }',
   '',
 ].join('\n');

@@ -47,7 +47,7 @@ Open `http://localhost:4200`. The app opens on the list of the first table you p
 
 What `init` wrote:
 
-- `src/app/resources.ts`: one `Resource` per table, with its typed fields. Edit it to rename a label, hide a field or turn an action off.
+- `src/app/resources.ts`: one `Resource` per table, with its typed fields. Edit it to rename a label or the singular label of the create, edit and show titles, hide a field or turn an action off. The singular label is made from the table name and can be wrong for some plurals (`movies` gives `Movy`): fix it there.
 - `src/app/resource-routes.ts`: the routes `:resource`, `:resource/create`, `:resource/:id` and `:resource/:id/edit`, with their guards, and the `sign-in` route.
 - `src/app/pages/` and `src/app/pidrang/`: the List, Create, Show, Edit and sign-in pages, and the helpers they call.
 - `src/app/layout/`: the navigation layout.
