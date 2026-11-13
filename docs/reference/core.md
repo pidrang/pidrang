@@ -86,6 +86,7 @@ Source: `libs/core/src/lib/auth-session-ref.ts` lines 5–10 (interface definiti
 | `readOnly` | `boolean` | `false` | Field excluded from create and edit forms entirely (primary keys, generated columns). Source: same file, line 15. |
 | `nullable` | `boolean` | `false` | For `timestamp`, `time`, `numeric`, `date`: allows the field to be cleared (sent as `null`) rather than blocked as invalid when empty. Source: same file, line 16. |
 | `hasDefault` | `boolean` | `false` | Shows hint "Leave unchanged to use the database default." on create; exempts from required check while untouched. Source: same file, line 17. |
+| `sortable` | `boolean` | `true` | `false` removes the sort header of the column in both `ResourceTable` layers: no button and no `aria-sort`. Source: same file, line 18. |
 
 ## Field types
 
@@ -115,7 +116,7 @@ Five helpers turn a `Field` into what a form renders; both UI layers call them i
 |----------|------|-------------|
 | `pagination?.current` | `number` | Page number (1-based). |
 | `pagination?.pageSize` | `number` | Rows per page. |
-| `sorters?` | `{ field: string; order: 'asc' \| 'desc' }[]` | Sort fields and direction. |
+| `sorters?` | `Sorter[]` | Sort fields and direction. `interface Sorter { field: string; order: 'asc' \| 'desc' }`, source `libs/core/src/lib/sorter.ts` lines 1–4. |
 | `filters?` | `readonly Filter[] \| Record<string, FilterValue \| null \| undefined>` | AND-combined filters; shorthand object syntax maps values to `eq`. Values are normalized (`libs/core/src/lib/normalize-filters.ts`) and unsupported operators are rejected (`libs/core/src/lib/reject-unsupported-filters.ts`). Anything else is rejected before a request is sent. |
 
 Three helpers apply those rules before any request. `normalizeFilters(filters: ListParams['filters']): Filter[]` returns `[]` for `undefined` or `null`, copies an array, turns the shorthand record into `{ field, operator: 'eq', value }` members (a `null` value becomes the `null` operator), and throws on a single filter object or a value that is not a plain object. `rejectUnsupportedFilters(filters, supported)` throws ``Unsupported filter operator "<operator>" on field "<field>"`` for an operator the backend cannot express. `validateListParams(params)` rejects a malformed page number, sorter or filter. Sources: `libs/core/src/lib/normalize-filters.ts` line 16, `libs/core/src/lib/reject-unsupported-filters.ts` lines 4–7, `libs/core/src/lib/validate-list-params.ts` line 83.
@@ -125,7 +126,7 @@ Three helpers apply those rules before any request. `normalizeFilters(filters: L
 | Property | Type | What it holds |
 |----------|------|---------------|
 | `data` | `T[]` | The loaded rows. |
-| `total` | `number` | Total row count for pagination. List parameters are validated before a request is sent (`validate-list-params.ts`). Source: `libs/core/src/lib/list-params.ts` lines 22–25 (`ListResult`). |
+| `total` | `number` | Total row count for pagination. List parameters are validated before a request is sent (`validate-list-params.ts`). Source: `libs/core/src/lib/list-params.ts` lines 20–23 (`ListResult`). |
 
 Filter operators:
 
@@ -143,7 +144,7 @@ Filter operators:
 
 Values accepted by operators: `string`, `number`, or `boolean` (`FilterValue`). Each operator enforces its own type at compile time through TypeScript constraints.
 
-Source: `libs/core/src/lib/list-params.ts` lines 4–19 (`ListParams`), lines 22–25 (`ListResult`); `libs/core/src/lib/filter.ts` lines 1–11 (`Filter`); `libs/core/src/lib/filter-value.ts` line 1 (`FilterValue`); `libs/core/src/lib/filter-operator.ts` line 3 (`FilterOperator`). Exact semantics delegated to [Writing a data provider](../data-providers.md#filters).
+Source: `libs/core/src/lib/list-params.ts` lines 5–18 (`ListParams`), lines 20–23 (`ListResult`); `libs/core/src/lib/sorter.ts` lines 1–4 (`Sorter`); `libs/core/src/lib/filter.ts` lines 1–11 (`Filter`); `libs/core/src/lib/filter-value.ts` line 1 (`FilterValue`); `libs/core/src/lib/filter-operator.ts` line 3 (`FilterOperator`). Exact semantics delegated to [Writing a data provider](../data-providers.md#filters).
 
 ## Data provider
 
