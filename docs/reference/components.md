@@ -17,12 +17,12 @@ Inputs and outputs:
 
 | Input / Output | Type | Required | What it does |
 |----------------|------|----------|-------------|
-| `fields` | `Field[]` | Yes | Columns to display, one data column per entry, in order. The table does not read `hidden`: the caller filters those fields out, as the list page of [Write the pages yourself](../manual-setup.md) does. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 19 (Material); Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts`. |
-| `data` | `T[]` | Yes | Rows to render. Source: same file, line 20. |
+| `fields` | `Field[]` | Yes | Columns to display, one data column per entry, in order. The table does not read `hidden`: the caller filters those fields out, as the list page of [Write the pages yourself](../manual-setup.md) does. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 21 (Material); Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts` line 17. |
+| `data` | `T[]` | Yes | Rows to render. Source: same file, line 22; Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts` line 18. |
 | `sort` | `Sorter \| null` | No (default `null`) | The column the table shows as sorted, and its direction. `null` shows no column as sorted, whatever order the rows come in. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 24; Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts` line 20. |
 | `sortChange` | `Sorter \| null` | Output | Emitted on a click, Enter or Space on a sort header: `{ field, order: 'asc' }` for a new column, then `'desc'`, then `null`. The table does not sort `data` itself: the caller loads the rows in that order and passes the new value back to `sort`. Source: same file, line 25; Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts` line 21. |
 
-Projected `#actions`: a `TemplateRef<{ $implicit: T }>` rendered as the last column with an `Actions` header. The `$implicit` context variable gives access to the current row object. A data column named `actions` keeps its own column alongside the projected one — column names are internal identifiers (`field-0`, `field-1`, …) so no collision is possible. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 21; `docs/design-notes.md` line 89.
+Projected `#actions`: a `TemplateRef<{ $implicit: T }>` rendered as the last column with an `Actions` header. The `$implicit` context variable gives access to the current row object. A data column named `actions` keeps its own column alongside the projected one — column names are internal identifiers (`field-0`, `field-1`, …) so no collision is possible. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 23; `docs/design-notes.md` line 89.
 
 Mat table columns use positional names (`field-N`) rather than field names for identification, avoiding the duplicate-column error that would occur if a data column were named `actions` (colliding with the projected actions column).
 

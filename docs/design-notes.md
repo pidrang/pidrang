@@ -425,7 +425,7 @@ The key in `environment.ts` (`supabasePublishableKey`) is the public publishable
 
 ### Sorting the list by a column header (#165)
 
-The sort is controlled: `ResourceTable` takes `sort` as an input and emits `sortChange`, and it keeps no sort state of its own. The page state has to know the sort to build the request and to go back to page 1, and both UI layers expose the same API, so the table stays a view of the state.
+The sort is controlled: `ResourceTable` takes `sort` as an input and emits `sortChange`, and it shows the `sort` it receives (in Material, MatSort keeps an arrow of its own only when a caller leaves `[sort]` unbound). The page state has to know the sort to build the request and to go back to page 1, and both UI layers expose the same API, so the table stays a view of the state.
 
 `id` is sent as a second sorter after the chosen column. Rows that share the value of the chosen column would otherwise change page from one request to the next, and a provider other than Supabase does not necessarily add an `id` tie-break on its own.
 
