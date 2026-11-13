@@ -300,6 +300,43 @@ describe('ResourceTable', () => {
       return fixture;
     }
 
+    it('renders no sort header and no aria-sort when the caller does not bind sort', async () => {
+      @Component({
+        imports: [ResourceTable],
+        template: `
+          <pidrang-tailwind-resource-table [fields]="fields" [data]="data">
+            <ng-template #actions let-row>
+              <button type="button">Delete {{ row.name }}</button>
+            </ng-template>
+          </pidrang-tailwind-resource-table>
+        `,
+      })
+      class HostWithoutSort {
+        protected readonly fields: Field[] = [
+          { name: 'name', type: 'text' },
+          { name: 'price', type: 'number' },
+        ];
+        protected readonly data = [{ name: 'Alice', price: 10 }];
+      }
+
+      TestBed.configureTestingModule({ imports: [HostWithoutSort] });
+      const fixture = TestBed.createComponent(HostWithoutSort);
+      await fixture.whenStable();
+
+      const headers = Array.from(
+        fixture.nativeElement.querySelectorAll('th') as NodeListOf<HTMLElement>,
+      );
+      expect(headers.map((header) => header.textContent?.trim())).toEqual([
+        'name',
+        'price',
+        'Actions',
+      ]);
+      for (const header of headers) {
+        expect(header.hasAttribute('aria-sort')).toBe(false);
+        expect(header.querySelector('button')).toBeNull();
+      }
+    });
+
     it('shows aria-sort none on sortable headers before any click, and no aria-sort on a non-sortable or Actions header', async () => {
       const fixture = await setUpHost();
 
@@ -380,6 +417,24 @@ describe('ResourceTable', () => {
       expect(headerOf(fixture, 'price').getAttribute('aria-sort')).toBe(
         'descending',
       );
+    });
+
+    it('shows a neutral arrow hidden from assistive technology on a sortable column that is not sorted', async () => {
+      const fixture = await setUpHost();
+      const arrow = sortButtonOf(headerOf(fixture, 'price')).querySelector(
+        'span',
+      );
+
+      expect(arrow?.textContent?.trim()).toBe('⇅');
+      expect(arrow?.getAttribute('aria-hidden')).toBe('true');
+
+      fixture.componentInstance.sort.set({ field: 'name', order: 'asc' });
+      await fixture.whenStable();
+      expect(
+        sortButtonOf(headerOf(fixture, 'price'))
+          .querySelector('span')
+          ?.textContent?.trim(),
+      ).toBe('⇅');
     });
 
     it('shows an up arrow on the ascending column and a down arrow on the descending one, hidden from assistive technology', async () => {

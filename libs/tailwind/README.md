@@ -29,7 +29,7 @@ See the [getting started guide](https://github.com/pidrang/pidrang/blob/main/doc
   </pidrang-tailwind-resource-table>
   ```
 
-  Bind `[sort]` (a `Sorter` or `null`) and `(sortChange)` to sort by clicking a column header: ascending, descending, then `null` for the default order; a field with `sortable: false` gets no sort header. Bind both: the table shows only the `sort` it receives.
+  Bind `[sort]` (a `Sorter`, or `null` when no column is sorted) and `(sortChange)` to sort by clicking a column header: ascending, descending, then `null` for the default order; a field with `sortable: false` gets no sort header. Without `[sort]` the table renders no sort header and no `aria-sort`.
 
   Long values are shown on one line, cut at 12rem with an ellipsis, with the full value in the cell's `title`; cells align to the top and the actions column stays on one line.
 

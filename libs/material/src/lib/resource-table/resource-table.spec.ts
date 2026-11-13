@@ -296,6 +296,43 @@ describe('ResourceTable', () => {
       return fixture;
     }
 
+    it('renders no sort header and no aria-sort when the caller does not bind sort', async () => {
+      @Component({
+        imports: [ResourceTable],
+        template: `
+          <pidrang-material-resource-table [fields]="fields" [data]="data">
+            <ng-template #actions let-row>
+              <button type="button">Delete {{ row.name }}</button>
+            </ng-template>
+          </pidrang-material-resource-table>
+        `,
+      })
+      class HostWithoutSort {
+        protected readonly fields: Field[] = [
+          { name: 'name', type: 'text' },
+          { name: 'price', type: 'number' },
+        ];
+        protected readonly data = [{ name: 'Alice', price: 10 }];
+      }
+
+      TestBed.configureTestingModule({ imports: [HostWithoutSort] });
+      const fixture = TestBed.createComponent(HostWithoutSort);
+      await fixture.whenStable();
+
+      const headers = Array.from(
+        fixture.nativeElement.querySelectorAll('th') as NodeListOf<HTMLElement>,
+      );
+      expect(headers.map((header) => header.textContent?.trim())).toEqual([
+        'name',
+        'price',
+        'Actions',
+      ]);
+      for (const header of headers) {
+        expect(header.hasAttribute('aria-sort')).toBe(false);
+        expect(header.querySelector('[role="button"]')).toBeNull();
+      }
+    });
+
     it('shows aria-sort none on sortable headers before any click, and no aria-sort on a non-sortable or Actions header', async () => {
       const fixture = await setUpHost();
 

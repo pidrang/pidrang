@@ -21,7 +21,7 @@ export class ResourceTable<T extends Record<string, unknown>> {
   readonly fields = input.required<Field[]>();
   readonly data = input.required<T[]>();
   readonly actions = contentChild<TemplateRef<{ $implicit: T }>>('actions');
-  readonly sort = input<Sorter | null>(null);
+  readonly sort = input<Sorter | null | undefined>(undefined);
   readonly sortChange = output<Sorter | null>();
 
   protected readonly actionsColumn = 'actions';
@@ -45,7 +45,7 @@ export class ResourceTable<T extends Record<string, unknown>> {
   }
 
   protected isSortable(field: Field): boolean {
-    return field.sortable !== false;
+    return this.sort() !== undefined && field.sortable !== false;
   }
 
   protected changeSort(event: Sort): void {
