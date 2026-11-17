@@ -9,7 +9,7 @@
 | `pidrang init [--plan <file>] [--project <name>] [--skip-install]` | Scaffolds Resource definitions and CRUD pages into an Angular app. Run it from the workspace root.                                                 |
 | `pidrang generate auth [--project <name>]`                         | Writes the sign-in page the pages and the layout link to, and its route, when the app has none. Needs the `resource-routes.ts` that `init` writes. |
 
-Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 112–166.
+Source: `usage` in `apps/pidrang-cli/src/run-cli.ts`.
 
 ## Options
 
@@ -20,7 +20,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 112–166.
 | `--skip-install`   | `init`     | Do not offer to install the packages; print the commands instead. |
 | `-h, --help`       | Both       | Show this help message.                                           |
 
-Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 120–124.
+Source: `usage` in `apps/pidrang-cli/src/run-cli.ts`.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts`, function `usage`, lines 120–124.
 | Node.js 22.22.3 or a later 22.x, 24.15.0 or a later 24.x, or 26 and later | `apps/pidrang-cli/src/node-version.ts` reads `process.version` against the range `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0` | Stops immediately with a plain error before touching any file.          |
 | Angular 22.1 or a later 22.x                                              | `apps/pidrang-cli/src/preflight-app.ts` reads `@angular/core/package.json` or `package.json` dependencies               | Listed among other problems in the "this folder is not an app" message. |
 
-Source: `apps/pidrang-cli/src/node-version.ts` line 1 (`SUPPORTED_NODE`), `apps/pidrang-cli/src/preflight-app.ts` lines 27, 138–166.
+Source: `SUPPORTED_NODE` in `apps/pidrang-cli/src/node-version.ts`; `preflightApp`, `supportsAngular` in `apps/pidrang-cli/src/preflight-app.ts`.
 
 ## The questions
 
@@ -37,18 +37,18 @@ The wizard asks these questions in order:
 
 | Order           | Question                                                                                                                                                                                                   | Default        | When asked                                                                                                                                                                                    |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1               | `Which data source do you want to scaffold from?`                                                                                                                                                          | —              | Only when more than one provider is registered. Source: `libs/cli/src/lib/wizard.ts`, line 271.                                                                                               |
-| 2               | `Supabase project URL, from the Connect button at the top of the Supabase dashboard:`                                                                                                                      | —              | Always first for Supabase. Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`, line 38.                                                                               |
-| 3               | `How should pidrang read your table definitions?`                                                                                                                                                          | `service-role` | Always after the URL. Choices: Secret key (`sb_secret_`), Direct database connection (host, user, password), GraphQL with the publishable key. Source: same file, line 486.                   |
-| 4               | `Which tables should pidrang scaffold?`                                                                                                                                                                    | —              | After connection is resolved. Multi-select checkbox over available tables. Source: `libs/cli/src/lib/wizard.ts`, line 168.                                                                    |
-| 5 _(per table)_ | `Which actions should "<table>" support?`                                                                                                                                                                  | All checked    | After selecting tables. Checkbox with disabled unavailable actions. Source: `libs/cli/src/lib/wizard.ts` lines 305–312 (`actionsMessage`, label at line 309), checkbox call at lines 321–329. |
-| 6 _(per table)_ | `Any fields to hide from the list/edit views for "<table>"? (optional)`                                                                                                                                    | —              | Per table. Checkbox listing introspected fields. Source: `libs/cli/src/lib/wizard.ts`, lines 332–338.                                                                                         |
-| 7               | `Generate a navigation layout? It adds a header with your app name and a sign in/out link, and a side menu of the resources.`                                                                              | `true`         | New app only; always `"none"` for existing apps. Source: `libs/cli/src/lib/wizard.ts`, lines 21–25.                                                                                           |
-| 8               | `Generate a sign-in page at /sign-in? The app needs one to sign in and write data.`                                                                                                                        | `true`         | New app only; always `true` for existing apps. Source: `libs/cli/src/lib/wizard.ts`, lines 29–32.                                                                                             |
-| 9               | `Do your tables need a signed-in user to be read? Say yes when the select policy of the tables hides their rows from anonymous visitors, so a new app opens on the sign-in page instead of an empty list.` | `false`        | Not asked per-table: graphql and secret-key strategies answer globally; postgres answers per-table. Source: `libs/cli/src/lib/wizard.ts`, lines 36–40.                                        |
-| 10              | `Install the required packages?`                                                                                                                                                                           | `Y`            | Always last. Confirms before running the install command. Source: `libs/cli/src/lib/wizard.ts`, line 350.                                                                                     |
+| 1               | `Which data source do you want to scaffold from?`                                                                                                                                                          | —              | Only when more than one provider is registered. Source: `chooseProvider` in `libs/cli/src/lib/wizard.ts`. |
+| 2               | `Supabase project URL, from the Connect button at the top of the Supabase dashboard:`                                                                                                                      | —              | Always first for Supabase. Source: `promptProjectUrl` in `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`. |
+| 3               | `How should pidrang read your table definitions?`                                                                                                                                                          | `service-role` | Always after the URL. Choices: Secret key (`sb_secret_`), Direct database connection (host, user, password), GraphQL with the publishable key. Source: `promptPostgresConnection` in `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`. |
+| 4               | `Which tables should pidrang scaffold?`                                                                                                                                                                    | —              | After connection is resolved. Multi-select checkbox over available tables. Source: `promptTable` in `libs/cli/src/lib/wizard.ts`. |
+| 5 _(per table)_ | `Which actions should "<table>" support?`                                                                                                                                                                  | All checked    | After selecting tables. Checkbox with disabled unavailable actions. Source: `actionsMessage`, `promptTable` in `libs/cli/src/lib/wizard.ts`. |
+| 6 _(per table)_ | `Any fields to hide from the list/edit views for "<table>"? (optional)`                                                                                                                                    | —              | Per table. Checkbox listing introspected fields. Source: `promptTable` in `libs/cli/src/lib/wizard.ts`. |
+| 7               | `Generate a navigation layout? It adds a header with your app name and a sign in/out link, and a side menu of the resources.`                                                                              | `true`         | New app only; always `"none"` for existing apps. Source: `promptLayout` in `libs/cli/src/lib/wizard.ts`. |
+| 8               | `Generate a sign-in page at /sign-in? The app needs one to sign in and write data.`                                                                                                                        | `true`         | New app only; always `true` for existing apps. Source: `promptSignIn` in `libs/cli/src/lib/wizard.ts`. |
+| 9               | `Do your tables need a signed-in user to be read? Say yes when the select policy of the tables hides their rows from anonymous visitors, so a new app opens on the sign-in page instead of an empty list.` | `false`        | Not asked per-table: graphql and secret-key strategies answer globally; postgres answers per-table. Source: `promptReadsNeedSignIn`, `providerReadsNeedSignIn` in `libs/cli/src/lib/wizard.ts`. |
+| 10              | `Install the required packages?`                                                                                                                                                                           | `Y`            | Always last. Confirms before running the install command. Source: `confirmPackageInstall` in `libs/cli/src/lib/wizard.ts`. |
 
-When the connection attempt fails, the wizard repeats the question with the rejection message and asks whether to fall back to the secret key (for graphql). Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`, lines 148–154.
+When the connection attempt fails, the wizard repeats the question with the rejection message and asks whether to fall back to the secret key (for graphql). Source: `retryConnection` in `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`.
 
 ## What it writes
 
@@ -70,7 +70,7 @@ When the connection attempt fails, the wizard repeats the question with the reje
 
 How it wires the app itself is described in [Getting started](../getting-started.md#existing-app). The resource routes guard every `:resource` action with both `canMatchResourceAction(...)` and `canMatchSignedIn([...])` when the corresponding tables need a signed-in user. A file it writes is never overwritten: one that already exists with other content stops `init` before any write. An existing `resources.ts` is edited instead: a second run appends the tables it does not list yet and leaves the others as they are.
 
-Sources: `libs/cli/src/lib/generate-pages-bundle.ts` (`PAGES_UI_LAYER_PACKAGES`, lines 70–73), `libs/cli/src/lib/generated-pages.ts` (page file list), `libs/cli/src/lib/generate-resources-file.ts` (resources.ts generation), `libs/cli/src/lib/build-sign-in-page.ts` (sign-in page generation), `libs/cli/src/lib/generate-layout-module.ts` (layout generation), `apps/pidrang-cli/src/edit-app-config.ts`, `apps/pidrang-cli/src/edit-app-routes.ts`.
+Sources: `libs/cli/src/lib/generate-pages-bundle.ts` (`PAGES_UI_LAYER_PACKAGES`), `libs/cli/src/lib/generated-pages.ts` (page file list), `libs/cli/src/lib/generate-resources-file.ts` (resources.ts generation), `libs/cli/src/lib/build-sign-in-page.ts` (sign-in page generation), `libs/cli/src/lib/generate-layout-module.ts` (layout generation), `apps/pidrang-cli/src/edit-app-config.ts`, `apps/pidrang-cli/src/edit-app-routes.ts`.
 
 ## The plan file
 
@@ -93,14 +93,14 @@ actions lists at least one of list, create, show, edit, delete. hiddenFields is 
 
 | Key                     | Type                    | Default  | Meaning                                                                                                                                |
 | ----------------------- | ----------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `provider`              | string                  | —        | Provider id, e.g. `"supabase"`. Source: `libs/cli/src/lib/init-plan.ts` line 19.                                                       |
-| `connection`            | object                  | —        | Strategy-dependent connection object (see below). Source: `libs/cli/src/lib/init-plan.ts` line 20.                                     |
-| `tables[].table`        | string                  | —        | Database table name, used as resource name and URL segment. Source: `libs/cli/src/lib/init-plan.ts` line 3 (TABLE_KEYS).               |
-| `tables[].actions`      | string[]                | —        | Must list at least one of list, create, show, edit, delete. Duplicates detected. Source: `libs/cli/src/lib/init-plan.ts` lines 95–101. |
-| `tables[].hiddenFields` | string[]                | `[]`     | Fields omitted from list and edit views. Source: `libs/cli/src/lib/init-plan.ts` lines 102–106.                                        |
-| `layout`                | `"sidebar"` \| `"none"` | `"none"` | `"sidebar"` for new apps only; existing apps ignore it and keep theirs. Source: `libs/cli/src/lib/init-plan.ts` lines 22, 170.         |
-| `signIn`                | boolean                 | `false`  | Generate the sign-in page. Defaults to false; init asks on new apps. Source: `libs/cli/src/lib/init-plan.ts` lines 23, 171.            |
-| `readsNeedSignIn`       | boolean                 | `false`  | Global per-table override when the postgres strategy answers per-table. Source: `libs/cli/src/lib/init-plan.ts` lines 24, 172.         |
+| `provider`              | string                  | —        | Provider id, e.g. `"supabase"`. Source: `InitPlan` in `libs/cli/src/lib/init-plan.ts`. |
+| `connection`            | object                  | —        | Strategy-dependent connection object (see below). Source: `InitPlan` in `libs/cli/src/lib/init-plan.ts`. |
+| `tables[].table`        | string                  | —        | Database table name, used as resource name and URL segment. Source: `TABLE_KEYS`, `TableSelection` in `libs/cli/src/lib/init-plan.ts`. |
+| `tables[].actions`      | string[]                | —        | Must list at least one of list, create, show, edit, delete. Duplicates detected. Source: `tableProblems`, `duplicates` in `libs/cli/src/lib/init-plan.ts`. |
+| `tables[].hiddenFields` | string[]                | `[]`     | Fields omitted from list and edit views. Source: `tableProblems` in `libs/cli/src/lib/init-plan.ts`. |
+| `layout`                | `"sidebar"` \| `"none"` | `"none"` | `"sidebar"` for new apps only; existing apps ignore it and keep theirs. Source: `parseInitPlan`, `InitPlan` in `libs/cli/src/lib/init-plan.ts`. |
+| `signIn`                | boolean                 | `false`  | Generate the sign-in page. Defaults to false; init asks on new apps. Source: `parseInitPlan`, `InitPlan` in `libs/cli/src/lib/init-plan.ts`. |
+| `readsNeedSignIn`       | boolean                 | `false`  | Global per-table override when the postgres strategy answers per-table. Source: `parseInitPlan`, `InitPlan` in `libs/cli/src/lib/init-plan.ts`. |
 
 ### Connection per strategy
 
@@ -122,9 +122,9 @@ Supabase plan connection, one of:
 
 Keys allowed per strategy (strict): `graphql` allows `strategy` and `url`; `secret-key` allows the same; `postgres` allows `strategy`, `host`, `port`, `database`, `user`, `tls`, `caCertificatePath`, and `url`. Extra keys produce validation errors (secrets must not appear in the plan, use env vars).
 
-Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts` lines 259–275 (`PLAN_HELP`).
+Source: `PLAN_HELP` in `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`.
 
-Legacy names still work and print a warning: `"service-role"` for `"secret-key"`, `PIDRANG_SUPABASE_ANON_KEY` for `PIDRANG_SUPABASE_PUBLISHABLE_KEY`, `PIDRANG_SUPABASE_SERVICE_ROLE_KEY` for `PIDRANG_SUPABASE_SECRET_KEY`. Source: same file, lines 141–142, 227–229.
+Legacy names still work and print a warning: `"service-role"` for `"secret-key"`, `PIDRANG_SUPABASE_ANON_KEY` for `PIDRANG_SUPABASE_PUBLISHABLE_KEY`, `PIDRANG_SUPABASE_SERVICE_ROLE_KEY` for `PIDRANG_SUPABASE_SECRET_KEY`. Source: `connectionFromPlan`, `promptGraphQlConnection` in `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`.
 
 ### Secrets from the environment
 
@@ -136,7 +136,7 @@ Legacy names still work and print a warning: `"service-role"` for `"secret-key"`
 
 When both the new variable and the legacy name are set, the new variable wins. The legacy name produces a deprecation warning printed to stderr.
 
-Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts` lines 225–237 (`ENV_*` constants, `SECRETS_IN_ENV`).
+Source: `ENV_PUBLISHABLE_KEY`, `ENV_SECRET_KEY`, `LEGACY_ENV_ANON_KEY`, `LEGACY_ENV_SERVICE_ROLE_KEY`, `SECRETS_IN_ENV` in `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts`.
 
 ## Exit codes
 
@@ -146,7 +146,7 @@ Source: `libs/cli-supabase/src/lib/supabase-schema-provider-definition.ts` lines
 | 1    | Invalid input, unsupported Node.js or app, conflicting file, failed install, unknown provider, wrong table name, writing stopped by an error (`init` lists the files written and not written).                                                                                                         |
 | 130  | Interrupted by the user (Ctrl+C). Before any write: prints `Cancelled: nothing was written.` to stderr. During the writes: lists the files written and those not written, and asks to run `init` again. At the install question: the files are already written and `init` prints the install commands. |
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 79–81 (`EXIT_OK`, `EXIT_FAILED`, `EXIT_CANCELLED`) and the `INSTALL_STATUS` map at line 644.
+Source: `EXIT_OK`, `EXIT_FAILED`, `EXIT_CANCELLED`, `INSTALL_STATUS` in `apps/pidrang-cli/src/run-cli.ts`.
 
 ## A second run
 
@@ -154,7 +154,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 79–81 (`EXIT_OK`, `EXIT_FAILED
 
 Guard updates: a guard already written receives new private tables appended to its list. Guards for tables not seen in `resources.ts` are held back until those tables are listed.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 819–884 (resources edit, guarded resources).
+Source: `runInit`, `editCandidate`, `reportConflicts` in `apps/pidrang-cli/src/run-cli.ts`.
 
 ## A new app and an existing app
 
@@ -162,7 +162,7 @@ On a new app, `init` replaces the welcome page, generates the full page bundle (
 
 The layout feature (`app-layout.ts`) is gated on four conditions met together: the app must be new (`ng new`'s `app.html` has not been changed), `app.html` must contain only `<app-layout>`, `app.ts` must match the `ng new` template, and the layout must be requested (`sidebar`). When any condition fails, `init` reports the missing files and skips the layout. An existing app kept its own `app.html` and never receives a layout.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 743–768 (layout conditions), `libs/cli/src/lib/generate-layout-module.ts` lines 14–17 (`LAYOUTS` map keyed on `LayoutUi`).
+Source: `runInit` in `apps/pidrang-cli/src/run-cli.ts`; `LAYOUTS`, `generateLayoutFile` in `libs/cli/src/lib/generate-layout-module.ts`.
 
 ## When the tables need a signed-in user
 
@@ -172,7 +172,7 @@ For new apps: init asks once ("Do your tables need a signed-in user to be read?"
 
 Only the `postgres` strategy answers `readsNeedSignIn` per-table (reading the actual Row Level Security policies). The `graphql` and `secret-key` strategies ask a single global question.
 
-Source: `libs/cli/src/lib/wizard.ts` lines 43–55 (`providerReadsNeedSignIn`), `apps/pidrang-cli/src/run-cli.ts` lines 728–741 (guard setup and unguarded resources message).
+Source: `providerReadsNeedSignIn` in `libs/cli/src/lib/wizard.ts`; `signedInResources`, `unguardedReadsMessage` in `apps/pidrang-cli/src/run-cli.ts`.
 
 ## The sign-in page
 
@@ -182,9 +182,9 @@ When `src/app/pages/sign-in-page.ts` is already there with other content, `init`
 
 `pidrang generate auth` writes the same page when `app.routes.ts` has no existing sign-in route and `app.config.ts` does not call `provideSignInPath` with another path. It needs the `src/app/resource-routes.ts` that `init` writes, since the route goes there: without it, it exits `1` and writes nothing.
 
-`init` writes its own `sign-in` route into `resource-routes.ts`, above the `:resource` routes, only when the sign-in page it generates is in place: a run that leaves the page out writes no route, a later run that writes the page adds it, and a route an earlier run wrote is kept. `pidrang generate auth` adds the route with the page; when `resource-routes.ts` was edited by hand, it adds a `// pidrang:` comment with the route to write instead. When `app.routes.ts` already declares a first segment named `sign-in`, `init` writes no sign-in route and leaves yours in place. A table named `sign-in` or `resource-unavailable`, or like a route declared in `app.routes.ts`, is refused on every run, so the `:resource` routes cannot take those paths. Source: `libs/cli/src/lib/generate-pages-bundle.ts` lines 5-10 and 102-116 (sign-in route placement), `apps/pidrang-cli/src/run-cli.ts` lines 273-315 (`planSignIn`), 885-897 (sign-in route on init) and 1078-1174 (`runGenerateAuth`), `apps/pidrang-cli/src/add-sign-in-route.ts`, `apps/pidrang-cli/src/preflight-app.ts` lines 180-182 (`declaresSignInRoute`), `libs/cli/src/lib/wizard.ts` lines 79-99 (`routeNameProblem`).
+`init` writes its own `sign-in` route into `resource-routes.ts`, above the `:resource` routes, only when the sign-in page it generates is in place: a run that leaves the page out writes no route, a later run that writes the page adds it, and a route an earlier run wrote is kept. `pidrang generate auth` adds the route with the page; when `resource-routes.ts` was edited by hand, it adds a `// pidrang:` comment with the route to write instead. When `app.routes.ts` already declares a first segment named `sign-in`, `init` writes no sign-in route and leaves yours in place. A table named `sign-in` or `resource-unavailable`, or like a route declared in `app.routes.ts`, is refused on every run, so the `:resource` routes cannot take those paths. Source: `SIGN_IN_ROUTE_SNIPPET`, `generateResourceRoutesFile` in `libs/cli/src/lib/generate-pages-bundle.ts`; `planSignIn`, `runInit`, `runGenerateAuth` in `apps/pidrang-cli/src/run-cli.ts`; `apps/pidrang-cli/src/add-sign-in-route.ts`; `declaresSignInRoute` in `apps/pidrang-cli/src/preflight-app.ts`; `routeNameProblem` in `libs/cli/src/lib/wizard.ts`.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 485–493 (instruction printed without provider), `libs/demo-shared/src/lib/provide-sign-in-path.ts` (validation logic).
+Source: `printGeneratedSignIn` in `apps/pidrang-cli/src/run-cli.ts`; `libs/demo-shared/src/lib/provide-sign-in-path.ts`.
 
 ## Changing what it wrote
 
@@ -194,7 +194,7 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 485–493 (instruction printed w
 - The helpers under `src/app/pidrang/` are called by the generated pages and the layout module, so deleting them breaks the build even when `resources.ts` is correct.
 - `pnpm run sync:pages` and `sync:layout` serve the demo repositories in this codebase; they are not meant for consumer applications.
 
-Source: `apps/pidrang-cli/src/run-cli.ts` lines 153–156 (never-overwrite rule, manual comments), `apps/pidrang-cli/src/write-plan.ts` (conflict detection), `docs/design-notes.md` lines 163, 175.
+Source: `usage` in `apps/pidrang-cli/src/run-cli.ts`; `apps/pidrang-cli/src/write-plan.ts`; `docs/design-notes.md`.
 
 ## When it stops
 
@@ -209,4 +209,4 @@ Source: `apps/pidrang-cli/src/run-cli.ts` lines 153–156 (never-overwrite rule,
 | Conflict: file exists with other content                                   | Lists conflicted files under `resources.ts`, stops before any write | Resolve the conflict (the older pages need `src/app/pages` and `src/app/pidrang` deleted together). |
 | Install failed                                                             | Printed command, remaining commands listed                          | Run the printed command manually or fix the package manager issue.                                  |
 
-Sources: `apps/pidrang-cli/src/preflight-app.ts` lines 189–226 (preflight checks), `apps/pidrang-cli/src/node-version.ts` line 39 (node check), `apps/pidrang-cli/src/run-cli.ts` lines 692–696, 969–980 (conflict reporting), `apps/pidrang-cli/src/install-packages.ts` lines 142–156 (missing packages detection).
+Source: `preflightApp` in `apps/pidrang-cli/src/preflight-app.ts`; `apps/pidrang-cli/src/node-version.ts`; `reportConflicts`, `reportGenerateConflicts` in `apps/pidrang-cli/src/run-cli.ts`; `missingPackages` in `apps/pidrang-cli/src/install-packages.ts`.
