@@ -866,11 +866,26 @@ export const routes: Routes = [
         "export const routes: Routes = [\n  ...resourceRoutes,\n  { path: 'sign-in', component: SignInPage },\n];",
       );
       expect(output()).toContain(
-        'The app already has its own pages and routes, so pidrang only added the resource routes to src/app/app.routes.ts.',
+        'The app differs from a new ng new app, so pidrang only added the resource routes to src/app/app.routes.ts.',
       );
       expect(output()).toContain(
         "  { path: '', pathMatch: 'full', redirectTo: '/products' },",
       );
+    });
+
+    it('describes an edited template without claiming it already has routes', async () => {
+      await put({
+        'src/app/app.html': '<main>Existing content</main>',
+        'src/app/app.routes.ts': NG_ROUTES,
+      });
+      const plan = await planFile(PLAN);
+      expect(
+        await runCli(['init', '--plan', plan], context(undefined, STRUCTURAL)),
+      ).toBe(0);
+      expect(output()).toContain(
+        'The app differs from a new ng new app, so pidrang only added the resource routes to src/app/app.routes.ts.',
+      );
+      expect(output()).not.toContain('already has its own pages and routes');
     });
 
     describe("with a table name that holds a quote, such as o'brien", () => {
@@ -965,7 +980,7 @@ export const routes: Routes = [
           await runCli(['init', '--plan', plan], context(undefined, tooling)),
         ).toBe(0);
 
-        expect(output()).not.toContain('The app already has its own pages');
+        expect(output()).not.toContain('The app differs from a new ng new app');
         expect(output()).not.toContain("redirectTo: '/products'");
       },
     );

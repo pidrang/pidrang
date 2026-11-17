@@ -347,7 +347,7 @@ function printExistingAppNotice(
   }
   context.out('');
   context.out(
-    `The app already has its own pages and routes, so pidrang only added the resource routes to ${layout.routesFile}. To open the first generated page, add this route above the others:`,
+    `The app differs from a new ng new app, so pidrang only added the resource routes to ${layout.routesFile}. To open the first generated page, add this route above the others:`,
   );
   context.out(
     `  { path: '', pathMatch: 'full', redirectTo: ${quote(entry.path)} },`,
