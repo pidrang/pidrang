@@ -13,16 +13,22 @@ Switching between layers is a change of import and element name. Each layer's se
 
 ## ResourceTable
 
-Inputs:
+Inputs and outputs:
 
-| Input | Type | Required | What it does |
-|-------|------|----------|-------------|
-| `fields` | `Field[]` | Yes | Columns to display, one data column per entry, in order. The table does not read `hidden`: the caller filters those fields out, as the list page of [Write the pages yourself](../manual-setup.md) does. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 19 (Material); Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts`. |
-| `data` | `T[]` | Yes | Rows to render. Source: same file, line 20. |
+| Input / Output | Type | Required | What it does |
+|----------------|------|----------|-------------|
+| `fields` | `Field[]` | Yes | Columns to display, one data column per entry, in order. The table does not read `hidden`: the caller filters those fields out, as the list page of [Write the pages yourself](../manual-setup.md) does. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 21 (Material); Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts` line 17. |
+| `data` | `T[]` | Yes | Rows to render. Source: same file, line 22; Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts` line 18. |
+| `sort` | `Sorter \| null \| undefined` | No (default `undefined`) | Turns sorting on and says which column the table shows as sorted. `undefined`, the default when the input is not bound, renders no sort header and no `aria-sort`, so a table whose caller does not handle `sortChange` never offers a sort it cannot apply. `null` makes every field without `sortable: false` sortable, with no column shown as sorted, whatever order the rows come in. A `Sorter` shows that column sorted in that direction. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 24; Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts` line 20. |
+| `sortChange` | `Sorter \| null` | Output | Emitted on a click, Enter or Space on a sort header: `{ field, order: 'asc' }` for a new column, then `'desc'`, then `null`. The table does not sort `data` itself: the caller loads the rows in that order and passes the new value back to `sort`. Source: same file, line 25; Tailwind equivalent at `libs/tailwind/src/lib/resource-table/resource-table.ts` line 21. |
 
-Projected `#actions`: a `TemplateRef<{ $implicit: T }>` rendered as the last column with an `Actions` header. The `$implicit` context variable gives access to the current row object. A data column named `actions` keeps its own column alongside the projected one — column names are internal identifiers (`field-0`, `field-1`, …) so no collision is possible. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 21; `docs/design-notes.md` line 89.
+Projected `#actions`: a `TemplateRef<{ $implicit: T }>` rendered as the last column with an `Actions` header. The `$implicit` context variable gives access to the current row object. A data column named `actions` keeps its own column alongside the projected one — column names are internal identifiers (`field-0`, `field-1`, …) so no collision is possible. Source: `libs/material/src/lib/resource-table/resource-table.ts` line 23; `docs/design-notes.md` line 89.
 
 Mat table columns use positional names (`field-N`) rather than field names for identification, avoiding the duplicate-column error that would occur if a data column were named `actions` (colliding with the projected actions column).
+
+Sort headers appear only when `sort` is bound. In Material, a sortable column then renders `mat-sort-header` with the field name as its id, inside a `matSort` table: the header holds a `role="button"` element that takes focus, Enter and Space sort, and the `th` carries `aria-sort` (`ascending`, `descending`, or `none` when not sorted). A field with `sortable: false`, and the `Actions` column, render a plain header without `aria-sort`.
+
+In Tailwind, a sortable header holds a native `<button type="button">` with the label and an arrow hidden from assistive technology (`↑` or `↓` on the sorted column, a neutral `⇅` on the others), and the `th` carries the same `aria-sort` values.
 
 The table sits in a scroll container of its own: a `div` with `overflow-x: auto`, `role="region"`, `tabindex="0"` and `aria-label="Resource table"`. On a narrow screen only the table scrolls sideways, so the page stays in place and the `Actions` column is reachable by scrolling the table, and a keyboard user can focus the container even when no row has a focusable element. On a wide screen the container never scrolls and the table keeps the full width of its parent. Source: `libs/material/src/lib/resource-table/resource-table.html` and `resource-table.css`; `libs/tailwind/src/lib/resource-table/resource-table.html`.
 

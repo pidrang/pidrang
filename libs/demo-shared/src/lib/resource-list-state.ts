@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import {
+  Sorter,
   injectDataProvider,
   injectResourceList,
   isResourceActionEnabled,
@@ -33,6 +34,18 @@ const DELETE_TIMEOUT_MESSAGE =
 
 function mayHaveChanged(outcome: SaveOutcome | null): boolean {
   return outcome === null || outcome.ok;
+}
+
+const ID_ORDER: Sorter = { field: 'id', order: 'asc' };
+
+function sortersFor(
+  sort: Sorter | null,
+  defaults: Sorter[] | undefined,
+): Sorter[] {
+  if (sort === null) {
+    return defaults ?? [ID_ORDER];
+  }
+  return sort.field === 'id' ? [sort] : [sort, ID_ORDER];
 }
 
 export function injectResourceListState(resource: Signal<string>) {
@@ -74,9 +87,17 @@ export function injectResourceListState(resource: Signal<string>) {
     source: shown,
     computation: () => null,
   });
+  const sort = linkedSignal<string, Sorter | null>({
+    source: resource,
+    computation: () => null,
+  });
   const pageSize = signal(PAGE_SIZE_OPTIONS[0]);
   const page = linkedSignal({
-    source: () => ({ resource: resource(), pageSize: pageSize() }),
+    source: () => ({
+      resource: resource(),
+      pageSize: pageSize(),
+      sort: sort(),
+    }),
     computation: () => 1,
   });
   const revision = linkedSignal<
@@ -93,7 +114,7 @@ export function injectResourceListState(resource: Signal<string>) {
     revision();
     return {
       pagination: { current: page(), pageSize: pageSize() },
-      sorters: definition()?.defaultSorters ?? [{ field: 'id', order: 'asc' }],
+      sorters: sortersFor(sort(), definition()?.defaultSorters),
     };
   });
   const total = linkedSignal<
@@ -109,6 +130,23 @@ export function injectResourceListState(resource: Signal<string>) {
       (previous?.source.resource === source.resource
         ? previous.value
         : undefined),
+  });
+  const rows = linkedSignal<
+    { resource: string; failed: boolean; rows: ResourceRow[] | undefined },
+    ResourceRow[] | undefined
+  >({
+    source: () => ({
+      resource: resource(),
+      failed: list.status() === 'error',
+      rows: list.hasValue() ? list.value().data : undefined,
+    }),
+    computation: (source, previous) =>
+      source.failed
+        ? undefined
+        : (source.rows ??
+          (previous?.source.resource === source.resource
+            ? previous.value
+            : undefined)),
   });
   const lastPage = computed(() =>
     Math.max(1, Math.ceil((total() ?? 0) / pageSize())),
@@ -183,8 +221,10 @@ export function injectResourceListState(resource: Signal<string>) {
     pageSizeOptions: PAGE_SIZE_OPTIONS,
     pageSize,
     page,
+    sort,
     lastPage,
     list,
+    rows,
     total,
     deleting,
     deleteLocked,

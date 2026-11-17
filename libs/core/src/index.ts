@@ -8,6 +8,7 @@ export * from './lib/filter-operator';
 export * from './lib/filter';
 export * from './lib/filter-value';
 export * from './lib/list-params';
+export * from './lib/sorter';
 export * from './lib/normalize-filters';
 export * from './lib/reject-unsupported-filters';
 export * from './lib/validate-list-params';

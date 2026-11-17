@@ -1,15 +1,13 @@
 import { Filter } from './filter';
 import { FilterValue } from './filter-value';
+import { Sorter } from './sorter';
 
 export interface ListParams {
   pagination?: {
     current?: number;
     pageSize?: number;
   };
-  sorters?: {
-    field: string;
-    order: 'asc' | 'desc';
-  }[];
+  sorters?: Sorter[];
   filters?:
     | readonly Filter[]
     | {

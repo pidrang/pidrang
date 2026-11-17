@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { Component, signal } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Field, Sorter } from '@pidrang/core';
 
 import { ResourceTable } from './resource-table';
 
@@ -234,5 +235,227 @@ describe('ResourceTable', () => {
       'tbody tr td:last-child',
     ) as HTMLElement;
     expect(actionsCell.className).toContain('whitespace-nowrap');
+  });
+
+  describe('sorting', () => {
+    @Component({
+      imports: [ResourceTable],
+      template: `
+        <pidrang-tailwind-resource-table
+          [fields]="fields"
+          [data]="data"
+          [sort]="sort()"
+          (sortChange)="onSort($event)"
+        >
+          <ng-template #actions let-row>
+            <button type="button">Delete {{ row.name }}</button>
+          </ng-template>
+        </pidrang-tailwind-resource-table>
+      `,
+    })
+    class HostWithSort {
+      readonly sort = signal<Sorter | null>(null);
+      readonly sortEvents: (Sorter | null)[] = [];
+      protected readonly fields: Field[] = [
+        { name: 'name', type: 'text' },
+        { name: 'price', type: 'number' },
+        { name: 'notes', type: 'text', sortable: false },
+      ];
+      protected readonly data = [{ name: 'Alice', price: 10, notes: 'a' }];
+
+      onSort(event: Sorter | null): void {
+        this.sortEvents.push(event);
+        this.sort.set(event);
+      }
+    }
+
+    function headerOf(
+      fixture: ComponentFixture<HostWithSort>,
+      label: string,
+    ): HTMLElement {
+      const headers = fixture.nativeElement.querySelectorAll(
+        'th',
+      ) as NodeListOf<HTMLElement>;
+      const header = Array.from(headers).find((candidate) =>
+        candidate.textContent?.trim().startsWith(label),
+      );
+      if (header === undefined) {
+        throw new Error(`no header named ${label}`);
+      }
+      return header;
+    }
+
+    function sortButtonOf(header: HTMLElement): HTMLButtonElement {
+      const button = header.querySelector('button');
+      if (button === null) {
+        throw new Error('the header has no sort button');
+      }
+      return button;
+    }
+
+    async function setUpHost(): Promise<ComponentFixture<HostWithSort>> {
+      TestBed.configureTestingModule({ imports: [HostWithSort] });
+      const fixture = TestBed.createComponent(HostWithSort);
+      await fixture.whenStable();
+      return fixture;
+    }
+
+    it('renders no sort header and no aria-sort when the caller does not bind sort', async () => {
+      @Component({
+        imports: [ResourceTable],
+        template: `
+          <pidrang-tailwind-resource-table [fields]="fields" [data]="data">
+            <ng-template #actions let-row>
+              <button type="button">Delete {{ row.name }}</button>
+            </ng-template>
+          </pidrang-tailwind-resource-table>
+        `,
+      })
+      class HostWithoutSort {
+        protected readonly fields: Field[] = [
+          { name: 'name', type: 'text' },
+          { name: 'price', type: 'number' },
+        ];
+        protected readonly data = [{ name: 'Alice', price: 10 }];
+      }
+
+      TestBed.configureTestingModule({ imports: [HostWithoutSort] });
+      const fixture = TestBed.createComponent(HostWithoutSort);
+      await fixture.whenStable();
+
+      const headers = Array.from(
+        fixture.nativeElement.querySelectorAll('th') as NodeListOf<HTMLElement>,
+      );
+      expect(headers.map((header) => header.textContent?.trim())).toEqual([
+        'name',
+        'price',
+        'Actions',
+      ]);
+      for (const header of headers) {
+        expect(header.hasAttribute('aria-sort')).toBe(false);
+        expect(header.querySelector('button')).toBeNull();
+      }
+    });
+
+    it('shows aria-sort none on sortable headers before any click, and no aria-sort on a non-sortable or Actions header', async () => {
+      const fixture = await setUpHost();
+
+      expect(headerOf(fixture, 'name').getAttribute('aria-sort')).toBe('none');
+      expect(headerOf(fixture, 'price').getAttribute('aria-sort')).toBe('none');
+      expect(headerOf(fixture, 'notes').hasAttribute('aria-sort')).toBe(false);
+      expect(headerOf(fixture, 'Actions').hasAttribute('aria-sort')).toBe(
+        false,
+      );
+    });
+
+    it('cycles ascending, descending, then the default order on three clicks', async () => {
+      const fixture = await setUpHost();
+      const button = sortButtonOf(headerOf(fixture, 'price'));
+
+      button.click();
+      await fixture.whenStable();
+      expect(headerOf(fixture, 'price').getAttribute('aria-sort')).toBe(
+        'ascending',
+      );
+
+      button.click();
+      await fixture.whenStable();
+      expect(headerOf(fixture, 'price').getAttribute('aria-sort')).toBe(
+        'descending',
+      );
+
+      button.click();
+      await fixture.whenStable();
+      expect(headerOf(fixture, 'price').getAttribute('aria-sort')).toBe('none');
+
+      expect(fixture.componentInstance.sortEvents).toEqual([
+        { field: 'price', order: 'asc' },
+        { field: 'price', order: 'desc' },
+        null,
+      ]);
+    });
+
+    it('starts ascending on another column after a sort on price', async () => {
+      const fixture = await setUpHost();
+
+      sortButtonOf(headerOf(fixture, 'price')).click();
+      await fixture.whenStable();
+      sortButtonOf(headerOf(fixture, 'name')).click();
+      await fixture.whenStable();
+
+      const events = fixture.componentInstance.sortEvents;
+      expect(events[events.length - 1]).toEqual({
+        field: 'name',
+        order: 'asc',
+      });
+    });
+
+    it('renders the sort header as a native button, so Enter and Space sort without extra code', async () => {
+      const fixture = await setUpHost();
+      const button = sortButtonOf(headerOf(fixture, 'price'));
+
+      expect(button.tagName).toBe('BUTTON');
+      expect(button.type).toBe('button');
+    });
+
+    it('renders no sort button on a non-sortable header, and a click on it emits nothing', async () => {
+      const fixture = await setUpHost();
+      const header = headerOf(fixture, 'notes');
+
+      expect(header.querySelector('button')).toBeNull();
+      header.click();
+      await fixture.whenStable();
+
+      expect(fixture.componentInstance.sortEvents).toEqual([]);
+    });
+
+    it('shows descending on the header of the sort set by the host, without a click', async () => {
+      const fixture = await setUpHost();
+      fixture.componentInstance.sort.set({ field: 'price', order: 'desc' });
+      await fixture.whenStable();
+
+      expect(headerOf(fixture, 'price').getAttribute('aria-sort')).toBe(
+        'descending',
+      );
+    });
+
+    it('shows a neutral arrow hidden from assistive technology on a sortable column that is not sorted', async () => {
+      const fixture = await setUpHost();
+      const arrow = sortButtonOf(headerOf(fixture, 'price')).querySelector(
+        'span',
+      );
+
+      expect(arrow?.textContent?.trim()).toBe('⇅');
+      expect(arrow?.getAttribute('aria-hidden')).toBe('true');
+
+      fixture.componentInstance.sort.set({ field: 'name', order: 'asc' });
+      await fixture.whenStable();
+      expect(
+        sortButtonOf(headerOf(fixture, 'price'))
+          .querySelector('span')
+          ?.textContent?.trim(),
+      ).toBe('⇅');
+    });
+
+    it('shows an up arrow on the ascending column and a down arrow on the descending one, hidden from assistive technology', async () => {
+      const fixture = await setUpHost();
+      const button = sortButtonOf(headerOf(fixture, 'price'));
+
+      button.click();
+      await fixture.whenStable();
+      const ascendingArrow = sortButtonOf(
+        headerOf(fixture, 'price'),
+      ).querySelector('span');
+      expect(sortButtonOf(headerOf(fixture, 'price')).textContent).toContain(
+        '↑',
+      );
+      expect(ascendingArrow?.getAttribute('aria-hidden')).toBe('true');
+
+      sortButtonOf(headerOf(fixture, 'price')).click();
+      await fixture.whenStable();
+      expect(sortButtonOf(headerOf(fixture, 'price')).textContent).toContain(
+        '↓',
+      );
+    });
   });
 });

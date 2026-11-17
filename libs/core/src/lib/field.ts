@@ -15,4 +15,5 @@ export interface Field {
   readOnly?: boolean;
   nullable?: boolean;
   hasDefault?: boolean;
+  sortable?: boolean;
 }

@@ -6,6 +6,8 @@ import {
   AuthIdentity,
   AuthProvider,
   DataProvider,
+  ListParams,
+  ListResult,
   PidrangError,
   providePidrang,
 } from '@pidrang/core';
@@ -34,12 +36,18 @@ const ROWS = [
   { id: '2', name: 'Mouse' },
 ];
 
+type ListReply = (
+  params: ListParams | undefined,
+) => Promise<ListResult<{ id: string; name: string }>>;
+
 async function setup(
   remove: (id: string) => Promise<unknown>,
   providers: Provider[] = [],
   identity: AuthIdentity | null = { id: 'writer' },
+  listReply: ListReply | undefined = undefined,
 ) {
   const deletes: string[] = [];
+  const listRequests: (ListParams | undefined)[] = [];
   let lists = 0;
   const listeners = new Set<() => void>();
   const authProvider: AuthProvider = {
@@ -52,8 +60,12 @@ async function setup(
     },
   };
   const dataProvider: DataProvider = {
-    getList: <T>() => {
+    getList: <T>(_resource: string, params?: ListParams) => {
       lists += 1;
+      listRequests.push(params);
+      if (listReply !== undefined) {
+        return listReply(params) as Promise<ListResult<T>>;
+      }
       return Promise.resolve({ data: ROWS as T[], total: ROWS.length });
     },
     getOne: () => Promise.reject(new Error('unused')),
@@ -85,6 +97,7 @@ async function setup(
   return {
     fixture,
     deletes,
+    listRequests,
     listCalls: () => lists,
     changeSession: () => {
       for (const listener of listeners) {
@@ -768,5 +781,121 @@ describe('ResourceListPage sign-in link inside a route', () => {
     expect(page.querySelector('[role="alert"] a')?.getAttribute('href')).toBe(
       '/auth/sign-in',
     );
+  });
+});
+
+function headerOf(element: HTMLElement, label: string): HTMLElement {
+  const header = Array.from(element.querySelectorAll<HTMLElement>('th')).find(
+    (candidate) => candidate.textContent?.trim().startsWith(label),
+  );
+  if (header === undefined) {
+    throw new Error(`no header named ${label}`);
+  }
+  return header;
+}
+
+function sortButtonOf(element: HTMLElement, label: string): HTMLButtonElement {
+  const button = headerOf(element, label).querySelector('button');
+  if (button === null) {
+    throw new Error(`the ${label} header has no sort button`);
+  }
+  return button;
+}
+
+function nextButton(element: HTMLElement): HTMLButtonElement {
+  const button = Array.from(element.querySelectorAll('button')).find(
+    (candidate) => candidate.textContent?.trim() === 'Next',
+  );
+  if (button === undefined) {
+    throw new Error('the pagination has no Next button');
+  }
+  return button;
+}
+
+describe('ResourceListPage sorting', () => {
+  it('sends the clicked column first, then id, and goes back to page 1', async () => {
+    const { fixture, listRequests } = await setup(() => Promise.resolve({}));
+
+    sortButtonOf(fixture.nativeElement, 'name').click();
+    await settle(fixture);
+
+    const last = listRequests[listRequests.length - 1];
+    expect(last?.sorters).toEqual([
+      { field: 'name', order: 'asc' },
+      { field: 'id', order: 'asc' },
+    ]);
+    expect(last?.pagination?.current).toBe(1);
+    expect(
+      headerOf(fixture.nativeElement, 'name').getAttribute('aria-sort'),
+    ).toBe('ascending');
+  });
+
+  it('goes back to page 1 when a header is clicked on page 2', async () => {
+    const { fixture, listRequests } = await setup(
+      () => Promise.resolve({}),
+      [],
+      { id: 'writer' },
+      () => Promise.resolve({ data: ROWS, total: 25 }),
+    );
+    nextButton(fixture.nativeElement).click();
+    await settle(fixture);
+    expect(listRequests[listRequests.length - 1]?.pagination?.current).toBe(2);
+
+    sortButtonOf(fixture.nativeElement, 'name').click();
+    await settle(fixture);
+
+    expect(listRequests[listRequests.length - 1]?.pagination?.current).toBe(1);
+  });
+
+  it('keeps the rows, the clicked header and disabled deletes while a sorted read loads', async () => {
+    let pending: Deferred<ListResult<{ id: string; name: string }>> | null =
+      null;
+    const { fixture } = await setup(
+      () => Promise.resolve({}),
+      [],
+      { id: 'writer' },
+      () =>
+        pending === null
+          ? Promise.resolve({ data: ROWS, total: ROWS.length })
+          : pending.promise,
+    );
+    const page: HTMLElement = fixture.nativeElement;
+    const header = headerOf(page, 'name');
+    pending = deferred<ListResult<{ id: string; name: string }>>();
+
+    sortButtonOf(page, 'name').click();
+    fixture.detectChanges();
+
+    expect(page.querySelector('table')).not.toBeNull();
+    expect(headerOf(page, 'name')).toBe(header);
+    expect(page.textContent).toContain('Keyboard');
+    expect(deleteButtons(page)).toHaveLength(2);
+    expect(deleteButtons(page).every((button) => button.disabled)).toBe(true);
+
+    pending.resolve({ data: ROWS, total: ROWS.length });
+    await settle(fixture);
+
+    expect(deleteButtons(page).some((button) => button.disabled)).toBe(false);
+  });
+
+  it('shows only the error when the sorted read fails, with no rows', async () => {
+    let fail = false;
+    const { fixture } = await setup(
+      () => Promise.resolve({}),
+      [],
+      { id: 'writer' },
+      () =>
+        fail
+          ? Promise.reject(new Error('boom'))
+          : Promise.resolve({ data: ROWS, total: ROWS.length }),
+    );
+    const page: HTMLElement = fixture.nativeElement;
+    fail = true;
+
+    sortButtonOf(page, 'name').click();
+    await settle(fixture);
+
+    expect(page.textContent).toContain('boom');
+    expect(page.querySelectorAll('td')).toHaveLength(0);
   });
 });
